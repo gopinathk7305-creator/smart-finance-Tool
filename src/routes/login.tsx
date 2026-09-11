@@ -1,13 +1,16 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { CircleDollarSign, ShieldCheck, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable/index";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { logActivity, useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -26,16 +29,73 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
+  const { session, enterDemoMode } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  const submit = (kind: string) => (e: React.FormEvent) => {
+  useEffect(() => {
+    if (session) void navigate({ to: "/" });
+  }, [session, navigate]);
+
+  const signIn = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const form = new FormData(e.currentTarget);
     setLoading(true);
-    toast.info(`${kind} is a demo — accounts arrive with the backend.`);
-    setTimeout(() => {
-      setLoading(false);
-      navigate({ to: "/" });
-    }, 700);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: String(form.get("email")),
+      password: String(form.get("password")),
+    });
+    setLoading(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    await logActivity("Signed in", "Authentication");
+    await supabase.auth.getUser().then(({ data }) => {
+      if (data.user) {
+        void supabase.from("profiles").update({ last_login: new Date().toISOString() }).eq("id", data.user.id);
+      }
+    });
+    toast.success("Welcome back");
+    void navigate({ to: "/" });
+  };
+
+  const signUp = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    setLoading(true);
+    const { data, error } = await supabase.auth.signUp({
+      email: String(form.get("email")),
+      password: String(form.get("password")),
+      options: {
+        emailRedirectTo: window.location.origin,
+        data: { full_name: String(form.get("name")) },
+      },
+    });
+    setLoading(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    if (!data.session) {
+      setNotice("Account created — check your email and confirm it to sign in.");
+      toast.success("Confirmation email sent");
+      return;
+    }
+    toast.success("Account created");
+    void navigate({ to: "/" });
+  };
+
+  const googleSignIn = async () => {
+    const result = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: window.location.origin,
+    });
+    if (result.error) {
+      toast.error("Google sign-in failed. Try email instead.");
+      return;
+    }
+    if (result.redirected) return;
+    void navigate({ to: "/" });
   };
 
   return (
@@ -48,11 +108,11 @@ function LoginPage() {
           <span className="font-bold tracking-tight">Finance IQ</span>
         </div>
         <div className="space-y-5">
-          <h2 className="text-3xl font-bold tracking-tight">
+          <h1 className="text-3xl font-bold tracking-tight">
             Every number your board asks for, already calculated.
-          </h2>
+          </h1>
           <p className="max-w-md text-sm text-primary-foreground/70">
-            Upload transactions, payroll and budgets — get P&L, variance, aging and scenario
+            Upload transactions, payroll and budgets — get P&amp;L, variance, aging and scenario
             forecasts in seconds.
           </p>
           <div className="flex gap-6 text-xs text-primary-foreground/70">
@@ -60,11 +120,11 @@ function LoginPage() {
               <ShieldCheck className="size-4" /> Role-based access
             </span>
             <span className="flex items-center gap-2">
-              <Sparkles className="size-4" /> Automated validation
+              <Sparkles className="size-4" /> AI-assisted audit
             </span>
           </div>
         </div>
-        <p className="text-xs text-primary-foreground/50">FY2026 demo workspace</p>
+        <p className="text-xs text-primary-foreground/50">FY2026 workspace</p>
       </div>
 
       <div className="flex items-center justify-center p-6">
@@ -85,14 +145,14 @@ function LoginPage() {
               </TabsList>
 
               <TabsContent value="login">
-                <form className="space-y-4 pt-4" onSubmit={submit("Login")}>
+                <form className="space-y-4 pt-4" onSubmit={signIn}>
                   <div className="space-y-2">
                     <Label htmlFor="email">Work email</Label>
-                    <Input id="email" type="email" placeholder="you@company.com" required />
+                    <Input id="email" name="email" type="email" placeholder="you@company.com" required />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="password">Password</Label>
-                    <Input id="password" type="password" placeholder="••••••••" required />
+                    <Input id="password" name="password" type="password" placeholder="••••••••" required />
                   </div>
                   <Button type="submit" className="w-full" disabled={loading}>
                     {loading ? "Signing in…" : "Sign in"}
@@ -101,37 +161,55 @@ function LoginPage() {
               </TabsContent>
 
               <TabsContent value="signup">
-                <form className="space-y-4 pt-4" onSubmit={submit("Sign up")}>
+                <form className="space-y-4 pt-4" onSubmit={signUp}>
                   <div className="space-y-2">
                     <Label htmlFor="name">Full name</Label>
-                    <Input id="name" placeholder="Aathi K" required />
+                    <Input id="name" name="name" placeholder="Aathi K" required />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email2">Work email</Label>
-                    <Input id="email2" type="email" placeholder="you@company.com" required />
+                    <Input id="email2" name="email" type="email" placeholder="you@company.com" required />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="password2">Password</Label>
-                    <Input id="password2" type="password" placeholder="••••••••" required />
+                    <Input
+                      id="password2"
+                      name="password"
+                      type="password"
+                      placeholder="At least 6 characters"
+                      minLength={6}
+                      required
+                    />
                   </div>
                   <Button type="submit" className="w-full" disabled={loading}>
-                    Create account
+                    {loading ? "Creating…" : "Create account"}
                   </Button>
                 </form>
               </TabsContent>
             </Tabs>
 
+            {notice && <p className="mt-4 text-sm text-muted-foreground">{notice}</p>}
+
             <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
               <span className="h-px flex-1 bg-border" /> or <span className="h-px flex-1 bg-border" />
             </div>
 
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => navigate({ to: "/" })}
-            >
-              Continue with demo data
-            </Button>
+            <div className="space-y-2">
+              <Button variant="outline" className="w-full" onClick={googleSignIn}>
+                Continue with Google
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full"
+                onClick={() => {
+                  enterDemoMode();
+                  toast.info("Demo mode — sample FY2026 data, nothing is saved.");
+                  void navigate({ to: "/" });
+                }}
+              >
+                Continue with demo data
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
