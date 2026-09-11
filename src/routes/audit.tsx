@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { AlertOctagon, CheckCircle2, Copy, ShieldAlert } from "lucide-react";
+import { AlertOctagon, CheckCircle2, Copy, ShieldAlert, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -26,8 +26,11 @@ import {
 import {
   auditFindings,
   immutableAuditTrail,
+  type AuditFinding,
   type AuditStatus,
 } from "@/lib/enterprise-data";
+import { scanLedgerWithAi } from "@/lib/ai.functions";
+import { useDataset } from "@/lib/dataset";
 import { downloadCSV, inr } from "@/lib/finance-data";
 
 export const Route = createFileRoute("/audit")({
@@ -57,9 +60,50 @@ const STATUS_LABEL: Record<AuditStatus, string> = {
 };
 
 function AuditPage() {
-  const findings = useMemo(() => auditFindings(), []);
+  const { txns, live } = useDataset();
+  const ruleFindings = useMemo(() => auditFindings(live ? txns : undefined), [txns, live]);
+  const [aiFindings, setAiFindings] = useState<AuditFinding[]>([]);
+  const [scanning, setScanning] = useState(false);
   const [statuses, setStatuses] = useState<Record<string, AuditStatus>>({});
   const [ruleFilter, setRuleFilter] = useState("all");
+
+  const findings = useMemo(() => [...aiFindings, ...ruleFindings], [aiFindings, ruleFindings]);
+
+  const runAiScan = async () => {
+    setScanning(true);
+    try {
+      const res = await scanLedgerWithAi({
+        data: {
+          rows: txns.map((t) => ({
+            id: t.id,
+            date: t.date,
+            category: t.category,
+            type: t.type,
+            amount: t.amount,
+            vendor_client: t.vendor_client,
+            status: t.status,
+          })),
+        },
+      });
+      const mapped: AuditFinding[] = res.findings.map((f, i) => ({
+        id: `AI-${i + 1}`,
+        rule: f.rule,
+        severity: f.severity,
+        party: f.party,
+        date: f.date,
+        amount: Number(f.amount) || 0,
+        detail: f.detail,
+      }));
+      setAiFindings(mapped);
+      toast.success(
+        mapped.length ? `AI scan flagged ${mapped.length} items` : "AI scan found no new anomalies",
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "AI scan failed.");
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const rules = Array.from(new Set(findings.map((f) => f.rule)));
   const visible = findings.filter((f) => ruleFilter === "all" || f.rule === ruleFilter);
@@ -76,7 +120,7 @@ function AuditPage() {
   const duplicates = findings.filter((f) => f.rule === "Duplicate invoice").length;
 
   return (
-    <AppShell title="Internal Audit & Compliance" subtitle="Automated anomaly detection on the FY2026 ledger">
+    <AppShell title="Internal Audit & Compliance" subtitle={live ? "Scanning your uploaded ledger" : "Sample ledger · upload transactions for a real scan"}>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard label="Total Exceptions" value={String(findings.length)} icon={ShieldAlert} tone="warning" hint={`${open} unresolved`} />
         <KpiCard label="High Severity" value={String(high)} icon={AlertOctagon} tone="danger" hint="Immediate review" />
@@ -104,6 +148,10 @@ function AuditPage() {
                 ))}
               </SelectContent>
             </Select>
+            <Button onClick={() => void runAiScan()} disabled={scanning}>
+              <Sparkles className="size-4" />
+              {scanning ? "Scanning…" : "AI scan ledger"}
+            </Button>
             <Button
               variant="outline"
               onClick={() => {
