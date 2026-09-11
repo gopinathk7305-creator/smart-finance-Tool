@@ -161,6 +161,8 @@ function mapRows(key: DatasetKey, raw: Record<string, string>[], userId: string,
 function UploadPage() {
   const { user } = useAuth();
   const { refresh, live } = useDataset();
+  const { orgId, liveOrgs, orgName } = useOrg();
+  const scopeOrgId = liveOrgs && orgId !== ALL ? orgId : null;
   const [active, setActive] = useState<DatasetKey>("transactions");
   const [dragging, setDragging] = useState(false);
   const [parsed, setParsed] = useState<Partial<Record<DatasetKey, Parsed>>>({});
@@ -182,11 +184,12 @@ function UploadPage() {
       return;
     }
     const { rows, errors, warnings } = mapRows(key, raw, user.id, file.name);
+    const scoped = scopeOrgId ? rows.map((r) => ({ ...r, org_id: scopeOrgId })) : rows;
     setParsed((s) => ({
       ...s,
       [key]: {
         fileName: file.name,
-        rows,
+        rows: scoped,
         preview: raw.slice(0, 10),
         errors,
         warnings,
