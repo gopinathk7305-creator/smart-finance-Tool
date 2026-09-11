@@ -68,6 +68,8 @@ export function AppShell({
   const { user, demoMode, signOut, loading } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { orgs, orgId, setOrgId, vendor, setVendor } = useOrg();
+  const { vendors } = useDataset();
 
   useEffect(() => {
     if (!loading && !user && !demoMode) void navigate({ to: "/login", replace: true });
