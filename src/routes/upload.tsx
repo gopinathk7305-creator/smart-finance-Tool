@@ -91,13 +91,13 @@ function mapRows(key: DatasetKey, raw: Record<string, string>[], userId: string,
   let warnings = 0;
   const rows: Record<string, unknown>[] = [];
 
-  raw.forEach((r, i) => {
+  raw.forEach((r, i): void => {
     const line = i + 2;
     if (key === "transactions") {
       const date = toISODate(r["date"] ?? r["txn_date"]);
       const amount = toNumber(r["amount"]);
-      if (!date) return errors.push({ row: line, issue: "date is missing or unreadable" });
-      if (!amount) return errors.push({ row: line, issue: "amount is blank or zero" });
+      if (!date) { errors.push({ row: line, issue: "date is missing or unreadable" }); return; }
+      if (!amount) { errors.push({ row: line, issue: "amount is blank or zero" }); return; }
       if ((r["status"] ?? "").toLowerCase() === "pending") warnings++;
       rows.push({
         user_id: userId,
@@ -112,7 +112,7 @@ function mapRows(key: DatasetKey, raw: Record<string, string>[], userId: string,
       });
     } else if (key === "payroll") {
       const basic = toNumber(r["basic_pay"]);
-      if (!basic) return errors.push({ row: line, issue: "basic_pay is blank — row will be skipped" });
+      if (!basic) { errors.push({ row: line, issue: "basic_pay is blank — row will be skipped" }); return; }
       rows.push({
         user_id: userId,
         month_year: r["month_year"] || "",
@@ -128,8 +128,8 @@ function mapRows(key: DatasetKey, raw: Record<string, string>[], userId: string,
       });
     } else if (key === "budget") {
       const amt = toNumber(r["budgeted_amount"]);
-      if (!r["category"]) return errors.push({ row: line, issue: "category is missing" });
-      if (!amt) return errors.push({ row: line, issue: "budgeted_amount is blank" });
+      if (!r["category"]) { errors.push({ row: line, issue: "category is missing" }); return; }
+      if (!amt) { errors.push({ row: line, issue: "budgeted_amount is blank" }); return; }
       rows.push({
         user_id: userId,
         fiscal_year: r["fiscal_year"] || "FY2026",
@@ -140,8 +140,8 @@ function mapRows(key: DatasetKey, raw: Record<string, string>[], userId: string,
       });
     } else {
       const amt = toNumber(r["amount"]);
-      if (!r["party_name"]) return errors.push({ row: line, issue: "party_name is missing" });
-      if (!amt) return errors.push({ row: line, issue: "amount is blank" });
+      if (!r["party_name"]) { errors.push({ row: line, issue: "party_name is missing" }); return; }
+      if (!amt) { errors.push({ row: line, issue: "amount is blank" }); return; }
       rows.push({
         user_id: userId,
         type: (r["type"] ?? "AR").toUpperCase() === "AP" ? "AP" : "AR",
