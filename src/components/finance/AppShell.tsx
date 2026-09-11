@@ -168,26 +168,45 @@ export function AppShell({
               </DropdownMenuContent>
             </DropdownMenu>
 
+            {demoMode && !user && (
+              <span className="hidden rounded-full bg-warning-soft px-2.5 py-1 text-[11px] font-semibold text-warning sm:inline">
+                Demo mode
+              </span>
+            )}
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="gap-2 px-2">
                   <span className="flex size-8 items-center justify-center rounded-full bg-brand-soft text-xs font-semibold text-brand">
-                    AK
+                    {initials}
                   </span>
                   <span className="hidden text-left text-xs leading-tight sm:block">
-                    Aathi K
-                    <span className="block text-muted-foreground">Finance Manager</span>
+                    {displayName}
+                    <span className="block text-muted-foreground">
+                      {user ? "Signed in" : "Demo data"}
+                    </span>
                   </span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuLabel>My account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>Profile settings</DropdownMenuItem>
-                <DropdownMenuItem>Organisation</DropdownMenuItem>
+                <DropdownMenuLabel>{user ? user.email : "Demo session"}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link to="/login">Sign out</Link>
+                  <Link to="/users">Users &amp; activity</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/upload">Upload data</Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onSelect={async () => {
+                    await queryClient.cancelQueries();
+                    queryClient.clear();
+                    await signOut();
+                    void navigate({ to: "/login", replace: true });
+                  }}
+                >
+                  {user ? "Sign out" : "Exit demo mode"}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
