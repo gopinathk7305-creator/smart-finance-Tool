@@ -26,7 +26,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { downloadCSV, grossPay, inr, netPay, payroll } from "@/lib/finance-data";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { downloadCSV, grossPay, inr, netPay, payroll, type PayrollRecord } from "@/lib/finance-data";
+import { computeTax } from "@/lib/enterprise-data";
 
 export const Route = createFileRoute("/payroll")({
   head: () => ({
@@ -49,6 +58,8 @@ export const Route = createFileRoute("/payroll")({
 
 function PayrollPage() {
   const [query, setQuery] = useState("");
+  const [taxFor, setTaxFor] = useState<PayrollRecord | null>(null);
+  const [regime, setRegime] = useState<"new" | "old">("new");
 
   const filtered = useMemo(
     () =>
@@ -189,6 +200,7 @@ function PayrollPage() {
                   <TableHead className="text-right">TDS</TableHead>
                   <TableHead className="text-right">Other</TableHead>
                   <TableHead className="text-right">Net Pay</TableHead>
+                  <TableHead className="text-right">Tax</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -203,11 +215,16 @@ function PayrollPage() {
                     <TableCell className="tabular text-right text-warning">{inr(p.tds_deduction)}</TableCell>
                     <TableCell className="tabular text-right">{inr(p.deductions)}</TableCell>
                     <TableCell className="tabular text-right font-semibold">{inr(netPay(p))}</TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="outline" onClick={() => setTaxFor(p)}>
+                        View Tax Breakdown
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
                 {filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">
                       No employees match “{query}”.
                     </TableCell>
                   </TableRow>
@@ -217,6 +234,8 @@ function PayrollPage() {
           </div>
         </CardContent>
       </Card>
+
+      <TaxDialog record={taxFor} regime={regime} setRegime={setRegime} onClose={() => setTaxFor(null)} />
     </AppShell>
   );
 }
