@@ -1,4 +1,5 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Bell,
   Calculator,
@@ -16,7 +17,7 @@ import {
   Wallet,
   CircleDollarSign,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/lib/auth";
 import { alerts } from "@/lib/finance-data";
 import { cn } from "@/lib/utils";
 
@@ -62,6 +64,21 @@ export function AppShell({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { user, demoMode, signOut, loading } = useAuth();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!loading && !user && !demoMode) void navigate({ to: "/login", replace: true });
+  }, [loading, user, demoMode, navigate]);
+
+  const displayName =
+    (user?.user_metadata?.["full_name"] as string | undefined) || user?.email?.split("@")[0] || "Demo user";
+  const initials = displayName
+    .split(/[\s.@]+/)
+    .slice(0, 2)
+    .map((w: string) => w[0]?.toUpperCase() ?? "")
+    .join("");
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -168,26 +185,45 @@ export function AppShell({
               </DropdownMenuContent>
             </DropdownMenu>
 
+            {demoMode && !user && (
+              <span className="hidden rounded-full bg-warning-soft px-2.5 py-1 text-[11px] font-semibold text-warning sm:inline">
+                Demo mode
+              </span>
+            )}
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="gap-2 px-2">
                   <span className="flex size-8 items-center justify-center rounded-full bg-brand-soft text-xs font-semibold text-brand">
-                    AK
+                    {initials}
                   </span>
                   <span className="hidden text-left text-xs leading-tight sm:block">
-                    Aathi K
-                    <span className="block text-muted-foreground">Finance Manager</span>
+                    {displayName}
+                    <span className="block text-muted-foreground">
+                      {user ? "Signed in" : "Demo data"}
+                    </span>
                   </span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuLabel>My account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>Profile settings</DropdownMenuItem>
-                <DropdownMenuItem>Organisation</DropdownMenuItem>
+                <DropdownMenuLabel>{user ? user.email : "Demo session"}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link to="/login">Sign out</Link>
+                  <Link to="/users">Users &amp; activity</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/upload">Upload data</Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onSelect={async () => {
+                    await queryClient.cancelQueries();
+                    queryClient.clear();
+                    await signOut();
+                    void navigate({ to: "/login", replace: true });
+                  }}
+                >
+                  {user ? "Sign out" : "Exit demo mode"}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

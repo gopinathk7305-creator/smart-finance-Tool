@@ -1,0 +1,114 @@
+import { createServerFn } from "@tanstack/react-start";
+
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
+const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
+
+async function callGateway(system: string, user: string, json = false) {
+  const key = process.env["LOVABLE_API_KEY"];
+  if (!key) throw new Error("AI is not configured for this project yet.");
+
+  const res = await fetch(GATEWAY, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Lovable-API-Key": key,
+      "X-Lovable-AIG-SDK": "fetch",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-3.8-flash",
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+      ...(json ? { response_format: { type: "json_object" } } : {}),
+    }),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text();
+    if (res.status === 429) throw new Error("AI is rate limited right now — try again shortly.");
+    if (res.status === 402) throw new Error("AI credits are exhausted for this workspace.");
+    throw new Error(`AI request failed (${res.status}): ${detail.slice(0, 300)}`);
+  }
+
+  const payload = (await res.json()) as {
+    choices?: { message?: { content?: string } }[];
+  };
+  return payload.choices?.[0]?.message?.content ?? "";
+}
+
+export interface PayrollAiInput {
+  name: string;
+  department: string;
+  regime: "new" | "old";
+  gross: number;
+  basic: number;
+  allowances: number;
+  pf: number;
+  esi: number;
+  taxableIncome: number;
+  annualTax: number;
+  cess: number;
+  monthlyTds: number;
+  netPay: number;
+}
+
+export const explainPayroll = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: PayrollAiInput) => input)
+  .handler(async ({ data }) => {
+    const text = await callGateway(
+      "You are an Indian payroll and income-tax expert. Explain salary structures clearly in short markdown-free plain text. Use Indian rupee amounts. Never invent numbers that are not supplied.",
+      `Explain this monthly payslip for ${data.name} (${data.department}), ${data.regime} tax regime.
+Gross: ${data.gross}. Basic: ${data.basic}. Allowances: ${data.allowances}.
+PF (12% of basic): ${data.pf}. ESI: ${data.esi}. Annual taxable income: ${data.taxableIncome}.
+Annual tax before cess: ${data.annualTax}. Cess (4%): ${data.cess}. Monthly TDS: ${data.monthlyTds}. Net take-home: ${data.netPay}.
+Give: 1) a two-line summary, 2) how the slab-wise tax and cess were arrived at, 3) one practical saving tip. Keep under 160 words.`,
+    );
+    return { text };
+  });
+
+export interface ScanTxn {
+  id: string;
+  date: string;
+  category: string;
+  type: string;
+  amount: number;
+  vendor_client: string;
+  status: string;
+}
+
+export interface AiFinding {
+  rule: string;
+  severity: "high" | "medium" | "low";
+  party: string;
+  date: string;
+  amount: number;
+  detail: string;
+}
+
+export const scanLedgerWithAi = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { rows: ScanTxn[] }) => input)
+  .handler(async ({ data }) => {
+    const rows = data.rows.slice(0, 250);
+    if (!rows.length) return { findings: [] as AiFinding[] };
+
+    const content = await callGateway(
+      "You are a forensic finance auditor. Review the ledger and return ONLY JSON.",
+      `Ledger rows (JSON): ${JSON.stringify(rows)}
+
+Flag anomalies for these rules only: "Duplicate invoice", "Round-figure high value", "Out-of-hours posting", "Category variance".
+Return JSON exactly like {"findings":[{"rule":"","severity":"high|medium|low","party":"","date":"YYYY-MM-DD","amount":0,"detail":""}]}.
+Maximum 20 findings, most severe first. Use only amounts and parties present in the data.`,
+      true,
+    );
+
+    try {
+      const parsed = JSON.parse(content) as { findings?: AiFinding[] };
+      return { findings: (parsed.findings ?? []).slice(0, 20) };
+    } catch {
+      return { findings: [] as AiFinding[] };
+    }
+  });

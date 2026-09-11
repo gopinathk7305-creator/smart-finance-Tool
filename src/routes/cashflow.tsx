@@ -32,7 +32,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AGING_BUCKETS, agingBucket, arApRecords, inr, monthlySummary } from "@/lib/finance-data";
+import { AGING_BUCKETS, agingBucket, inr, monthlySummary } from "@/lib/finance-data";
+import { useDataset } from "@/lib/dataset";
 
 export const Route = createFileRoute("/cashflow")({
   head: () => ({
@@ -55,7 +56,8 @@ export const Route = createFileRoute("/cashflow")({
 
 function CashFlowPage() {
   const [status, setStatus] = useState("all");
-  const series = monthlySummary();
+  const { txns, araps: arApRecords } = useDataset();
+  const series = monthlySummary(txns);
   const operating = series.reduce((s, m) => s + m.profit, 0);
   const investing = -6_400_000;
   const financing = 3_200_000;

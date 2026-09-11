@@ -18,6 +18,7 @@ import {
 
 import { AppShell } from "@/components/finance/AppShell";
 import { KpiCard } from "@/components/finance/KpiCard";
+import { useDataset } from "@/lib/dataset";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   actualsByCategory,
@@ -56,9 +57,10 @@ const PIE_COLORS = [
 ];
 
 function Dashboard() {
-  const series = monthlySummary();
-  const t = totals();
-  const runway = cashRunwayMonths();
+  const { txns, live } = useDataset();
+  const series = monthlySummary(txns);
+  const t = totals(txns);
+  const runway = cashRunwayMonths(txns);
 
   const h1 = series.slice(0, 6);
   const h2 = series.slice(6);
@@ -67,7 +69,7 @@ function Dashboard() {
   const expDelta = ((sum(h2, "expense") - sum(h1, "expense")) / sum(h1, "expense")) * 100;
   const margin = (t.netProfit / t.revenue) * 100;
 
-  const topCats = [...actualsByCategory().entries()]
+  const topCats = [...actualsByCategory(txns).entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
     .map(([name, value]) => ({ name, value }));
@@ -75,7 +77,7 @@ function Dashboard() {
   const toneIcon = { danger: AlertTriangle, warning: Info, success: CheckCircle2 };
 
   return (
-    <AppShell title="Executive Dashboard" subtitle="Fiscal year 2026 · consolidated view">
+    <AppShell title="Executive Dashboard" subtitle={live ? "Live view of your uploaded data" : "Sample data · upload your files to see real numbers"}>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           label="Total Revenue"

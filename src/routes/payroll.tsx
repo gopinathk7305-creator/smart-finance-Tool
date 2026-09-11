@@ -34,8 +34,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { downloadCSV, grossPay, inr, netPay, payroll, type PayrollRecord } from "@/lib/finance-data";
-import { computeTax } from "@/lib/enterprise-data";
+import { downloadCSV, grossPay, inr, netPay, type PayrollRecord } from "@/lib/finance-data";
+import { useDataset } from "@/lib/dataset";
+import { computeTax, type TaxComputation } from "@/lib/enterprise-data";
+import { explainPayroll } from "@/lib/ai.functions";
+import { Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/payroll")({
   head: () => ({
@@ -57,6 +60,7 @@ export const Route = createFileRoute("/payroll")({
 });
 
 function PayrollPage() {
+  const { pays: payroll } = useDataset();
   const [query, setQuery] = useState("");
   const [taxFor, setTaxFor] = useState<PayrollRecord | null>(null);
   const [regime, setRegime] = useState<"new" | "old">("new");
@@ -66,7 +70,7 @@ function PayrollPage() {
       payroll.filter((p) =>
         `${p.name} ${p.employee_id} ${p.department}`.toLowerCase().includes(query.toLowerCase()),
       ),
-    [query],
+    [query, payroll],
   );
 
   const totalCost = payroll.reduce((s, p) => s + grossPay(p), 0);
@@ -329,6 +333,8 @@ function TaxDialog({
           </div>
         </div>
 
+        <AiExplain record={record} regime={regime} c={c} />
+
         <div className="rounded-lg bg-secondary p-3">
           <Line label="Other deductions" value={`- ${inr(c.otherDeductions)}`} />
           <div className="flex items-center justify-between pt-2">
@@ -338,5 +344,59 @@ function TaxDialog({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function AiExplain({
+  record,
+  regime,
+  c,
+}: {
+  record: PayrollRecord;
+  regime: "new" | "old";
+  c: TaxComputation;
+}) {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const run = async () => {
+    setBusy(true);
+    try {
+      const res = await explainPayroll({
+        data: {
+          name: record.name,
+          department: record.department,
+          regime,
+          gross: c.gross,
+          basic: record.basic_pay,
+          allowances: record.allowances,
+          pf: c.pf,
+          esi: c.esi,
+          taxableIncome: c.annualGross,
+          annualTax: c.annualTax,
+          cess: c.cess,
+          monthlyTds: c.monthlyTds,
+          netPay: c.net,
+        },
+      });
+      setText(res.text);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not generate the explanation.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-border p-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold">Plain-English explanation</p>
+        <Button size="sm" variant="outline" onClick={() => void run()} disabled={busy}>
+          <Sparkles className="size-4" />
+          {busy ? "Thinking…" : text ? "Regenerate" : "Explain this payslip"}
+        </Button>
+      </div>
+      {text && <p className="mt-2 text-sm whitespace-pre-wrap text-muted-foreground">{text}</p>}
+    </div>
   );
 }

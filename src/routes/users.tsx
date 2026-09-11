@@ -33,7 +33,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useQuery } from "@tanstack/react-query";
+
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth";
 import { activityLogs, systemUsers, type SystemUser, type UserRole } from "@/lib/enterprise-data";
+
+const DB_ROLE_LABEL: Record<string, UserRole> = {
+  admin: "Admin",
+  finance_manager: "Finance Manager",
+  analyst: "Auditor",
+  viewer: "Viewer",
+};
 
 export const Route = createFileRoute("/users")({
   head: () => ({
@@ -57,17 +68,64 @@ export const Route = createFileRoute("/users")({
 const ROLES: UserRole[] = ["Admin", "Finance Manager", "Auditor", "Viewer"];
 
 function UsersPage() {
+  const { user } = useAuth();
+
+  const { data: liveUsers } = useQuery({
+    queryKey: ["directory", user?.id ?? "anon"],
+    enabled: !!user,
+    queryFn: async () => {
+      const [{ data: profiles }, { data: roles }] = await Promise.all([
+        supabase.from("profiles").select("*").order("created_at"),
+        supabase.from("user_roles").select("user_id, role"),
+      ]);
+      const roleOf = new Map((roles ?? []).map((r) => [r.user_id, r.role as string]));
+      return (profiles ?? []).map<SystemUser>((p) => ({
+        id: p.id.slice(0, 8),
+        name: p.full_name || p.email.split("@")[0] || "Unnamed",
+        email: p.email,
+        role: DB_ROLE_LABEL[roleOf.get(p.id) ?? "viewer"] ?? "Viewer",
+        status: p.status === "suspended" ? "suspended" : "active",
+        created_at: p.created_at.slice(0, 10),
+        last_login: p.last_login ? p.last_login.slice(0, 16).replace("T", " ") : "—",
+        department: p.department || "—",
+      }));
+    },
+  });
+
+  const { data: liveLogs } = useQuery({
+    queryKey: ["activity", user?.id ?? "anon"],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("activity_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      return (data ?? []).map((l) => ({
+        id: l.id,
+        timestamp: l.created_at.slice(0, 16).replace("T", " "),
+        email: l.email,
+        action: l.action,
+        module: l.module,
+        device: l.device || "Web",
+      }));
+    },
+  });
+
   const [rows, setRows] = useState<SystemUser[]>(systemUsers);
+
+  const directory = liveUsers?.length ? liveUsers : rows;
+  const logs = liveLogs?.length ? liveLogs : activityLogs;
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<SystemUser | null>(null);
   const [draftRole, setDraftRole] = useState<UserRole>("Viewer");
 
   const filtered = useMemo(
     () =>
-      rows.filter((u) =>
+      directory.filter((u) =>
         `${u.name} ${u.email} ${u.role}`.toLowerCase().includes(query.toLowerCase()),
       ),
-    [rows, query],
+    [directory, query],
   );
 
   const save = () => {
@@ -87,22 +145,22 @@ function UsersPage() {
   };
 
   return (
-    <AppShell title="User Directory & Activity Logs" subtitle="Access control and immutable audit trail">
+    <AppShell title="User Directory & Activity Logs" subtitle={liveUsers?.length ? "Live accounts from your workspace" : "Sample directory — sign in to see real accounts"}>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard label="Registered Users" value={String(rows.length)} icon={UsersIcon} />
+        <KpiCard label="Registered Users" value={String(directory.length)} icon={UsersIcon} />
         <KpiCard
           label="Active Accounts"
-          value={String(rows.filter((u) => u.status === "active").length)}
+          value={String(directory.filter((u) => u.status === "active").length)}
           icon={UserCheck}
           tone="success"
         />
         <KpiCard
           label="Admins & Auditors"
-          value={String(rows.filter((u) => u.role === "Admin" || u.role === "Auditor").length)}
+          value={String(directory.filter((u) => u.role === "Admin" || u.role === "Auditor").length)}
           icon={ShieldCheck}
           tone="warning"
         />
-        <KpiCard label="Logged Actions (7d)" value={String(activityLogs.length)} icon={Activity} tone="neutral" />
+        <KpiCard label="Logged Actions (7d)" value={String(logs.length)} icon={Activity} tone="neutral" />
       </div>
 
       <Card className="mt-4 border-border shadow-card">
@@ -196,7 +254,7 @@ function UsersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {activityLogs.map((l) => (
+                {logs.map((l) => (
                   <TableRow key={l.id}>
                     <TableCell className="tabular whitespace-nowrap">{l.timestamp}</TableCell>
                     <TableCell className="text-muted-foreground">{l.email}</TableCell>

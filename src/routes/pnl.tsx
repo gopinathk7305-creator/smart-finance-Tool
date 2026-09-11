@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { actualsByCategory, inr, monthlySummary, totals } from "@/lib/finance-data";
 import { gstSummary } from "@/lib/enterprise-data";
+import { useDataset } from "@/lib/dataset";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/pnl")({
@@ -42,9 +43,10 @@ export const Route = createFileRoute("/pnl")({
 
 function PnlPage() {
   const [showPct, setShowPct] = useState(true);
-  const t = totals();
-  const cats = actualsByCategory();
-  const series = monthlySummary();
+  const { txns } = useDataset();
+  const t = totals(txns);
+  const cats = actualsByCategory(txns);
+  const series = monthlySummary(txns);
   const gst = gstSummary(t.revenue, t.expense);
 
   const opexLines = ["Payroll", "Office Rent", "Marketing", "Utilities", "Software Subscriptions", "Legal"]
