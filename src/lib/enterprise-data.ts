@@ -236,9 +236,9 @@ export const seededTransactions: Transaction[] = [
 
 export const auditLedger: Transaction[] = [...transactions, ...seededTransactions];
 
-export function auditFindings(): AuditFinding[] {
+export function auditFindings(ledger: Transaction[] = auditLedger): AuditFinding[] {
   const out: AuditFinding[] = [];
-  const expenses = auditLedger.filter((t) => t.type === "expense");
+  const expenses = ledger.filter((t) => t.type === "expense");
 
   // Rule 1: duplicate invoices — same vendor & amount within 7 days.
   const seen = new Set<string>();
