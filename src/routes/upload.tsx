@@ -26,6 +26,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { logActivity, useAuth } from "@/lib/auth";
+import { ALL, useOrg } from "@/lib/orgs";
 import { parseCSV, toISODate, toNumber } from "@/lib/csv";
 import { useDataset } from "@/lib/dataset";
 
@@ -161,6 +162,8 @@ function mapRows(key: DatasetKey, raw: Record<string, string>[], userId: string,
 function UploadPage() {
   const { user } = useAuth();
   const { refresh, live } = useDataset();
+  const { orgId, liveOrgs, orgName } = useOrg();
+  const scopeOrgId = liveOrgs && orgId !== ALL ? orgId : null;
   const [active, setActive] = useState<DatasetKey>("transactions");
   const [dragging, setDragging] = useState(false);
   const [parsed, setParsed] = useState<Partial<Record<DatasetKey, Parsed>>>({});
@@ -182,11 +185,12 @@ function UploadPage() {
       return;
     }
     const { rows, errors, warnings } = mapRows(key, raw, user.id, file.name);
+    const scoped = scopeOrgId ? rows.map((r) => ({ ...r, org_id: scopeOrgId })) : rows;
     setParsed((s) => ({
       ...s,
       [key]: {
         fileName: file.name,
-        rows,
+        rows: scoped,
         preview: raw.slice(0, 10),
         errors,
         warnings,
@@ -215,7 +219,8 @@ function UploadPage() {
   const clearTable = async (key: DatasetKey) => {
     if (!user) return;
     const ds = DATASETS.find((d) => d.key === key)!;
-    const { error } = await supabase.from(ds.table).delete().eq("user_id", user.id);
+    const base = supabase.from(ds.table).delete().eq("user_id", user.id);
+    const { error } = await (scopeOrgId ? base.eq("org_id", scopeOrgId) : base);
     if (error) {
       toast.error(error.message);
       return;
@@ -231,8 +236,8 @@ function UploadPage() {
       subtitle={
         user
           ? live
-            ? "Your uploaded data is powering every dashboard"
-            : "Upload a CSV to replace the sample numbers"
+            ? `${orgName} — your uploaded data is powering every dashboard`
+            : `${orgName} — upload a CSV to replace the sample numbers`
           : "Demo mode — sign in to upload real files"
       }
     >

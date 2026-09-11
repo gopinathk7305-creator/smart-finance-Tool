@@ -8,7 +8,7 @@ import {
   LayoutDashboard,
   LineChart,
   PanelLeft,
-  Search,
+  Building2,
   ShieldAlert,
   Target,
   TrendingUp,
@@ -20,7 +20,6 @@ import {
 import { useEffect, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -37,6 +36,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/lib/auth";
+import { useDataset } from "@/lib/dataset";
+import { ALL, useOrg } from "@/lib/orgs";
 import { alerts } from "@/lib/finance-data";
 import { cn } from "@/lib/utils";
 
@@ -67,6 +68,8 @@ export function AppShell({
   const { user, demoMode, signOut, loading } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { orgs, orgId, setOrgId, vendor, setVendor } = useOrg();
+  const { vendors } = useDataset();
 
   useEffect(() => {
     if (!loading && !user && !demoMode) void navigate({ to: "/login", replace: true });
@@ -147,10 +150,34 @@ export function AppShell({
           </div>
 
           <div className="ml-auto flex items-center gap-2">
-            <div className="relative hidden lg:block">
-              <Search className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input placeholder="Search vendors, categories…" className="w-56 bg-background pl-8" />
-            </div>
+            <Select value={orgId} onValueChange={setOrgId}>
+              <SelectTrigger className="w-[190px] bg-background">
+                <Building2 className="size-4 text-muted-foreground" />
+                <SelectValue placeholder="Select organization" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>All organizations</SelectItem>
+                {orgs.map((o) => (
+                  <SelectItem key={o.id} value={o.id}>
+                    {o.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={vendor} onValueChange={setVendor}>
+              <SelectTrigger className="hidden w-[170px] bg-background lg:flex">
+                <SelectValue placeholder="All vendors" />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value={ALL}>All vendors</SelectItem>
+                {vendors.map((v) => (
+                  <SelectItem key={v} value={v}>
+                    {v}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
             <Select defaultValue="ytd">
               <SelectTrigger className="w-[132px] bg-background">

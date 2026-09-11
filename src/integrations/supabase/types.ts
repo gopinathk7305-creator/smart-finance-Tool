@@ -51,6 +51,7 @@ export type Database = {
           due_date: string | null
           id: string
           invoice_date: string | null
+          org_id: string | null
           party_name: string
           source_file: string
           status: string
@@ -63,6 +64,7 @@ export type Database = {
           due_date?: string | null
           id?: string
           invoice_date?: string | null
+          org_id?: string | null
           party_name?: string
           source_file?: string
           status?: string
@@ -75,13 +77,22 @@ export type Database = {
           due_date?: string | null
           id?: string
           invoice_date?: string | null
+          org_id?: string | null
           party_name?: string
           source_file?: string
           status?: string
           type?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "arap_records_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       audit_findings: {
         Row: {
@@ -133,6 +144,7 @@ export type Database = {
           department: string
           fiscal_year: string
           id: string
+          org_id: string | null
           source_file: string
           user_id: string
         }
@@ -143,6 +155,7 @@ export type Database = {
           department?: string
           fiscal_year?: string
           id?: string
+          org_id?: string | null
           source_file?: string
           user_id: string
         }
@@ -153,7 +166,37 @@ export type Database = {
           department?: string
           fiscal_year?: string
           id?: string
+          org_id?: string | null
           source_file?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_targets_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
           user_id?: string
         }
         Relationships: []
@@ -169,6 +212,7 @@ export type Database = {
           id: string
           month_year: string
           name: string
+          org_id: string | null
           pf_deduction: number
           source_file: string
           tds_deduction: number
@@ -184,6 +228,7 @@ export type Database = {
           id?: string
           month_year?: string
           name?: string
+          org_id?: string | null
           pf_deduction?: number
           source_file?: string
           tds_deduction?: number
@@ -199,12 +244,21 @@ export type Database = {
           id?: string
           month_year?: string
           name?: string
+          org_id?: string | null
           pf_deduction?: number
           source_file?: string
           tds_deduction?: number
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "payroll_records_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -242,6 +296,7 @@ export type Database = {
           category: string
           created_at: string
           id: string
+          org_id: string | null
           source_file: string
           status: string
           subcategory: string
@@ -255,6 +310,7 @@ export type Database = {
           category?: string
           created_at?: string
           id?: string
+          org_id?: string | null
           source_file?: string
           status?: string
           subcategory?: string
@@ -268,6 +324,7 @@ export type Database = {
           category?: string
           created_at?: string
           id?: string
+          org_id?: string | null
           source_file?: string
           status?: string
           subcategory?: string
@@ -276,7 +333,15 @@ export type Database = {
           user_id?: string
           vendor_client?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "transactions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {

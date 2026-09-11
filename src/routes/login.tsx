@@ -69,7 +69,10 @@ function LoginPage() {
       password: String(form.get("password")),
       options: {
         emailRedirectTo: window.location.origin,
-        data: { full_name: String(form.get("name")) },
+        data: {
+          full_name: String(form.get("name")),
+          org_name: String(form.get("org") || "").trim(),
+        },
       },
     });
     setLoading(false);
@@ -165,6 +168,10 @@ function LoginPage() {
                   <div className="space-y-2">
                     <Label htmlFor="name">Full name</Label>
                     <Input id="name" name="name" placeholder="Aathi K" required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="org">Organization name</Label>
+                    <Input id="org" name="org" placeholder="TechCorp Global" required />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email2">Work email</Label>
