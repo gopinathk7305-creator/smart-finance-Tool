@@ -113,7 +113,7 @@ function buildTransactions(): Transaction[] {
         subcategory: i === 0 ? "Subscriptions" : i === 1 ? "Services" : "Licensing",
         type: "income",
         amount,
-        vendor_client: CLIENTS[(m + i) % CLIENTS.length],
+        vendor_client: CLIENTS[(m + i) % CLIENTS.length]!,
         status: m >= 10 && i === 2 ? "pending" : "paid",
       });
     }
@@ -129,7 +129,7 @@ function buildTransactions(): Transaction[] {
     };
 
     EXPENSE_CATEGORIES.forEach((cat, ci) => {
-      const amount = Math.round(weights[cat] * (0.92 + rand(m * 13 + ci) * 0.2));
+      const amount = Math.round(weights[cat]! * (0.92 + rand(m * 13 + ci) * 0.2));
       rows.push({
         id: `txn-${++n}`,
         date: monthDate(m, 12 + ci * 2),
@@ -137,7 +137,7 @@ function buildTransactions(): Transaction[] {
         subcategory: cat === "Payroll" ? "Salaries" : "Operating",
         type: "expense",
         amount,
-        vendor_client: VENDORS[cat][(m + ci) % VENDORS[cat].length],
+        vendor_client: VENDORS[cat]![(m + ci) % VENDORS[cat]!.length]!,
         status: m === 11 && ci > 3 ? "pending" : "paid",
       });
     });
@@ -179,7 +179,7 @@ const LAST = ["Sharma", "Iyer", "Patel", "Reddy", "Nair", "Gupta", "Menon", "Kha
 
 function buildPayroll(): PayrollRecord[] {
   return FIRST.map((first, i) => {
-    const dept = DEPARTMENTS[i % DEPARTMENTS.length];
+    const dept = DEPARTMENTS[i % DEPARTMENTS.length]!;
     const basic = Math.round((52_000 + rand(i + 1) * 68_000) / 500) * 500;
     const allowances = Math.round(basic * (0.28 + rand(i + 40) * 0.14));
     const pf = Math.round(basic * 0.12);
@@ -189,7 +189,7 @@ function buildPayroll(): PayrollRecord[] {
       id: `pay-${i + 1}`,
       month_year: "Dec 2026",
       employee_id: `EMP-${String(1001 + i)}`,
-      name: `${first} ${LAST[i % LAST.length]}`,
+      name: `${first} ${LAST[i % LAST.length]!}`,
       department: dept,
       basic_pay: basic,
       allowances,
@@ -326,7 +326,7 @@ export function cashRunwayMonths() {
   const series = monthlySummary();
   const last3 = series.slice(-3);
   const burn = last3.reduce((s, m) => s + Math.max(0, m.expense - m.revenue), 0) / 3;
-  const cash = series[series.length - 1].cash;
+  const cash = series[series.length - 1]!.cash;
   return burn <= 0 ? Infinity : cash / burn;
 }
 
@@ -343,8 +343,8 @@ export const AGING_BUCKETS = ["0-30", "31-60", "61-90", "90+"] as const;
 
 export function forecast(revenueGrowth: number, opexAdj: number, newHires: number) {
   const series = monthlySummary();
-  const lastRev = series[series.length - 1].revenue;
-  const lastExp = series[series.length - 1].expense;
+  const lastRev = series[series.length - 1]!.revenue;
+  const lastExp = series[series.length - 1]!.expense;
   const avgSalary = payroll.reduce((s, p) => s + grossPay(p), 0) / payroll.length;
   return Array.from({ length: 12 }, (_, i) => {
     const baseRev = lastRev * Math.pow(1.012, i + 1);
@@ -353,7 +353,7 @@ export function forecast(revenueGrowth: number, opexAdj: number, newHires: numbe
     const scenExp =
       lastExp * Math.pow(1 + (0.009 + opexAdj / 100 / 12), i + 1) + newHires * avgSalary * 1.2;
     return {
-      month: MONTHS[i].slice(0, 3),
+      month: MONTHS[i]!.slice(0, 3),
       baseline: Math.round(baseRev - baseExp),
       scenario: Math.round(scenRev - scenExp),
       scenarioRevenue: Math.round(scenRev),
@@ -374,7 +374,7 @@ export const pct = (v: number, digits = 1) => `${v >= 0 ? "" : ""}${v.toFixed(di
 
 export function toCSV(rows: Record<string, unknown>[]) {
   if (!rows.length) return "";
-  const headers = Object.keys(rows[0]);
+  const headers = Object.keys(rows[0]!);
   const escape = (v: unknown) => {
     const s = String(v ?? "");
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
