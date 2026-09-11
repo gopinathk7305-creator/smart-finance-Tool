@@ -98,6 +98,16 @@ function buildRows(key: ReportKey): Record<string, unknown>[] {
       tds: p.tds_deduction,
       net_pay: netPay(p),
     }));
+  if (key === "audit")
+    return auditFindings().map((f) => ({
+      id: f.id,
+      rule: f.rule,
+      severity: f.severity,
+      party: f.party,
+      date: f.date,
+      amount: f.amount,
+      finding: f.detail,
+    }));
   return arApRecords.map((r) => ({
     type: r.type,
     party: r.party_name,
