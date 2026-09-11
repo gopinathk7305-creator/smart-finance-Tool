@@ -219,7 +219,8 @@ function UploadPage() {
   const clearTable = async (key: DatasetKey) => {
     if (!user) return;
     const ds = DATASETS.find((d) => d.key === key)!;
-    const { error } = await supabase.from(ds.table).delete().eq("user_id", user.id);
+    const base = supabase.from(ds.table).delete().eq("user_id", user.id);
+    const { error } = await (scopeOrgId ? base.eq("org_id", scopeOrgId) : base);
     if (error) {
       toast.error(error.message);
       return;
