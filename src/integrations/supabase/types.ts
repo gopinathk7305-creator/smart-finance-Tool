@@ -14,16 +14,306 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      activity_logs: {
+        Row: {
+          action: string
+          created_at: string
+          device: string
+          email: string
+          id: string
+          module: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          device?: string
+          email?: string
+          id?: string
+          module?: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          device?: string
+          email?: string
+          id?: string
+          module?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      arap_records: {
+        Row: {
+          amount: number
+          created_at: string
+          due_date: string | null
+          id: string
+          invoice_date: string | null
+          party_name: string
+          source_file: string
+          status: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          invoice_date?: string | null
+          party_name?: string
+          source_file?: string
+          status?: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          invoice_date?: string | null
+          party_name?: string
+          source_file?: string
+          status?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      audit_findings: {
+        Row: {
+          amount: number
+          created_at: string
+          detail: string
+          finding_date: string | null
+          id: string
+          origin: string
+          party: string
+          rule: string
+          severity: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          detail?: string
+          finding_date?: string | null
+          id?: string
+          origin?: string
+          party?: string
+          rule: string
+          severity?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          detail?: string
+          finding_date?: string | null
+          id?: string
+          origin?: string
+          party?: string
+          rule?: string
+          severity?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      budget_targets: {
+        Row: {
+          budgeted_amount: number
+          category: string
+          created_at: string
+          department: string
+          fiscal_year: string
+          id: string
+          source_file: string
+          user_id: string
+        }
+        Insert: {
+          budgeted_amount?: number
+          category?: string
+          created_at?: string
+          department?: string
+          fiscal_year?: string
+          id?: string
+          source_file?: string
+          user_id: string
+        }
+        Update: {
+          budgeted_amount?: number
+          category?: string
+          created_at?: string
+          department?: string
+          fiscal_year?: string
+          id?: string
+          source_file?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      payroll_records: {
+        Row: {
+          allowances: number
+          basic_pay: number
+          created_at: string
+          deductions: number
+          department: string
+          employee_id: string
+          id: string
+          month_year: string
+          name: string
+          pf_deduction: number
+          source_file: string
+          tds_deduction: number
+          user_id: string
+        }
+        Insert: {
+          allowances?: number
+          basic_pay?: number
+          created_at?: string
+          deductions?: number
+          department?: string
+          employee_id?: string
+          id?: string
+          month_year?: string
+          name?: string
+          pf_deduction?: number
+          source_file?: string
+          tds_deduction?: number
+          user_id: string
+        }
+        Update: {
+          allowances?: number
+          basic_pay?: number
+          created_at?: string
+          deductions?: number
+          department?: string
+          employee_id?: string
+          id?: string
+          month_year?: string
+          name?: string
+          pf_deduction?: number
+          source_file?: string
+          tds_deduction?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          department: string
+          email: string
+          full_name: string
+          id: string
+          last_login: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          department?: string
+          email: string
+          full_name?: string
+          id: string
+          last_login?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          department?: string
+          email?: string
+          full_name?: string
+          id?: string
+          last_login?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          id: string
+          source_file: string
+          status: string
+          subcategory: string
+          txn_date: string
+          type: string
+          user_id: string
+          vendor_client: string
+        }
+        Insert: {
+          amount?: number
+          category?: string
+          created_at?: string
+          id?: string
+          source_file?: string
+          status?: string
+          subcategory?: string
+          txn_date: string
+          type?: string
+          user_id: string
+          vendor_client?: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          id?: string
+          source_file?: string
+          status?: string
+          subcategory?: string
+          txn_date?: string
+          type?: string
+          user_id?: string
+          vendor_client?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "finance_manager" | "analyst" | "viewer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +440,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "finance_manager", "analyst", "viewer"],
+    },
   },
 } as const
