@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Download, FileSpreadsheet, FileText, Printer } from "lucide-react";
-import { useState } from "react";
+import { Download, FileSpreadsheet, FileText, Loader2, Printer } from "lucide-react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/finance/AppShell";
@@ -34,6 +34,8 @@ import {
   payroll,
   totals,
 } from "@/lib/finance-data";
+import { auditFindings } from "@/lib/enterprise-data";
+import { exportElementToPdf } from "@/lib/pdf-export";
 
 export const Route = createFileRoute("/reports")({
   head: () => ({
@@ -56,8 +58,9 @@ export const Route = createFileRoute("/reports")({
 
 const REPORTS = {
   pnl: "Profit & Loss Statement",
-  summary: "Executive Summary",
-  payroll: "Payroll Ledger",
+  summary: "Executive Financial Summary",
+  payroll: "Payroll Tax Sheet",
+  audit: "Audit Exception Log",
   aging: "AR/AP Aging",
 } as const;
 
@@ -95,6 +98,16 @@ function buildRows(key: ReportKey): Record<string, unknown>[] {
       tds: p.tds_deduction,
       net_pay: netPay(p),
     }));
+  if (key === "audit")
+    return auditFindings().map((f) => ({
+      id: f.id,
+      rule: f.rule,
+      severity: f.severity,
+      party: f.party,
+      date: f.date,
+      amount: f.amount,
+      finding: f.detail,
+    }));
   return arApRecords.map((r) => ({
     type: r.type,
     party: r.party_name,
@@ -109,17 +122,32 @@ function ReportsPage() {
   const [report, setReport] = useState<ReportKey>("pnl");
   const [range, setRange] = useState("ytd");
   const [format, setFormat] = useState("csv");
+  const [busy, setBusy] = useState(false);
+  const printRef = useRef<HTMLDivElement>(null);
 
   const rows = buildRows(report);
-  const preview = rows.slice(0, 8);
+  const preview = rows.slice(0, 20);
 
-  const run = () => {
+  const run = async () => {
     if (format === "pdf") {
-      toast.info("Opening print preview — choose “Save as PDF”.");
-      setTimeout(() => window.print(), 400);
+      if (!printRef.current) return;
+      setBusy(true);
+      toast.info("Rendering PDF…");
+      try {
+        await exportElementToPdf(
+          printRef.current,
+          `${report}-${range}.pdf`,
+          `${REPORTS[report]} · ${range.toUpperCase()}`,
+        );
+        toast.success(`${REPORTS[report]} PDF downloaded`);
+      } catch {
+        toast.error("PDF generation failed");
+      } finally {
+        setBusy(false);
+      }
       return;
     }
-    downloadCSV(`${report}-${range}.${format === "excel" ? "csv" : "csv"}`, rows);
+    downloadCSV(`${report}-${range}.csv`, rows);
     toast.success(`${REPORTS[report]} downloaded`);
   };
 
@@ -172,13 +200,19 @@ function ReportsPage() {
                 <SelectContent>
                   <SelectItem value="csv">CSV</SelectItem>
                   <SelectItem value="excel">Excel (.csv)</SelectItem>
-                  <SelectItem value="pdf">PDF (print)</SelectItem>
+                  <SelectItem value="pdf">PDF document</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <Button className="w-full" onClick={run}>
-              {format === "pdf" ? <Printer className="size-4" /> : <Download className="size-4" />}
+            <Button className="w-full" onClick={run} disabled={busy}>
+              {busy ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : format === "pdf" ? (
+                <Printer className="size-4" />
+              ) : (
+                <Download className="size-4" />
+              )}
               Generate {format.toUpperCase()}
             </Button>
           </CardContent>
@@ -191,7 +225,13 @@ function ReportsPage() {
               {rows.length} rows · showing first {preview.length}
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent ref={printRef}>
+            <div className="mb-3 border-b border-border pb-2">
+              <p className="text-sm font-bold">Finance IQ · {REPORTS[report]}</p>
+              <p className="text-xs text-muted-foreground">
+                Fiscal year 2026 · {range.toUpperCase()} · generated {new Date().toLocaleDateString("en-IN")}
+              </p>
+            </div>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>

@@ -26,7 +26,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { downloadCSV, grossPay, inr, netPay, payroll } from "@/lib/finance-data";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { downloadCSV, grossPay, inr, netPay, payroll, type PayrollRecord } from "@/lib/finance-data";
+import { computeTax } from "@/lib/enterprise-data";
 
 export const Route = createFileRoute("/payroll")({
   head: () => ({
@@ -49,6 +58,8 @@ export const Route = createFileRoute("/payroll")({
 
 function PayrollPage() {
   const [query, setQuery] = useState("");
+  const [taxFor, setTaxFor] = useState<PayrollRecord | null>(null);
+  const [regime, setRegime] = useState<"new" | "old">("new");
 
   const filtered = useMemo(
     () =>
@@ -189,6 +200,7 @@ function PayrollPage() {
                   <TableHead className="text-right">TDS</TableHead>
                   <TableHead className="text-right">Other</TableHead>
                   <TableHead className="text-right">Net Pay</TableHead>
+                  <TableHead className="text-right">Tax</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -203,11 +215,16 @@ function PayrollPage() {
                     <TableCell className="tabular text-right text-warning">{inr(p.tds_deduction)}</TableCell>
                     <TableCell className="tabular text-right">{inr(p.deductions)}</TableCell>
                     <TableCell className="tabular text-right font-semibold">{inr(netPay(p))}</TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="outline" onClick={() => setTaxFor(p)}>
+                        View Tax Breakdown
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
                 {filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">
                       No employees match “{query}”.
                     </TableCell>
                   </TableRow>
@@ -217,6 +234,109 @@ function PayrollPage() {
           </div>
         </CardContent>
       </Card>
+
+      <TaxDialog record={taxFor} regime={regime} setRegime={setRegime} onClose={() => setTaxFor(null)} />
     </AppShell>
+  );
+}
+
+function TaxDialog({
+  record,
+  regime,
+  setRegime,
+  onClose,
+}: {
+  record: PayrollRecord | null;
+  regime: "new" | "old";
+  setRegime: (r: "new" | "old") => void;
+  onClose: () => void;
+}) {
+  if (!record) return null;
+  const c = computeTax(record, regime);
+
+  const Line = ({ label, value, tone }: { label: string; value: string; tone?: string }) => (
+    <div className="flex items-center justify-between border-b border-border py-2 text-sm last:border-0">
+      <span className="text-muted-foreground">{label}</span>
+      <span className={`tabular font-medium ${tone ?? ""}`}>{value}</span>
+    </div>
+  );
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[85vh] overflow-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Tax breakdown — {record.name}</DialogTitle>
+          <DialogDescription>
+            {record.employee_id} · {record.department} · December 2026
+          </DialogDescription>
+        </DialogHeader>
+
+        <Tabs value={regime} onValueChange={(v) => setRegime(v as "new" | "old")}>
+          <TabsList>
+            <TabsTrigger value="new">New regime</TabsTrigger>
+            <TabsTrigger value="old">Old regime</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        <div className="mt-2">
+          <p className="mb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+            Monthly salary build-up
+          </p>
+          <Line label="Basic pay" value={inr(record.basic_pay)} />
+          <Line label="Allowances" value={inr(record.allowances)} />
+          <Line label="Gross salary" value={inr(c.gross)} tone="font-semibold" />
+          <Line label="Employee PF (12% of basic)" value={`- ${inr(c.pf)}`} tone="text-warning" />
+          <Line
+            label={`ESI (0.75% ${c.esi ? "" : "— not applicable, gross > ₹21,000"})`}
+            value={`- ${inr(c.esi)}`}
+            tone="text-warning"
+          />
+        </div>
+
+        <div>
+          <p className="mb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+            Annual income tax slabs ({regime === "new" ? "New" : "Old"} regime)
+          </p>
+          <div className="rounded-md border border-border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Slab</TableHead>
+                  <TableHead className="text-right">Rate</TableHead>
+                  <TableHead className="text-right">Taxable</TableHead>
+                  <TableHead className="text-right">Tax</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {c.rows.map((r) => (
+                  <TableRow key={r.from}>
+                    <TableCell className="tabular">
+                      {inr(r.from)} – {r.to === Infinity ? "above" : inr(r.to)}
+                    </TableCell>
+                    <TableCell className="tabular text-right">{(r.rate * 100).toFixed(0)}%</TableCell>
+                    <TableCell className="tabular text-right">{inr(r.taxable)}</TableCell>
+                    <TableCell className="tabular text-right font-medium">{inr(r.tax)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <div className="mt-2">
+            <Line label="Taxable annual income (after standard deduction)" value={inr(c.annualGross)} />
+            <Line label="Health & education cess (4%)" value={inr(c.cess)} />
+            <Line label="Annual tax liability" value={inr(c.annualTax)} tone="font-semibold" />
+            <Line label="Monthly TDS" value={`- ${inr(c.monthlyTds)}`} tone="text-danger" />
+          </div>
+        </div>
+
+        <div className="rounded-lg bg-secondary p-3">
+          <Line label="Other deductions" value={`- ${inr(c.otherDeductions)}`} />
+          <div className="flex items-center justify-between pt-2">
+            <span className="text-sm font-semibold">Net take-home salary</span>
+            <span className="tabular text-lg font-bold text-success">{inr(c.net)}</span>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
