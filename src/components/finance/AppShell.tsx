@@ -62,6 +62,21 @@ export function AppShell({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { user, demoMode, signOut, loading } = useAuth();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!loading && !user && !demoMode) void navigate({ to: "/login", replace: true });
+  }, [loading, user, demoMode, navigate]);
+
+  const displayName =
+    (user?.user_metadata?.["full_name"] as string | undefined) || user?.email?.split("@")[0] || "Demo user";
+  const initials = displayName
+    .split(/[\s.@]+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
 
   return (
     <div className="flex min-h-screen bg-background">
