@@ -1,4 +1,5 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Bell,
   Calculator,
@@ -16,7 +17,7 @@ import {
   Wallet,
   CircleDollarSign,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/lib/auth";
 import { alerts } from "@/lib/finance-data";
 import { cn } from "@/lib/utils";
 
@@ -75,7 +77,7 @@ export function AppShell({
   const initials = displayName
     .split(/[\s.@]+/)
     .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
+    .map((w: string) => w[0]?.toUpperCase() ?? "")
     .join("");
 
   return (
