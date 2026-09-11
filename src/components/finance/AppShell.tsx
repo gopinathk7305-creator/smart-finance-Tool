@@ -1,12 +1,14 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Bell,
+  Calculator,
   ChevronLeft,
   FileText,
   LayoutDashboard,
   LineChart,
   PanelLeft,
   Search,
+  ShieldAlert,
   Target,
   TrendingUp,
   UploadCloud,
@@ -38,13 +40,15 @@ import { cn } from "@/lib/utils";
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/users", label: "Users & Activity", icon: Users },
   { to: "/upload", label: "Data Upload", icon: UploadCloud },
-  { to: "/payroll", label: "Payroll Analytics", icon: Users },
+  { to: "/payroll", label: "Payroll & Tax", icon: Calculator },
   { to: "/budget", label: "Budget vs Actual", icon: Target },
   { to: "/pnl", label: "Financial Analysis", icon: TrendingUp },
   { to: "/cashflow", label: "Cash Flow & AR/AP", icon: Wallet },
+  { to: "/audit", label: "Internal Audit", icon: ShieldAlert },
   { to: "/forecast", label: "Forecasting", icon: LineChart },
-  { to: "/reports", label: "Reports & Export", icon: FileText },
+  { to: "/reports", label: "Reports & PDF", icon: FileText },
 ] as const;
 
 export function AppShell({
