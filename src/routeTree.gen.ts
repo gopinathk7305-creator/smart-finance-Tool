@@ -11,8 +11,10 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BudgetRouteImport } from './routes/budget'
+import { Route as CashflowRouteImport } from './routes/cashflow'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PayrollRouteImport } from './routes/payroll'
+import { Route as PnlRouteImport } from './routes/pnl'
 import { Route as UploadRouteImport } from './routes/upload'
 
 const IndexRoute = IndexRouteImport.update({
@@ -25,6 +27,11 @@ const BudgetRoute = BudgetRouteImport.update({
   path: '/budget',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CashflowRoute = CashflowRouteImport.update({
+  id: '/cashflow',
+  path: '/cashflow',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -33,6 +40,11 @@ const LoginRoute = LoginRouteImport.update({
 const PayrollRoute = PayrollRouteImport.update({
   id: '/payroll',
   path: '/payroll',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PnlRoute = PnlRouteImport.update({
+  id: '/pnl',
+  path: '/pnl',
   getParentRoute: () => rootRouteImport,
 } as any)
 const UploadRoute = UploadRouteImport.update({
@@ -44,38 +56,55 @@ const UploadRoute = UploadRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/budget': typeof BudgetRoute
+  '/cashflow': typeof CashflowRoute
   '/login': typeof LoginRoute
   '/payroll': typeof PayrollRoute
+  '/pnl': typeof PnlRoute
   '/upload': typeof UploadRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/budget': typeof BudgetRoute
+  '/cashflow': typeof CashflowRoute
   '/login': typeof LoginRoute
   '/payroll': typeof PayrollRoute
+  '/pnl': typeof PnlRoute
   '/upload': typeof UploadRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/budget': typeof BudgetRoute
+  '/cashflow': typeof CashflowRoute
   '/login': typeof LoginRoute
   '/payroll': typeof PayrollRoute
+  '/pnl': typeof PnlRoute
   '/upload': typeof UploadRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/budget' | '/login' | '/payroll' | '/upload'
+  fullPaths:
+    '/' | '/budget' | '/cashflow' | '/login' | '/payroll' | '/pnl' | '/upload'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/budget' | '/login' | '/payroll' | '/upload'
-  id: '__root__' | '/' | '/budget' | '/login' | '/payroll' | '/upload'
+  to: '/' | '/budget' | '/cashflow' | '/login' | '/payroll' | '/pnl' | '/upload'
+  id:
+    | '__root__'
+    | '/'
+    | '/budget'
+    | '/cashflow'
+    | '/login'
+    | '/payroll'
+    | '/pnl'
+    | '/upload'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BudgetRoute: typeof BudgetRoute
+  CashflowRoute: typeof CashflowRoute
   LoginRoute: typeof LoginRoute
   PayrollRoute: typeof PayrollRoute
+  PnlRoute: typeof PnlRoute
   UploadRoute: typeof UploadRoute
 }
 
@@ -95,6 +124,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BudgetRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cashflow': {
+      id: '/cashflow'
+      path: '/cashflow'
+      fullPath: '/cashflow'
+      preLoaderRoute: typeof CashflowRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -107,6 +143,13 @@ declare module '@tanstack/react-router' {
       path: '/payroll'
       fullPath: '/payroll'
       preLoaderRoute: typeof PayrollRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pnl': {
+      id: '/pnl'
+      path: '/pnl'
+      fullPath: '/pnl'
+      preLoaderRoute: typeof PnlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/upload': {
@@ -122,8 +165,10 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BudgetRoute: BudgetRoute,
+  CashflowRoute: CashflowRoute,
   LoginRoute: LoginRoute,
   PayrollRoute: PayrollRoute,
+  PnlRoute: PnlRoute,
   UploadRoute: UploadRoute,
 }
 export const routeTree = rootRouteImport
