@@ -39,6 +39,7 @@ import { useDataset } from "@/lib/dataset";
 import { computeTax, type TaxComputation } from "@/lib/enterprise-data";
 import { explainPayroll } from "@/lib/ai.functions";
 import { Sparkles } from "lucide-react";
+import { SalaryCalculator } from "@/components/finance/SalaryCalculator";
 
 export const Route = createFileRoute("/payroll")({
   head: () => ({
@@ -122,6 +123,8 @@ function PayrollPage() {
         <KpiCard label="PF / ESI Deductions" value={inr(totalPf, true)} icon={Percent} tone="warning" hint="Statutory" />
         <KpiCard label="TDS Withheld" value={inr(totalTds, true)} icon={Receipt} tone="danger" hint="Remit by 7th" />
       </div>
+
+      <SalaryCalculator />
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <Card className="border-border shadow-card">
