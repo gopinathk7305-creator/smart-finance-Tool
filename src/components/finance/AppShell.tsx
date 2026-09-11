@@ -147,10 +147,34 @@ export function AppShell({
           </div>
 
           <div className="ml-auto flex items-center gap-2">
-            <div className="relative hidden lg:block">
-              <Search className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input placeholder="Search vendors, categories…" className="w-56 bg-background pl-8" />
-            </div>
+            <Select value={orgId} onValueChange={setOrgId}>
+              <SelectTrigger className="w-[190px] bg-background">
+                <Building2 className="size-4 text-muted-foreground" />
+                <SelectValue placeholder="Select organization" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>All organizations</SelectItem>
+                {orgs.map((o) => (
+                  <SelectItem key={o.id} value={o.id}>
+                    {o.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={vendor} onValueChange={setVendor}>
+              <SelectTrigger className="hidden w-[170px] bg-background lg:flex">
+                <SelectValue placeholder="All vendors" />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value={ALL}>All vendors</SelectItem>
+                {vendors.map((v) => (
+                  <SelectItem key={v} value={v}>
+                    {v}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
             <Select defaultValue="ytd">
               <SelectTrigger className="w-[132px] bg-background">
