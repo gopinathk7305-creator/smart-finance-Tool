@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { actualsByCategory, inr, monthlySummary, totals } from "@/lib/finance-data";
+import { gstSummary } from "@/lib/enterprise-data";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/pnl")({
@@ -139,6 +140,58 @@ function PnlPage() {
                 <Line type="monotone" dataKey="netMargin" name="Net margin" stroke="var(--success)" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <Card className="border-border shadow-card">
+          <CardHeader>
+            <CardTitle className="text-base">GST Breakdown</CardTitle>
+            <CardDescription>Output GST payable vs input tax credit (18% standard rate)</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-1">
+            <div className="flex justify-between rounded-md px-3 py-2 text-sm">
+              <span className="text-muted-foreground">Output GST on sales</span>
+              <span className="tabular font-medium">{inr(gst.outputGst)}</span>
+            </div>
+            <div className="flex justify-between rounded-md px-3 py-2 text-sm">
+              <span className="text-muted-foreground">Input Tax Credit (ITC) on purchases</span>
+              <span className="tabular font-medium text-success">({inr(gst.inputCredit)})</span>
+            </div>
+            <div className="mt-2 flex justify-between rounded-md bg-primary px-3 py-2 text-sm font-bold text-primary-foreground">
+              <span>Net GST payable</span>
+              <span className="tabular">{inr(gst.payable)}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border shadow-card">
+          <CardHeader>
+            <CardTitle className="text-base">Corporate Tax Computation</CardTitle>
+            <CardDescription>Statutory rate 25% on earnings before tax</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-1">
+            <div className="flex justify-between rounded-md px-3 py-2 text-sm">
+              <span className="text-muted-foreground">EBITDA</span>
+              <span className="tabular font-medium">{inr(t.ebitda)}</span>
+            </div>
+            <div className="flex justify-between rounded-md px-3 py-2 text-sm">
+              <span className="text-muted-foreground">Less: depreciation & interest</span>
+              <span className="tabular font-medium">({inr(t.depreciation + t.interest)})</span>
+            </div>
+            <div className="flex justify-between rounded-md bg-secondary px-3 py-2 text-sm font-semibold">
+              <span>Earnings before tax (EBT)</span>
+              <span className="tabular">{inr(t.ebitda - t.depreciation - t.interest)}</span>
+            </div>
+            <div className="flex justify-between rounded-md px-3 py-2 text-sm">
+              <span className="text-muted-foreground">Corporate tax @ 25%</span>
+              <span className="tabular font-medium text-danger">({inr(t.tax)})</span>
+            </div>
+            <div className="mt-2 flex justify-between rounded-md bg-primary px-3 py-2 text-sm font-bold text-primary-foreground">
+              <span>Net profit after tax</span>
+              <span className="tabular">{inr(t.netProfit)}</span>
+            </div>
           </CardContent>
         </Card>
       </div>
