@@ -239,3 +239,104 @@ function PayrollPage() {
     </AppShell>
   );
 }
+
+function TaxDialog({
+  record,
+  regime,
+  setRegime,
+  onClose,
+}: {
+  record: PayrollRecord | null;
+  regime: "new" | "old";
+  setRegime: (r: "new" | "old") => void;
+  onClose: () => void;
+}) {
+  if (!record) return null;
+  const c = computeTax(record, regime);
+
+  const Line = ({ label, value, tone }: { label: string; value: string; tone?: string }) => (
+    <div className="flex items-center justify-between border-b border-border py-2 text-sm last:border-0">
+      <span className="text-muted-foreground">{label}</span>
+      <span className={`tabular font-medium ${tone ?? ""}`}>{value}</span>
+    </div>
+  );
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[85vh] overflow-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Tax breakdown — {record.name}</DialogTitle>
+          <DialogDescription>
+            {record.employee_id} · {record.department} · December 2026
+          </DialogDescription>
+        </DialogHeader>
+
+        <Tabs value={regime} onValueChange={(v) => setRegime(v as "new" | "old")}>
+          <TabsList>
+            <TabsTrigger value="new">New regime</TabsTrigger>
+            <TabsTrigger value="old">Old regime</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        <div className="mt-2">
+          <p className="mb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+            Monthly salary build-up
+          </p>
+          <Line label="Basic pay" value={inr(record.basic_pay)} />
+          <Line label="Allowances" value={inr(record.allowances)} />
+          <Line label="Gross salary" value={inr(c.gross)} tone="font-semibold" />
+          <Line label="Employee PF (12% of basic)" value={`- ${inr(c.pf)}`} tone="text-warning" />
+          <Line
+            label={`ESI (0.75% ${c.esi ? "" : "— not applicable, gross > ₹21,000"})`}
+            value={`- ${inr(c.esi)}`}
+            tone="text-warning"
+          />
+        </div>
+
+        <div>
+          <p className="mb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+            Annual income tax slabs ({regime === "new" ? "New" : "Old"} regime)
+          </p>
+          <div className="rounded-md border border-border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Slab</TableHead>
+                  <TableHead className="text-right">Rate</TableHead>
+                  <TableHead className="text-right">Taxable</TableHead>
+                  <TableHead className="text-right">Tax</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {c.rows.map((r) => (
+                  <TableRow key={r.from}>
+                    <TableCell className="tabular">
+                      {inr(r.from)} – {r.to === Infinity ? "above" : inr(r.to)}
+                    </TableCell>
+                    <TableCell className="tabular text-right">{(r.rate * 100).toFixed(0)}%</TableCell>
+                    <TableCell className="tabular text-right">{inr(r.taxable)}</TableCell>
+                    <TableCell className="tabular text-right font-medium">{inr(r.tax)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <div className="mt-2">
+            <Line label="Taxable annual income (after standard deduction)" value={inr(c.annualGross)} />
+            <Line label="Health & education cess (4%)" value={inr(c.cess)} />
+            <Line label="Annual tax liability" value={inr(c.annualTax)} tone="font-semibold" />
+            <Line label="Monthly TDS" value={`- ${inr(c.monthlyTds)}`} tone="text-danger" />
+          </div>
+        </div>
+
+        <div className="rounded-lg bg-secondary p-3">
+          <Line label="Other deductions" value={`- ${inr(c.otherDeductions)}`} />
+          <div className="flex items-center justify-between pt-2">
+            <span className="text-sm font-semibold">Net take-home salary</span>
+            <span className="tabular text-lg font-bold text-success">{inr(c.net)}</span>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
