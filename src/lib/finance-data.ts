@@ -287,10 +287,10 @@ export interface MonthlySummary {
   cash: number;
 }
 
-export function monthlySummary(): MonthlySummary[] {
+export function monthlySummary(txns: Transaction[] = transactions): MonthlySummary[] {
   let cash = 8_500_000;
   return MONTHS.map((month, m) => {
-    const rows = transactions.filter((t) => monthIndexOf(t.date) === m);
+    const rows = txns.filter((t) => monthIndexOf(t.date) === m);
     const revenue = rows.filter((r) => r.type === "income").reduce((s, r) => s + r.amount, 0);
     const expense = rows.filter((r) => r.type === "expense").reduce((s, r) => s + r.amount, 0);
     cash += revenue - expense;
@@ -298,20 +298,18 @@ export function monthlySummary(): MonthlySummary[] {
   });
 }
 
-export function actualsByCategory() {
+export function actualsByCategory(txns: Transaction[] = transactions) {
   const map = new Map<string, number>();
-  transactions
+  txns
     .filter((t) => t.type === "expense")
     .forEach((t) => map.set(t.category, (map.get(t.category) ?? 0) + t.amount));
   return map;
 }
 
-export function totals() {
-  const revenue = transactions.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
-  const expense = transactions
-    .filter((t) => t.type === "expense")
-    .reduce((s, t) => s + t.amount, 0);
-  const cogs = actualsByCategory().get("COGS") ?? 0;
+export function totals(txns: Transaction[] = transactions) {
+  const revenue = txns.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
+  const expense = txns.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+  const cogs = actualsByCategory(txns).get("COGS") ?? 0;
   const grossProfit = revenue - cogs;
   const opex = expense - cogs;
   const ebitda = grossProfit - opex;
@@ -322,8 +320,8 @@ export function totals() {
   return { revenue, expense, cogs, grossProfit, opex, ebitda, depreciation, interest, tax, netProfit };
 }
 
-export function cashRunwayMonths() {
-  const series = monthlySummary();
+export function cashRunwayMonths(txns: Transaction[] = transactions) {
+  const series = monthlySummary(txns);
   const last3 = series.slice(-3);
   const burn = last3.reduce((s, m) => s + Math.max(0, m.expense - m.revenue), 0) / 3;
   const cash = series[series.length - 1]!.cash;
@@ -341,11 +339,19 @@ export function agingBucket(dueISO: string) {
 
 export const AGING_BUCKETS = ["0-30", "31-60", "61-90", "90+"] as const;
 
-export function forecast(revenueGrowth: number, opexAdj: number, newHires: number) {
-  const series = monthlySummary();
+export function forecast(
+  revenueGrowth: number,
+  opexAdj: number,
+  newHires: number,
+  txns: Transaction[] = transactions,
+  pays: PayrollRecord[] = payroll,
+) {
+  const series = monthlySummary(txns);
   const lastRev = series[series.length - 1]!.revenue;
   const lastExp = series[series.length - 1]!.expense;
-  const avgSalary = payroll.reduce((s, p) => s + grossPay(p), 0) / payroll.length;
+  const avgSalary = pays.length
+    ? pays.reduce((s, p) => s + grossPay(p), 0) / pays.length
+    : 0;
   return Array.from({ length: 12 }, (_, i) => {
     const baseRev = lastRev * Math.pow(1.012, i + 1);
     const baseExp = lastExp * Math.pow(1.009, i + 1);
@@ -362,13 +368,34 @@ export function forecast(revenueGrowth: number, opexAdj: number, newHires: numbe
   });
 }
 
-export const inr = (v: number, compact = false) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: compact ? 1 : 0,
-    notation: compact ? "compact" : "standard",
-  }).format(v);
+function compactInr(v: number) {
+  const sign = v < 0 ? "-" : "";
+  const abs = Math.abs(v);
+  const fmt = (n: number, suffix: string) => {
+    const rounded = Math.round(n * 10) / 10;
+    const text = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+    return `${sign}\u20B9${text}${suffix}`;
+  };
+  if (abs >= 1_00_00_000) return fmt(abs / 1_00_00_000, "Cr");
+  if (abs >= 1_00_000) return fmt(abs / 1_00_000, "L");
+  if (abs >= 1_000) return fmt(abs / 1_000, "K");
+  return `${sign}\u20B9${Math.round(abs)}`;
+}
+
+function groupIndian(n: number) {
+  const s = String(n);
+  if (s.length <= 3) return s;
+  const last3 = s.slice(-3);
+  const rest = s.slice(0, -3);
+  return `${rest.replace(/\B(?=(\d{2})+(?!\d))/g, ",")},${last3}`;
+}
+
+export const inr = (v: number, compact = false) => {
+  if (!Number.isFinite(v)) return "\u20B90";
+  if (compact) return compactInr(v);
+  const sign = v < 0 ? "-" : "";
+  return `${sign}\u20B9${groupIndian(Math.round(Math.abs(v)))}`;
+};
 
 export const pct = (v: number, digits = 1) => `${v >= 0 ? "" : ""}${v.toFixed(digits)}%`;
 
