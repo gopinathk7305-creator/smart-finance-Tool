@@ -8,7 +8,7 @@ import {
   LayoutDashboard,
   LineChart,
   PanelLeft,
-  Search,
+  Building2,
   ShieldAlert,
   Target,
   TrendingUp,
@@ -20,7 +20,6 @@ import {
 import { useEffect, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
