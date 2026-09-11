@@ -34,7 +34,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { downloadCSV, grossPay, inr, netPay, payroll, type PayrollRecord } from "@/lib/finance-data";
+import { downloadCSV, grossPay, inr, netPay, type PayrollRecord } from "@/lib/finance-data";
+import { useDataset } from "@/lib/dataset";
 import { computeTax } from "@/lib/enterprise-data";
 
 export const Route = createFileRoute("/payroll")({
@@ -57,6 +58,7 @@ export const Route = createFileRoute("/payroll")({
 });
 
 function PayrollPage() {
+  const { pays: payroll } = useDataset();
   const [query, setQuery] = useState("");
   const [taxFor, setTaxFor] = useState<PayrollRecord | null>(null);
   const [regime, setRegime] = useState<"new" | "old">("new");
@@ -66,7 +68,7 @@ function PayrollPage() {
       payroll.filter((p) =>
         `${p.name} ${p.employee_id} ${p.department}`.toLowerCase().includes(query.toLowerCase()),
       ),
-    [query],
+    [query, payroll],
   );
 
   const totalCost = payroll.reduce((s, p) => s + grossPay(p), 0);
