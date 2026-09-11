@@ -45,6 +45,7 @@ function PnlPage() {
   const t = totals();
   const cats = actualsByCategory();
   const series = monthlySummary();
+  const gst = gstSummary(t.revenue, t.expense);
 
   const opexLines = ["Payroll", "Office Rent", "Marketing", "Utilities", "Software Subscriptions", "Legal"]
     .map((c) => ({ label: c, value: cats.get(c) ?? 0 }))
