@@ -236,8 +236,8 @@ function UploadPage() {
       subtitle={
         user
           ? live
-            ? "Your uploaded data is powering every dashboard"
-            : "Upload a CSV to replace the sample numbers"
+            ? `${orgName} — your uploaded data is powering every dashboard`
+            : `${orgName} — upload a CSV to replace the sample numbers`
           : "Demo mode — sign in to upload real files"
       }
     >
