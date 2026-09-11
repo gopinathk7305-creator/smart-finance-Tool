@@ -58,8 +58,9 @@ export const Route = createFileRoute("/reports")({
 
 const REPORTS = {
   pnl: "Profit & Loss Statement",
-  summary: "Executive Summary",
-  payroll: "Payroll Ledger",
+  summary: "Executive Financial Summary",
+  payroll: "Payroll Tax Sheet",
+  audit: "Audit Exception Log",
   aging: "AR/AP Aging",
 } as const;
 
@@ -189,13 +190,19 @@ function ReportsPage() {
                 <SelectContent>
                   <SelectItem value="csv">CSV</SelectItem>
                   <SelectItem value="excel">Excel (.csv)</SelectItem>
-                  <SelectItem value="pdf">PDF (print)</SelectItem>
+                  <SelectItem value="pdf">PDF document</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <Button className="w-full" onClick={run}>
-              {format === "pdf" ? <Printer className="size-4" /> : <Download className="size-4" />}
+            <Button className="w-full" onClick={run} disabled={busy}>
+              {busy ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : format === "pdf" ? (
+                <Printer className="size-4" />
+              ) : (
+                <Download className="size-4" />
+              )}
               Generate {format.toUpperCase()}
             </Button>
           </CardContent>
@@ -208,7 +215,13 @@ function ReportsPage() {
               {rows.length} rows · showing first {preview.length}
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent ref={printRef}>
+            <div className="mb-3 border-b border-border pb-2">
+              <p className="text-sm font-bold">Finance IQ · {REPORTS[report]}</p>
+              <p className="text-xs text-muted-foreground">
+                Fiscal year 2026 · {range.toUpperCase()} · generated {new Date().toLocaleDateString("en-IN")}
+              </p>
+            </div>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
