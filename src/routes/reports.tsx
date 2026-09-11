@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Download, FileSpreadsheet, FileText, Printer } from "lucide-react";
-import { useState } from "react";
+import { Download, FileSpreadsheet, FileText, Loader2, Printer } from "lucide-react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/finance/AppShell";
@@ -34,6 +34,8 @@ import {
   payroll,
   totals,
 } from "@/lib/finance-data";
+import { auditFindings } from "@/lib/enterprise-data";
+import { exportElementToPdf } from "@/lib/pdf-export";
 
 export const Route = createFileRoute("/reports")({
   head: () => ({
@@ -109,17 +111,32 @@ function ReportsPage() {
   const [report, setReport] = useState<ReportKey>("pnl");
   const [range, setRange] = useState("ytd");
   const [format, setFormat] = useState("csv");
+  const [busy, setBusy] = useState(false);
+  const printRef = useRef<HTMLDivElement>(null);
 
   const rows = buildRows(report);
-  const preview = rows.slice(0, 8);
+  const preview = rows.slice(0, 20);
 
-  const run = () => {
+  const run = async () => {
     if (format === "pdf") {
-      toast.info("Opening print preview — choose “Save as PDF”.");
-      setTimeout(() => window.print(), 400);
+      if (!printRef.current) return;
+      setBusy(true);
+      toast.info("Rendering PDF…");
+      try {
+        await exportElementToPdf(
+          printRef.current,
+          `${report}-${range}.pdf`,
+          `${REPORTS[report]} · ${range.toUpperCase()}`,
+        );
+        toast.success(`${REPORTS[report]} PDF downloaded`);
+      } catch {
+        toast.error("PDF generation failed");
+      } finally {
+        setBusy(false);
+      }
       return;
     }
-    downloadCSV(`${report}-${range}.${format === "excel" ? "csv" : "csv"}`, rows);
+    downloadCSV(`${report}-${range}.csv`, rows);
     toast.success(`${REPORTS[report]} downloaded`);
   };
 
