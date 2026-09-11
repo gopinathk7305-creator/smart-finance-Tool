@@ -164,6 +164,18 @@ export function OrgProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  // First sign-in: create the organization captured at signup.
+  useEffect(() => {
+    if (!user || !liveOrgRows || liveOrgRows.length > 0) return;
+    const name =
+      (user.user_metadata?.["org_name"] as string | undefined)?.trim() ||
+      (user.email?.split("@")[1]?.split(".")[0] ?? "My organization");
+    void supabase
+      .from("organizations")
+      .insert({ user_id: user.id, name })
+      .then(() => queryClient.invalidateQueries({ queryKey: ["organizations"] }));
+  }, [user, liveOrgRows, queryClient]);
+
   const liveOrgs = !!liveOrgRows && liveOrgRows.length > 0;
   const orgs = liveOrgs ? liveOrgRows! : DEMO_ORGS.map(({ id, name }) => ({ id, name }));
 
