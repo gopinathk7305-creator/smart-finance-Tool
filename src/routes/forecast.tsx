@@ -70,7 +70,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/lib/auth";
 import { useDataset } from "@/lib/dataset";
+
 import { downloadCSV, inr } from "@/lib/finance-data";
 import { exportElementToPdf } from "@/lib/pdf-export";
 import {
@@ -122,6 +124,8 @@ const TABS = [
 
 function ForecastPage() {
   const { txns, pays, live } = useDataset();
+  const { session } = useAuth();
+
   const [inputs, setInputs] = useState<ScenarioInputs>(BASE_SCENARIO);
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("profit");
   const [band, setBand] = useState(true);
@@ -135,8 +139,14 @@ function ForecastPage() {
   const explain = useServerFn(explainForecast);
 
   const askAi = async (focusMonth?: string) => {
+    if (!session) {
+      toast.error("Sign in to use the AI explanation — demo mode has no AI access.");
+      return;
+    }
+
     setAiLoading(true);
     setAiMonth(focusMonth ?? null);
+
     setAiText("");
     try {
       const res = await explain({
