@@ -144,7 +144,9 @@ function ForecastPage() {
       return;
     }
 
+    setAiLoading(true);
     setAiMonth(focusMonth ?? null);
+
     setAiText("");
     try {
       const res = await explain({
