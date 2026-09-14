@@ -78,9 +78,45 @@ function Dashboard() {
     .map(([name, value]) => ({ name, value }));
 
   const toneIcon = { danger: AlertTriangle, warning: Info, success: CheckCircle2 };
+  const chartsRef = useRef<HTMLDivElement>(null);
+
+  const buildReport = () => ({
+    page: "dashboard" as const,
+    reportName: "Executive Overview & Entity Health Report",
+    fy: "FY 2026-27",
+    kpis: [
+      { label: "Total Revenue", value: inr(t.revenue, true), delta: `${revDelta.toFixed(1)}% H2 vs H1` },
+      { label: "Total Expenses", value: inr(t.expense, true), delta: `${expDelta.toFixed(1)}% H2 vs H1` },
+      { label: "Net Profit Margin", value: `${margin.toFixed(1)}%`, delta: inr(t.netProfit, true) },
+      {
+        label: "Cash Runway",
+        value: Number.isFinite(runway) ? `${runway.toFixed(1)} months` : "Cash positive",
+        delta: "At current burn",
+      },
+    ],
+    tables: [
+      {
+        title: "Monthly Revenue, Expense & Cash Position",
+        columns: ["Month", "Revenue", "Expense", "Profit", "Cash Balance"],
+        numericFrom: 1,
+        rows: series.map((m) => [m.month, inr(m.revenue), inr(m.expense), inr(m.profit), inr(m.cash)]),
+      },
+      {
+        title: "Top 5 Expense Categories",
+        columns: ["Category", "Spend"],
+        numericFrom: 1,
+        rows: topCats.map((c) => [c.name, inr(c.value)]),
+      },
+    ],
+    facts: `Revenue ${inr(t.revenue)}, expenses ${inr(t.expense)}, gross profit ${inr(t.grossProfit)}, EBITDA ${inr(t.ebitda)}, net profit ${inr(t.netProfit)}, net margin ${margin.toFixed(1)}%, cash runway ${Number.isFinite(runway) ? runway.toFixed(1) : "unlimited"} months. Largest spend categories: ${topCats.map((c) => `${c.name} ${inr(c.value)}`).join(", ")}. Data source: ${live ? "user-uploaded ledger" : "demo dataset"}.`,
+    chartEl: chartsRef.current,
+  });
 
   return (
     <AppShell title="Executive Dashboard" subtitle={live ? "Live view of your uploaded data" : "Sample data · upload your files to see real numbers"}>
+      <div className="mb-4 flex justify-end">
+        <AiReportButton build={buildReport} />
+      </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           label="Total Revenue"
