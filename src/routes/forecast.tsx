@@ -219,22 +219,39 @@ function ForecastPage() {
 
   return (
     <AppShell
-      title="Financial Forecasting & Multi-Scenario Modeling"
-      subtitle={`Interactive 12-Month Rolling Outlook & Stress Testing Engine · ${live ? "live data" : "demo data"}`}
+      title={`Financial Forecasting & Scenario Planning (${inputs.fy})`}
+      subtitle={`12-Month Rolling Indian Corporate Outlook & Runway Stress Testing · ${live ? "live data" : "demo data"}`}
     >
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Button variant="outline" size="sm" onClick={() => applyPreset("base")}>
           Base Case
         </Button>
         <Button variant="outline" size="sm" onClick={() => applyPreset("best")}>
-          Best Case (+25% Rev)
+          High Growth (+25% Rev)
         </Button>
         <Button variant="outline" size="sm" onClick={() => applyPreset("worst")}>
-          Worst Case (−15% Rev)
+          Conservative / Slowdown (−15% Rev)
         </Button>
         <Button variant="ghost" size="sm" onClick={() => setInputs(BASE_SCENARIO)}>
           <RotateCcw className="size-4" /> Reset All
         </Button>
+        <Tabs value={inputs.fy} onValueChange={(v) => set("fy", v as FinancialYear)}>
+          <TabsList>
+            {FY_OPTIONS.map((f) => (
+              <TabsTrigger key={f} value={f} className="text-xs">
+                {f}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <Button variant="outline" size="sm" onClick={exportPdf}>
+          <FileText className="size-4" /> Export PDF Report
+        </Button>
+        <Button variant="outline" size="sm" onClick={exportCsv}>
+          <Download className="size-4" /> Export CSV
+        </Button>
+
+
 
         <div className="ml-auto flex items-center gap-2">
           {saved.length > 0 && (
