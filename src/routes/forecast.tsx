@@ -310,10 +310,12 @@ function ForecastPage() {
           <CardContent>
             <Accordion type="multiple" defaultValue={["rev", "cost", "cash"]}>
               <AccordionItem value="rev">
-                <AccordionTrigger className="text-sm font-semibold">Revenue drivers</AccordionTrigger>
+                <AccordionTrigger className="text-sm font-semibold">
+                  Revenue &amp; billing drivers
+                </AccordionTrigger>
                 <AccordionContent className="space-y-6 pt-2">
                   <Lever
-                    label="Projected revenue growth"
+                    label="Projected annual revenue growth"
                     value={inputs.revenueGrowth}
                     min={-30}
                     max={100}
@@ -336,13 +338,22 @@ function ForecastPage() {
                     suffix="%"
                     onChange={(v) => set("priceFactor", v)}
                   />
+                  <Lever
+                    label="GST output rate"
+                    value={inputs.gstRate}
+                    min={0}
+                    max={28}
+                    suffix="%"
+                    onChange={(v) => set("gstRate", v)}
+                  />
                 </AccordionContent>
               </AccordionItem>
 
               <AccordionItem value="cost">
                 <AccordionTrigger className="text-sm font-semibold">
-                  Cost &amp; payroll drivers
+                  Expense &amp; payroll drivers (Indian norms)
                 </AccordionTrigger>
+
                 <AccordionContent className="space-y-6 pt-2">
                   <Lever
                     label="Operating expenses adjustment"
