@@ -236,7 +236,9 @@ function PayrollPage() {
                 {filtered.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">
-                      No employees match “{query}”.
+                      {payroll.length === 0
+                        ? "No payroll records for this entity yet — upload a payroll CSV from Data Upload."
+                        : `No employees match “${query}”.`}
                     </TableCell>
                   </TableRow>
                 )}
