@@ -7,6 +7,7 @@ import {
   Bookmark,
   Download,
   FileText,
+  Loader2,
   Gauge,
   RotateCcw,
   Sparkles,
