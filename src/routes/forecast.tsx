@@ -33,6 +33,7 @@ import {
 } from "recharts";
 import { toast } from "sonner";
 
+import { AiReportButton } from "@/components/finance/AiReportButton";
 import { AppShell } from "@/components/finance/AppShell";
 import { KpiCard } from "@/components/finance/KpiCard";
 import {
