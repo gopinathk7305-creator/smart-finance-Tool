@@ -139,7 +139,11 @@ function ForecastPage() {
   const explain = useServerFn(explainForecast);
 
   const askAi = async (focusMonth?: string) => {
-    setAiLoading(true);
+    if (!session) {
+      toast.error("Sign in to use the AI explanation — demo mode has no AI access.");
+      return;
+    }
+
     setAiMonth(focusMonth ?? null);
     setAiText("");
     try {
