@@ -556,7 +556,17 @@ function ForecastPage() {
                       strokeWidth={2}
                       fill="url(#cum)"
                     />
-                  </AreaChart>
+                    <Line
+                      type="monotone"
+                      dataKey="advanceTax"
+                      name="Advance tax payout"
+                      stroke="#dc2626"
+                      strokeWidth={0}
+                      dot={{ r: 4, fill: "#dc2626" }}
+                      activeDot={{ r: 6 }}
+                    />
+                  </ComposedChart>
+
                 ) : (
                   <AreaChart data={rows}>
                     <defs>
