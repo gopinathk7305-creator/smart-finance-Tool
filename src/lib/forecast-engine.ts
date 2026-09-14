@@ -121,8 +121,15 @@ export function runForecast(
   const series = monthlySummary(txns);
   const last = series[series.length - 1]!;
   const startCash = last.cash;
-  const lastRev = last.revenue || 1;
-  const lastExp = last.expense || 1;
+  // Use the average of months that actually carry activity so a partially
+  // populated ledger (e.g. a freshly uploaded two-month CSV) still yields a
+  // realistic run-rate instead of an empty trailing month.
+  const active = series.filter((s) => s.revenue > 0 || s.expense > 0);
+  const sample = active.length ? active : series;
+  const avg = (pick: (s: (typeof series)[number]) => number) =>
+    sample.reduce((s, r) => s + pick(r), 0) / sample.length;
+  const lastRev = avg((s) => s.revenue) || 1;
+  const lastExp = avg((s) => s.expense) || 1;
 
   const basePayroll = pays.length ? pays.reduce((s, p) => s + grossPay(p), 0) : lastExp * 0.45;
   const baseOpex = Math.max(0, lastExp - basePayroll);

@@ -115,7 +115,14 @@ function PayrollPage() {
   };
 
   return (
-    <AppShell title="Payroll Analytics" subtitle="December 2026 payroll run · 25 employees">
+    <AppShell
+      title="Payroll Analytics"
+      subtitle={
+        payroll.length
+          ? `Current payroll run · ${payroll.length} employee${payroll.length === 1 ? "" : "s"} · PF 12%, ESI 3.25%, slab-wise TDS + 4% cess`
+          : "No payroll records yet — upload a payroll CSV from Data Upload"
+      }
+    >
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard label="Total Payroll Cost" value={inr(totalCost, true)} icon={Banknote} tone="neutral" hint="Gross monthly" />
         <KpiCard label="Average Salary" value={inr(avgSalary, true)} icon={Users} hint="Per employee" />
@@ -229,7 +236,9 @@ function PayrollPage() {
                 {filtered.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">
-                      No employees match “{query}”.
+                      {payroll.length === 0
+                        ? "No payroll records for this entity yet — upload a payroll CSV from Data Upload."
+                        : `No employees match “${query}”.`}
                     </TableCell>
                   </TableRow>
                 )}
