@@ -22,7 +22,9 @@ import {
   BarChart,
   CartesianGrid,
   Legend,
+  ComposedChart,
   Line,
+
   LineChart,
   ResponsiveContainer,
   Tooltip,
