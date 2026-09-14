@@ -437,10 +437,11 @@ function ForecastPage() {
               icon={TrendingUp}
             />
             <KpiCard
-              label="Projected 12M Net Profit"
+              label="Projected 12M EBITDA / Net Profit"
               value={inr(result.scenProfitTotal, true)}
               delta={profitDelta}
-              hint={`net margin ${result.netMargin.toFixed(1)}%`}
+              hint={`net margin ${result.netMargin.toFixed(1)}% · after tax ${inr(result.taxTotal, true)}`}
+
               icon={Banknote}
               tone={result.scenProfitTotal >= result.baseProfitTotal ? "success" : "danger"}
             />
