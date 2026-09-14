@@ -73,13 +73,16 @@ import { downloadCSV, inr } from "@/lib/finance-data";
 import { exportElementToPdf } from "@/lib/pdf-export";
 import {
   BASE_SCENARIO,
+  FY_OPTIONS,
   PRESETS,
   loadScenarios,
   runForecast,
   saveScenarios,
+  type FinancialYear,
   type SavedScenario,
   type ScenarioInputs,
 } from "@/lib/forecast-engine";
+
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/forecast")({
