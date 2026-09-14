@@ -324,9 +324,7 @@ function ForecastPage() {
             ))}
           </TabsList>
         </Tabs>
-        <Button variant="outline" size="sm" onClick={exportPdf}>
-          <FileText className="size-4" /> Export PDF Report
-        </Button>
+        <AiReportButton build={buildReport} label="Download AI Report" />
         <Button variant="outline" size="sm" onClick={exportCsv}>
           <Download className="size-4" /> Export CSV
         </Button>
