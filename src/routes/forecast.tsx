@@ -310,7 +310,7 @@ function ForecastPage() {
             <CardDescription>Tune drivers, results update instantly</CardDescription>
           </CardHeader>
           <CardContent>
-            <Accordion type="multiple" defaultValue={["rev", "cost", "cash"]}>
+            <Accordion type="multiple" defaultValue={["rev", "cost", "capex", "cash"]}>
               <AccordionItem value="rev">
                 <AccordionTrigger className="text-sm font-semibold">
                   Revenue &amp; billing drivers
@@ -506,7 +506,7 @@ function ForecastPage() {
                     <Tooltip formatter={(v) => inr(Number(v))} />
                     <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
                     <Bar dataKey="scenRevenue" name="Revenue" fill="#0284c7" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="scenExpense" name="Opex" fill="#475569" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="scenExpense" name="Opex" fill="#334155" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 ) : tab === "runway" ? (
                   <LineChart data={rows}>
@@ -615,7 +615,7 @@ function ForecastPage() {
                       type="monotone"
                       dataKey="baseProfit"
                       name="Baseline"
-                      stroke="#475569"
+                      stroke="#334155"
                       strokeDasharray="5 4"
                       strokeWidth={2}
                       fill="transparent"
