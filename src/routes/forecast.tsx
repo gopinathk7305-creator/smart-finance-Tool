@@ -70,7 +70,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/lib/auth";
 import { useDataset } from "@/lib/dataset";
+
 import { downloadCSV, inr } from "@/lib/finance-data";
 import { exportElementToPdf } from "@/lib/pdf-export";
 import {
