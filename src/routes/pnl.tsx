@@ -12,6 +12,7 @@ import {
   Legend,
 } from "recharts";
 
+import { AiReportButton } from "@/components/finance/AiReportButton";
 import { AppShell } from "@/components/finance/AppShell";
 import { KpiCard } from "@/components/finance/KpiCard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
