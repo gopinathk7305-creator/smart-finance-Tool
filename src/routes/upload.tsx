@@ -11,6 +11,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/finance/AppShell";
+import { computeTax } from "@/lib/enterprise-data";
+import type { PayrollRecord } from "@/lib/finance-data";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
