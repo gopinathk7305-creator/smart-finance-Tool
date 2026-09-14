@@ -630,24 +630,25 @@ function ForecastPage() {
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-3">
                 <div ref={tableRef} className="max-h-[320px] overflow-auto rounded-md border border-border">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Month</TableHead>
-                        <TableHead className="text-right">Base Rev</TableHead>
-                        <TableHead className="text-right">Scen Rev</TableHead>
-                        <TableHead className="text-right">Base Exp</TableHead>
-                        <TableHead className="text-right">Scen Exp</TableHead>
+                        <TableHead className="text-right">Revenue (Excl. GST)</TableHead>
+                        <TableHead className="text-right">Operating Exp.</TableHead>
+                        <TableHead className="text-right">Payroll (incl. PF/ESI)</TableHead>
+                        <TableHead className="text-right">EBITDA</TableHead>
+                        <TableHead className="text-right">Corporate Tax</TableHead>
                         <TableHead className="text-right">Net Profit</TableHead>
-                        <TableHead className="text-right">Cash</TableHead>
+                        <TableHead className="text-right">Ending Cash</TableHead>
                         <TableHead className="text-right">Runway</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {rows.map((r) => {
-                        const risky = r.scenProfit < 0 || r.scenCash < 0 || r.runway < 6;
+                        const risky = r.scenProfit < 0 || r.scenCash < 0 || r.runway < 3;
                         return (
                           <TableRow key={r.month} className={cn(risky && "bg-danger-soft/60")}>
                             <TableCell className="font-medium">
@@ -659,12 +660,16 @@ function ForecastPage() {
                                 title={`Why did ${r.month} change?`}
                               >
                                 {r.month}
+                                {r.advanceTax > 0 ? " *" : ""}
                               </button>
                             </TableCell>
-                            <TableCell className="tabular text-right">{inr(r.baseRevenue, true)}</TableCell>
                             <TableCell className="tabular text-right">{inr(r.scenRevenue, true)}</TableCell>
-                            <TableCell className="tabular text-right">{inr(r.baseExpense, true)}</TableCell>
-                            <TableCell className="tabular text-right">{inr(r.scenExpense, true)}</TableCell>
+                            <TableCell className="tabular text-right">{inr(r.opex, true)}</TableCell>
+                            <TableCell className="tabular text-right">{inr(r.payroll, true)}</TableCell>
+                            <TableCell className="tabular text-right">{inr(r.ebitda, true)}</TableCell>
+                            <TableCell className="tabular text-right text-muted-foreground">
+                              {inr(r.tax, true)}
+                            </TableCell>
                             <TableCell
                               className={cn(
                                 "tabular text-right font-semibold",
@@ -683,7 +688,17 @@ function ForecastPage() {
                     </TableBody>
                   </Table>
                 </div>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[11px] text-muted-foreground">
+                    * quarterly advance tax payout month (Q1 Jun, Q2 Sep, Q3 Dec, Q4 Mar). Net profit is
+                    post-tax at 25% + 7% surcharge + 4% cess.
+                  </p>
+                  <Button variant="secondary" size="sm" onClick={exportCsv}>
+                    <Download className="size-4" /> Download FY Projection Statement
+                  </Button>
+                </div>
               </CardContent>
+
             </Card>
           </div>
         </div>
