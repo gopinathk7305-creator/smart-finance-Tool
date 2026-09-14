@@ -124,6 +124,8 @@ const TABS = [
 
 function ForecastPage() {
   const { txns, pays, live } = useDataset();
+  const { session } = useAuth();
+
   const [inputs, setInputs] = useState<ScenarioInputs>(BASE_SCENARIO);
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("profit");
   const [band, setBand] = useState(true);
