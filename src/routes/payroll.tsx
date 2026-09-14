@@ -243,6 +243,7 @@ function PayrollPage() {
             <Button variant="outline" onClick={exportCsv}>
               <Download className="size-4" /> Export CSV
             </Button>
+            <AiReportButton build={buildReport} size="default" />
           </div>
         </CardHeader>
         <CardContent>
