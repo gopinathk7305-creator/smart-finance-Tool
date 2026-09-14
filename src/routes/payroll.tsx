@@ -178,7 +178,7 @@ function PayrollPage() {
         <KpiCard label="TDS Withheld" value={inr(totalTds, true)} icon={Receipt} tone="danger" hint="Remit by 7th" />
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+      <div ref={chartsRef} className="mt-4 grid gap-4 lg:grid-cols-2">
         <Card className="border-border shadow-card">
           <CardHeader>
             <CardTitle className="text-base">Department-wise Payroll Allocation</CardTitle>
