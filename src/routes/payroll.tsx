@@ -115,6 +115,53 @@ function PayrollPage() {
     toast.success("Payroll sheet exported");
   };
 
+  const chartsRef = useRef<HTMLDivElement>(null);
+  const totalNet = payroll.reduce((s, p) => s + netPay(p), 0);
+  const totalOther = payroll.reduce((s, p) => s + p.deductions, 0);
+
+  const buildReport = () => ({
+    page: "payroll" as const,
+    reportName: "Salary Register & Statutory Deductions Summary",
+    fy: "FY 2026-27",
+    kpis: [
+      { label: "Total Payroll Cost (Gross)", value: inr(totalCost, true), delta: `${payroll.length} employees` },
+      { label: "Average Salary", value: inr(avgSalary, true), delta: "Per employee / month" },
+      { label: "PF / ESI Deductions", value: inr(totalPf, true), delta: "PF 12% · ESI 3.25%" },
+      { label: "TDS Withheld", value: inr(totalTds, true), delta: "Remit by 7th" },
+    ],
+    tables: [
+      {
+        title: "Employee Salary Register",
+        columns: ["Emp ID", "Name", "Department", "Basic", "Allowances", "PF", "TDS", "Net Pay"],
+        numericFrom: 3,
+        rows: filtered.map((p) => [
+          p.employee_id,
+          p.name,
+          p.department,
+          inr(p.basic_pay),
+          inr(p.allowances),
+          inr(p.pf_deduction),
+          inr(p.tds_deduction),
+          inr(netPay(p)),
+        ]),
+      },
+      {
+        title: "Department-wise Payroll Allocation",
+        columns: ["Department", "Basic", "Allowances", "Deductions", "Net Payout"],
+        numericFrom: 1,
+        rows: byDept.map((d) => [
+          d.department,
+          inr(d.basic),
+          inr(d.allowances),
+          inr(d.deductions),
+          inr(d.basic + d.allowances - d.deductions),
+        ]),
+      },
+    ],
+    facts: `Headcount ${payroll.length}. Gross payroll ${inr(totalCost)}, PF ${inr(totalPf)}, TDS ${inr(totalTds)}, other deductions ${inr(totalOther)}, net take-home ${inr(totalNet)}. Tax regime selected: ${regime}. Statutory basis: employer PF 12% of basic, ESI 3.25%, slab-wise TDS plus 4% health and education cess.`,
+    chartEl: chartsRef.current,
+  });
+
   return (
     <AppShell
       title="Payroll Analytics"
