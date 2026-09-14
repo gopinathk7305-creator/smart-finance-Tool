@@ -172,30 +172,39 @@ function ForecastPage() {
   const revDelta = pctChange(result.scenRevenueTotal, result.baseRevenueTotal);
   const profitDelta = pctChange(result.scenProfitTotal, result.baseProfitTotal);
   const runwayTone = result.runway > 12 ? "success" : result.runway >= 6 ? "warning" : "danger";
+  const q3Tax = rows.find((r) => r.month === "Dec")?.advanceTax ?? 0;
 
   const applyPreset = (key: keyof typeof PRESETS) =>
-    setInputs({ ...BASE_SCENARIO, ...PRESETS[key] });
+    setInputs({ ...BASE_SCENARIO, fy: inputs.fy, ...PRESETS[key] });
 
   const exportCsv = () =>
     downloadCSV(
-      "forecast-projection.csv",
+      `fy-projection-${inputs.fy.replace(/\s/g, "-").toLowerCase()}.csv`,
       rows.map((r) => ({
         Month: r.month,
-        "Baseline Revenue": r.baseRevenue,
-        "Scenario Revenue": r.scenRevenue,
-        "Baseline Expenses": r.baseExpense,
-        "Scenario Expenses": r.scenExpense,
-        "Net Profit": r.scenProfit,
-        "Projected Cash": r.scenCash,
-        "Runway (months)": r.runway,
+        "Revenue (Excl. GST)": r.scenRevenue,
+        "GST Output": r.gstOutput,
+        "Operating Expenses": r.opex,
+        "Payroll (incl. PF/ESI)": r.payroll,
+        EBITDA: r.ebitda,
+        "Corporate Tax": r.tax,
+        "Advance Tax Payout": r.advanceTax,
+        "Net Profit (Post-Tax)": r.scenProfit,
+        "Ending Cash Balance": r.scenCash,
+        "Runway (Months)": r.runway,
       })),
     );
 
   const exportPdf = async () => {
     if (!tableRef.current) return;
     toast.info("Preparing PDF…");
-    await exportElementToPdf(tableRef.current, "forecast-projection.pdf", "12-Month Projection");
+    await exportElementToPdf(
+      tableRef.current,
+      `fy-projection-${inputs.fy.replace(/\s/g, "-").toLowerCase()}.pdf`,
+      `${inputs.fy} Projection Statement`,
+    );
   };
+
 
   const saveScenario = () => {
     const trimmed = name.trim();
