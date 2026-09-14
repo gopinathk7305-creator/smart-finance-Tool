@@ -650,7 +650,17 @@ function ForecastPage() {
                         const risky = r.scenProfit < 0 || r.scenCash < 0 || r.runway < 6;
                         return (
                           <TableRow key={r.month} className={cn(risky && "bg-danger-soft/60")}>
-                            <TableCell className="font-medium">{r.month}</TableCell>
+                            <TableCell className="font-medium">
+                              <button
+                                type="button"
+                                disabled={aiLoading}
+                                onClick={() => void askAi(r.month)}
+                                className="underline decoration-dotted underline-offset-4 hover:text-brand"
+                                title={`Why did ${r.month} change?`}
+                              >
+                                {r.month}
+                              </button>
+                            </TableCell>
                             <TableCell className="tabular text-right">{inr(r.baseRevenue, true)}</TableCell>
                             <TableCell className="tabular text-right">{inr(r.scenRevenue, true)}</TableCell>
                             <TableCell className="tabular text-right">{inr(r.baseExpense, true)}</TableCell>
