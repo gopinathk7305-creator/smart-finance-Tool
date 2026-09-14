@@ -587,6 +587,30 @@ function ForecastPage() {
                   {inr((result.scenRevenueTotal / 12) * Math.min(0.35, inputs.dso / 365), true)} of cash, and
                   CAPEX of {inr(inputs.capex, true)} hits month one.
                 </p>
+
+                <div className="space-y-2 border-t border-border pt-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                      AI explanation{aiMonth ? ` · ${aiMonth}` : ""}
+                    </span>
+                    <Button size="sm" variant="outline" disabled={aiLoading} onClick={() => void askAi()}>
+                      {aiLoading ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="size-4" />
+                      )}
+                      Why it changed
+                    </Button>
+                  </div>
+                  {aiText ? (
+                    <p className="whitespace-pre-line rounded-md bg-secondary p-3 text-sm">{aiText}</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Ask AI to explain the month-by-month revenue, cost and profit movement, or press
+                      “Why?” on any month in the table.
+                    </p>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
