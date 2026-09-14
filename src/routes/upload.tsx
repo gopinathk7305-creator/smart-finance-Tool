@@ -118,6 +118,24 @@ function mapRows(key: DatasetKey, raw: Record<string, string>[], userId: string,
     } else if (key === "payroll") {
       const basic = toNumber(r["basic_pay"]);
       if (!basic) { errors.push({ row: line, issue: "basic_pay is blank — row will be skipped" }); return; }
+      const allowances = toNumber(r["allowances"]);
+      const otherDed = toNumber(r["deductions"]);
+      const pf = toNumber(r["pf_deduction"]) || Math.round(basic * 0.12);
+      // Slab-wise TDS + 4% cess computed from the row when the file omits it.
+      const computed = computeTax(
+        {
+          employee_id: "",
+          name: "",
+          department: "",
+          month_year: "",
+          basic_pay: basic,
+          allowances,
+          deductions: otherDed,
+          pf_deduction: pf,
+          tds_deduction: 0,
+        } as PayrollRecord,
+        "new",
+      );
       rows.push({
         user_id: userId,
         month_year: r["month_year"] || "",
@@ -125,10 +143,10 @@ function mapRows(key: DatasetKey, raw: Record<string, string>[], userId: string,
         name: r["name"] || r["employee_name"] || "",
         department: r["department"] || "",
         basic_pay: basic,
-        allowances: toNumber(r["allowances"]),
-        deductions: toNumber(r["deductions"]),
-        pf_deduction: toNumber(r["pf_deduction"]) || Math.round(basic * 0.12),
-        tds_deduction: toNumber(r["tds_deduction"]),
+        allowances,
+        deductions: otherDed,
+        pf_deduction: pf,
+        tds_deduction: toNumber(r["tds_deduction"]) || computed.monthlyTds,
         source_file: fileName,
       });
     } else if (key === "budget") {
