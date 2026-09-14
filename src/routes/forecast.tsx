@@ -1,194 +1,678 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { RotateCcw, TrendingUp, UserPlus, Wallet } from "lucide-react";
-import { useState } from "react";
+import {
+  Banknote,
+  Bookmark,
+  Download,
+  FileText,
+  Gauge,
+  RotateCcw,
+  Sparkles,
+  TrendingUp,
+  Wallet,
+} from "lucide-react";
+import { useMemo, useRef, useState } from "react";
 import {
   Area,
   AreaChart,
+  Bar,
+  BarChart,
   CartesianGrid,
   Legend,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
+import { toast } from "sonner";
 
 import { AppShell } from "@/components/finance/AppShell";
 import { KpiCard } from "@/components/finance/KpiCard";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { forecast, inr } from "@/lib/finance-data";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useDataset } from "@/lib/dataset";
+import { downloadCSV, inr } from "@/lib/finance-data";
+import { exportElementToPdf } from "@/lib/pdf-export";
+import {
+  BASE_SCENARIO,
+  PRESETS,
+  loadScenarios,
+  runForecast,
+  saveScenarios,
+  type SavedScenario,
+  type ScenarioInputs,
+} from "@/lib/forecast-engine";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/forecast")({
   head: () => ({
     meta: [
-      { title: "Forecasting & Scenarios — Finance IQ" },
+      { title: "Financial Forecasting & Scenario Modeling — Finance IQ" },
       {
         name: "description",
         content:
-          "Model 12-month rolling forecasts with revenue growth, opex adjustment and hiring levers.",
+          "Interactive 12-month rolling forecast with revenue, cost, payroll and cash-flow levers, sensitivity insights and exportable projections.",
       },
-      { property: "og:title", content: "Forecasting & Scenarios — Finance IQ" },
+      {
+        property: "og:title",
+        content: "Financial Forecasting & Multi-Scenario Modeling — Finance IQ",
+      },
       {
         property: "og:description",
-        content: "Compare baseline versus scenario profit over the next twelve months.",
+        content:
+          "Stress-test revenue growth, churn, hiring, CAPEX and DSO against your baseline in one workspace.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: ForecastPage,
 });
 
-function ForecastPage() {
-  const [growth, setGrowth] = useState(12);
-  const [opex, setOpex] = useState(4);
-  const [hires, setHires] = useState(3);
+const TABS = [
+  { id: "profit", label: "Net Profit" },
+  { id: "revopex", label: "Revenue vs Opex" },
+  { id: "runway", label: "Cash Runway Trend" },
+  { id: "cumulative", label: "Cumulative Cash Flow" },
+] as const;
 
-  const data = forecast(growth, opex, hires);
-  const baselineTotal = data.reduce((s, d) => s + d.baseline, 0);
-  const scenarioTotal = data.reduce((s, d) => s + d.scenario, 0);
-  const delta = ((scenarioTotal - baselineTotal) / Math.abs(baselineTotal)) * 100;
+function ForecastPage() {
+  const { txns, pays, live } = useDataset();
+  const [inputs, setInputs] = useState<ScenarioInputs>(BASE_SCENARIO);
+  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("profit");
+  const [band, setBand] = useState(true);
+  const [saved, setSaved] = useState<SavedScenario[]>(() => loadScenarios());
+  const [name, setName] = useState("");
+  const [open, setOpen] = useState(false);
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  const set = <K extends keyof ScenarioInputs>(key: K, value: ScenarioInputs[K]) =>
+    setInputs((prev) => ({ ...prev, [key]: value }));
+
+  const result = useMemo(() => runForecast(inputs, txns, pays), [inputs, txns, pays]);
+  const { rows } = result;
+
+  const revDelta = pctChange(result.scenRevenueTotal, result.baseRevenueTotal);
+  const profitDelta = pctChange(result.scenProfitTotal, result.baseProfitTotal);
+  const runwayTone = result.runway > 12 ? "success" : result.runway >= 6 ? "warning" : "danger";
+
+  const applyPreset = (key: keyof typeof PRESETS) =>
+    setInputs({ ...BASE_SCENARIO, ...PRESETS[key] });
+
+  const exportCsv = () =>
+    downloadCSV(
+      "forecast-projection.csv",
+      rows.map((r) => ({
+        Month: r.month,
+        "Baseline Revenue": r.baseRevenue,
+        "Scenario Revenue": r.scenRevenue,
+        "Baseline Expenses": r.baseExpense,
+        "Scenario Expenses": r.scenExpense,
+        "Net Profit": r.scenProfit,
+        "Projected Cash": r.scenCash,
+        "Runway (months)": r.runway,
+      })),
+    );
+
+  const exportPdf = async () => {
+    if (!tableRef.current) return;
+    toast.info("Preparing PDF…");
+    await exportElementToPdf(tableRef.current, "forecast-projection.pdf", "12-Month Projection");
+  };
+
+  const saveScenario = () => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const next = [...saved.filter((s) => s.name !== trimmed), { name: trimmed, inputs }];
+    setSaved(next);
+    saveScenarios(next);
+    setName("");
+    setOpen(false);
+    toast.success(`Scenario "${trimmed}" saved`);
+  };
 
   return (
-    <AppShell title="Forecasting & Scenario Planning" subtitle="12-month rolling outlook">
-      <div className="grid gap-4 lg:grid-cols-4">
-        <Card className="border-border shadow-card lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="text-base">Scenario levers</CardTitle>
-            <CardDescription>Drag to re-model instantly</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-7">
-            <Lever
-              label="Revenue growth"
-              value={growth}
-              suffix="%"
-              min={-20}
-              max={50}
-              onChange={setGrowth}
-            />
-            <Lever label="Opex adjustment" value={opex} suffix="%" min={-20} max={30} onChange={setOpex} />
-            <Lever label="New hires" value={hires} suffix="" min={0} max={25} onChange={setHires} />
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-                setGrowth(12);
-                setOpex(4);
-                setHires(3);
+    <AppShell
+      title="Financial Forecasting & Multi-Scenario Modeling"
+      subtitle={`Interactive 12-Month Rolling Outlook & Stress Testing Engine · ${live ? "live data" : "demo data"}`}
+    >
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <Button variant="outline" size="sm" onClick={() => applyPreset("base")}>
+          Base Case
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => applyPreset("best")}>
+          Best Case (+25% Rev)
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => applyPreset("worst")}>
+          Worst Case (−15% Rev)
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setInputs(BASE_SCENARIO)}>
+          <RotateCcw className="size-4" /> Reset All
+        </Button>
+
+        <div className="ml-auto flex items-center gap-2">
+          {saved.length > 0 && (
+            <Select
+              onValueChange={(v) => {
+                const s = saved.find((x) => x.name === v);
+                if (s) setInputs(s.inputs);
               }}
             >
-              <RotateCcw className="size-4" /> Reset to baseline
-            </Button>
+              <SelectTrigger className="w-[190px] bg-background">
+                <SelectValue placeholder="Load saved scenario" />
+              </SelectTrigger>
+              <SelectContent>
+                {saved.map((s) => (
+                  <SelectItem key={s.name} value={s.name}>
+                    {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm">
+                <Bookmark className="size-4" /> Save Current Scenario
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Name this scenario</DialogTitle>
+              </DialogHeader>
+              <Input
+                autoFocus
+                placeholder="Aggressive Hiring Q4"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && saveScenario()}
+              />
+              <DialogFooter>
+                <Button onClick={saveScenario}>Save scenario</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-4">
+        <Card className="border-border shadow-card xl:col-span-1">
+          <CardHeader>
+            <CardTitle className="text-base">Scenario controls</CardTitle>
+            <CardDescription>Tune drivers, results update instantly</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Accordion type="multiple" defaultValue={["rev", "cost", "cash"]}>
+              <AccordionItem value="rev">
+                <AccordionTrigger className="text-sm font-semibold">Revenue drivers</AccordionTrigger>
+                <AccordionContent className="space-y-6 pt-2">
+                  <Lever
+                    label="Projected revenue growth"
+                    value={inputs.revenueGrowth}
+                    min={-30}
+                    max={100}
+                    suffix="%"
+                    onChange={(v) => set("revenueGrowth", v)}
+                  />
+                  <Lever
+                    label="Churn / attrition rate"
+                    value={inputs.churn}
+                    min={0}
+                    max={20}
+                    suffix="%"
+                    onChange={(v) => set("churn", v)}
+                  />
+                  <Lever
+                    label="Price / inflation factor"
+                    value={inputs.priceFactor}
+                    min={-10}
+                    max={30}
+                    suffix="%"
+                    onChange={(v) => set("priceFactor", v)}
+                  />
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="cost">
+                <AccordionTrigger className="text-sm font-semibold">
+                  Cost &amp; payroll drivers
+                </AccordionTrigger>
+                <AccordionContent className="space-y-6 pt-2">
+                  <Lever
+                    label="Operating expenses adjustment"
+                    value={inputs.opexAdj}
+                    min={-30}
+                    max={50}
+                    suffix="%"
+                    onChange={(v) => set("opexAdj", v)}
+                  />
+                  <Lever
+                    label="New hires"
+                    value={inputs.hires}
+                    min={0}
+                    max={50}
+                    suffix=""
+                    onChange={(v) => set("hires", v)}
+                  />
+                  <Lever
+                    label="Avg annual salary per hire"
+                    value={inputs.avgSalary}
+                    min={300000}
+                    max={5000000}
+                    step={50000}
+                    suffix=""
+                    currency
+                    onChange={(v) => set("avgSalary", v)}
+                  />
+                  <Lever
+                    label="Planned CAPEX (one-time)"
+                    value={inputs.capex}
+                    min={0}
+                    max={50000000}
+                    step={500000}
+                    suffix=""
+                    currency
+                    onChange={(v) => set("capex", v)}
+                  />
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="cash">
+                <AccordionTrigger className="text-sm font-semibold">Cash flow drivers</AccordionTrigger>
+                <AccordionContent className="space-y-6 pt-2">
+                  <Lever
+                    label="Days sales outstanding (DSO)"
+                    value={inputs.dso}
+                    min={0}
+                    max={90}
+                    suffix=" d"
+                    onChange={(v) => set("dso", v)}
+                  />
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </CardContent>
         </Card>
 
-        <div className="space-y-4 lg:col-span-3">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <KpiCard label="Baseline 12M Profit" value={inr(baselineTotal, true)} icon={Wallet} />
+        <div className="space-y-4 xl:col-span-3">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <KpiCard
-              label="Scenario 12M Profit"
-              value={inr(scenarioTotal, true)}
-              delta={delta}
-              hint="vs baseline"
+              label="Projected 12M Revenue"
+              value={inr(result.scenRevenueTotal, true)}
+              delta={revDelta}
+              hint={`baseline ${inr(result.baseRevenueTotal, true)}`}
               icon={TrendingUp}
-              tone={scenarioTotal >= baselineTotal ? "success" : "danger"}
             />
             <KpiCard
-              label="Headcount Impact"
-              value={inr(
-                hires *
-                  (data[0] ? data[0].scenarioExpense - data[0].scenarioExpense / (hires || 1) : 0) /
-                  (hires || 1),
-                true,
-              )}
-              hint={`${hires} new roles modelled`}
-              icon={UserPlus}
-              tone="warning"
+              label="Projected 12M Net Profit"
+              value={inr(result.scenProfitTotal, true)}
+              delta={profitDelta}
+              hint={`net margin ${result.netMargin.toFixed(1)}%`}
+              icon={Banknote}
+              tone={result.scenProfitTotal >= result.baseProfitTotal ? "success" : "danger"}
+            />
+            <KpiCard
+              label="Projected End Cash"
+              value={inr(result.endCash, true)}
+              hint={`cash impact ${inr(result.cashImpact, true)}`}
+              icon={Wallet}
+              tone={result.endCash >= 0 ? "neutral" : "danger"}
+            />
+            <KpiCard
+              label="Estimated Cash Runway"
+              value={result.runway >= 24 ? "24+ Months" : `${result.runway.toFixed(1)} Months`}
+              hint={runwayTone === "success" ? "healthy" : runwayTone === "warning" ? "monitor" : "critical"}
+              icon={Gauge}
+              tone={runwayTone}
             />
           </div>
 
           <Card className="border-border shadow-card">
-            <CardHeader>
-              <CardTitle className="text-base">Baseline vs Scenario Monthly Profit</CardTitle>
-              <CardDescription>Next twelve months</CardDescription>
+            <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-base">Baseline vs Scenario</CardTitle>
+                <CardDescription>Next twelve months</CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                {tab === "profit" && (
+                  <Button
+                    variant={band ? "secondary" : "outline"}
+                    size="sm"
+                    onClick={() => setBand((b) => !b)}
+                  >
+                    95% band
+                  </Button>
+                )}
+                <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
+                  <TabsList>
+                    {TABS.map((t) => (
+                      <TabsTrigger key={t.id} value={t.id} className="text-xs">
+                        {t.label}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
+              </div>
             </CardHeader>
             <CardContent className="h-[340px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data}>
-                  <defs>
-                    <linearGradient id="scen" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="var(--brand)" stopOpacity={0.35} />
-                      <stop offset="100%" stopColor="var(--brand)" stopOpacity={0.02} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                  <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
-                  <YAxis tickFormatter={(v) => inr(Number(v), true)} tickLine={false} axisLine={false} fontSize={12} width={72} />
-                  <Tooltip formatter={(v) => inr(Number(v))} />
-                  <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                  <Area
-                    type="monotone"
-                    dataKey="baseline"
-                    name="Baseline"
-                    stroke="var(--muted-foreground)"
-                    strokeDasharray="5 4"
-                    strokeWidth={2}
-                    fill="transparent"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="scenario"
-                    name="Scenario"
-                    stroke="var(--brand)"
-                    strokeWidth={2}
-                    fill="url(#scen)"
-                  />
-                </AreaChart>
+                {tab === "revopex" ? (
+                  <BarChart data={rows}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                    <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
+                    <YAxis
+                      tickFormatter={(v) => inr(Number(v), true)}
+                      tickLine={false}
+                      axisLine={false}
+                      fontSize={12}
+                      width={72}
+                    />
+                    <Tooltip formatter={(v) => inr(Number(v))} />
+                    <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                    <Bar dataKey="scenRevenue" name="Revenue" fill="#0284c7" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="scenExpense" name="Opex" fill="#475569" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                ) : tab === "runway" ? (
+                  <LineChart data={rows}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                    <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
+                    <YAxis
+                      tickFormatter={(v) => `${v}m`}
+                      tickLine={false}
+                      axisLine={false}
+                      fontSize={12}
+                      width={48}
+                    />
+                    <Tooltip formatter={(v) => `${Number(v).toFixed(1)} months`} />
+                    <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                    <Line
+                      type="monotone"
+                      dataKey="runway"
+                      name="Runway"
+                      stroke="#0284c7"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </LineChart>
+                ) : tab === "cumulative" ? (
+                  <AreaChart data={rows}>
+                    <defs>
+                      <linearGradient id="cum" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#0284c7" stopOpacity={0.35} />
+                        <stop offset="100%" stopColor="#0284c7" stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                    <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
+                    <YAxis
+                      tickFormatter={(v) => inr(Number(v), true)}
+                      tickLine={false}
+                      axisLine={false}
+                      fontSize={12}
+                      width={72}
+                    />
+                    <Tooltip formatter={(v) => inr(Number(v))} />
+                    <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                    <Area
+                      type="monotone"
+                      dataKey="cumulative"
+                      name="Cumulative cash flow"
+                      stroke="#0284c7"
+                      strokeWidth={2}
+                      fill="url(#cum)"
+                    />
+                  </AreaChart>
+                ) : (
+                  <AreaChart data={rows}>
+                    <defs>
+                      <linearGradient id="scen" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#0284c7" stopOpacity={0.35} />
+                        <stop offset="100%" stopColor="#0284c7" stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                    <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
+                    <YAxis
+                      tickFormatter={(v) => inr(Number(v), true)}
+                      tickLine={false}
+                      axisLine={false}
+                      fontSize={12}
+                      width={72}
+                    />
+                    <Tooltip formatter={(v) => inr(Number(v))} />
+                    <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                    {band && (
+                      <Area
+                        type="monotone"
+                        dataKey="upper"
+                        name="95% confidence"
+                        stroke="transparent"
+                        fill="#0284c7"
+                        fillOpacity={0.12}
+                      />
+                    )}
+                    {band && (
+                      <Area
+                        type="monotone"
+                        dataKey="lower"
+                        name="Lower bound"
+                        stroke="#0284c7"
+                        strokeOpacity={0.3}
+                        strokeWidth={1}
+                        fill="transparent"
+                        legendType="none"
+                        tooltipType="none"
+                      />
+                    )}
+                    <Area
+                      type="monotone"
+                      dataKey="baseProfit"
+                      name="Baseline"
+                      stroke="#475569"
+                      strokeDasharray="5 4"
+                      strokeWidth={2}
+                      fill="transparent"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="scenProfit"
+                      name="Scenario"
+                      stroke="#0284c7"
+                      strokeWidth={2}
+                      fill="url(#scen)"
+                    />
+                  </AreaChart>
+                )}
               </ResponsiveContainer>
             </CardContent>
           </Card>
+
+          <div className="grid gap-4 lg:grid-cols-5">
+            <Card className="border-border shadow-card lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Sparkles className="size-4 text-brand" /> Sensitivity insights
+                </CardTitle>
+                <CardDescription>Updates as you move the levers</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm leading-relaxed">
+                <p className="rounded-md bg-brand-soft p-3 text-brand">
+                  ⚡ Revenue growth of {inputs.revenueGrowth}% with {inputs.churn}% churn shifts 12-month
+                  revenue by {revDelta.toFixed(1)}% ({inr(result.scenRevenueTotal - result.baseRevenueTotal, true)}),
+                  while {inputs.hires} new hires add {inr(result.payrollImpact, true)} of annual payroll.
+                </p>
+                <p className="text-muted-foreground">
+                  Net profit moves {profitDelta.toFixed(1)}% versus baseline and ending cash lands at{" "}
+                  {inr(result.endCash, true)} ({inr(result.cashImpact, true)} vs baseline). Runway is{" "}
+                  {result.runway >= 24 ? "beyond 24" : result.runway.toFixed(1)} months at a{" "}
+                  {result.netMargin.toFixed(1)}% net margin.
+                </p>
+                <p className="text-muted-foreground">
+                  A {inputs.dso}-day collection cycle delays{" "}
+                  {inr((result.scenRevenueTotal / 12) * Math.min(0.35, inputs.dso / 365), true)} of cash, and
+                  CAPEX of {inr(inputs.capex, true)} hits month one.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border shadow-card lg:col-span-3">
+              <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="text-base">12-month detailed projections</CardTitle>
+                  <CardDescription>Low runway and negative cash months highlighted</CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={exportCsv}>
+                    <Download className="size-4" /> CSV
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={exportPdf}>
+                    <FileText className="size-4" /> PDF
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div ref={tableRef} className="max-h-[320px] overflow-auto rounded-md border border-border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Month</TableHead>
+                        <TableHead className="text-right">Base Rev</TableHead>
+                        <TableHead className="text-right">Scen Rev</TableHead>
+                        <TableHead className="text-right">Base Exp</TableHead>
+                        <TableHead className="text-right">Scen Exp</TableHead>
+                        <TableHead className="text-right">Net Profit</TableHead>
+                        <TableHead className="text-right">Cash</TableHead>
+                        <TableHead className="text-right">Runway</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rows.map((r) => {
+                        const risky = r.scenProfit < 0 || r.scenCash < 0 || r.runway < 6;
+                        return (
+                          <TableRow key={r.month} className={cn(risky && "bg-danger-soft/60")}>
+                            <TableCell className="font-medium">{r.month}</TableCell>
+                            <TableCell className="tabular text-right">{inr(r.baseRevenue, true)}</TableCell>
+                            <TableCell className="tabular text-right">{inr(r.scenRevenue, true)}</TableCell>
+                            <TableCell className="tabular text-right">{inr(r.baseExpense, true)}</TableCell>
+                            <TableCell className="tabular text-right">{inr(r.scenExpense, true)}</TableCell>
+                            <TableCell
+                              className={cn(
+                                "tabular text-right font-semibold",
+                                r.scenProfit < 0 ? "text-danger" : "text-success",
+                              )}
+                            >
+                              {inr(r.scenProfit, true)}
+                            </TableCell>
+                            <TableCell className="tabular text-right">{inr(r.scenCash, true)}</TableCell>
+                            <TableCell className="tabular text-right">
+                              {r.runway >= 24 ? "24+" : `${r.runway.toFixed(1)}m`}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </AppShell>
   );
 }
 
+function pctChange(next: number, base: number) {
+  if (!base) return 0;
+  return ((next - base) / Math.abs(base)) * 100;
+}
+
 function Lever({
   label,
   value,
-  suffix,
   min,
   max,
+  step = 1,
+  suffix,
+  currency = false,
   onChange,
 }: {
   label: string;
   value: number;
-  suffix: string;
   min: number;
   max: number;
+  step?: number;
+  suffix: string;
+  currency?: boolean;
   onChange: (v: number) => void;
 }) {
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <Label className="text-sm">{label}</Label>
-        <span className="tabular rounded-md bg-secondary px-2 py-0.5 text-sm font-semibold">
-          {value > 0 && suffix === "%" ? "+" : ""}
-          {value}
-          {suffix}
-        </span>
+    <div className="space-y-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <Label className="text-xs">{label}</Label>
+        <Input
+          type="number"
+          value={value}
+          min={min}
+          max={max}
+          step={step}
+          onChange={(e) => onChange(clamp(Number(e.target.value), min, max))}
+          className="tabular h-8 w-24 text-right text-xs"
+        />
       </div>
-      <Slider value={[value]} min={min} max={max} step={1} onValueChange={([v]) => onChange(v ?? 0)} />
+      <Slider
+        value={[value]}
+        min={min}
+        max={max}
+        step={step}
+        onValueChange={([v]) => onChange(v ?? min)}
+      />
       <div className="flex justify-between text-[11px] text-muted-foreground">
-        <span>
-          {min}
-          {suffix}
+        <span>{currency ? inr(min, true) : `${min}${suffix}`}</span>
+        <span className="font-medium text-foreground">
+          {currency ? inr(value, true) : `${value}${suffix}`}
         </span>
-        <span>
-          {max}
-          {suffix}
-        </span>
+        <span>{currency ? inr(max, true) : `${max}${suffix}`}</span>
       </div>
     </div>
   );
+}
+
+function clamp(v: number, min: number, max: number) {
+  if (!Number.isFinite(v)) return min;
+  return Math.min(max, Math.max(min, v));
 }
