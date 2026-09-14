@@ -112,3 +112,47 @@ Maximum 20 findings, most severe first. Use only amounts and parties present in 
       return { findings: [] as AiFinding[] };
     }
   });
+
+export interface ForecastMonth {
+  month: string;
+  revenue: number;
+  cost: number;
+  profit: number;
+  baseRevenue: number;
+  baseCost: number;
+  baseProfit: number;
+}
+
+export interface ForecastAiInput {
+  drivers: {
+    revenueGrowth: number;
+    churn: number;
+    priceFactor: number;
+    opexAdj: number;
+    hires: number;
+    avgSalary: number;
+    capex: number;
+    dso: number;
+  };
+  months: ForecastMonth[];
+  /** when set, focus the explanation on this single month */
+  focusMonth?: string;
+}
+
+export const explainForecast = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: ForecastAiInput) => input)
+  .handler(async ({ data }) => {
+    const d = data.drivers;
+    const text = await callGateway(
+      "You are a CFO-level financial planning analyst. Explain forecast movements in short, concrete plain text (no markdown symbols). Amounts are Indian rupees. Use only the numbers supplied and never invent new figures.",
+      data.focusMonth
+        ? `Scenario drivers: revenue growth ${d.revenueGrowth}%, churn ${d.churn}%, price/inflation ${d.priceFactor}%, opex adjustment ${d.opexAdj}%, ${d.hires} new hires at ${d.avgSalary} each per year, CAPEX ${d.capex}, DSO ${d.dso} days.
+Monthly data (JSON, revenue/cost/profit are scenario values, base* are baseline): ${JSON.stringify(data.months)}
+Explain ONLY the month "${data.focusMonth}": why its revenue, cost and profit differ from the baseline and from the previous month, naming which drivers caused it and by roughly how much. Under 90 words.`
+        : `Scenario drivers: revenue growth ${d.revenueGrowth}%, churn ${d.churn}%, price/inflation ${d.priceFactor}%, opex adjustment ${d.opexAdj}%, ${d.hires} new hires at ${d.avgSalary} each per year, CAPEX ${d.capex}, DSO ${d.dso} days.
+Monthly data (JSON, revenue/cost/profit are scenario values, base* are baseline): ${JSON.stringify(data.months)}
+Give: 1) two lines on how revenue, cost and profit move across the twelve months, 2) three bullets naming the drivers behind the biggest monthly changes with the months and amounts, 3) one line on the main risk month. Under 170 words.`,
+    );
+    return { text };
+  });
