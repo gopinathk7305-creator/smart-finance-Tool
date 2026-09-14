@@ -108,11 +108,12 @@ export const Route = createFileRoute("/forecast")({
 });
 
 const TABS = [
-  { id: "profit", label: "Net Profit" },
-  { id: "revopex", label: "Revenue vs Opex" },
-  { id: "runway", label: "Cash Runway Trend" },
+  { id: "profit", label: "Net Profit (Post-Tax)" },
+  { id: "revopex", label: "Revenue vs Opex (Excl. GST)" },
+  { id: "runway", label: "Cash Runway & Buffer" },
   { id: "cumulative", label: "Cumulative Cash Flow" },
 ] as const;
+
 
 function ForecastPage() {
   const { txns, pays, live } = useDataset();
