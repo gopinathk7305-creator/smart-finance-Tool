@@ -1,9 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+
+import { explainForecast } from "@/lib/ai.functions";
 import {
   Banknote,
   Bookmark,
   Download,
   FileText,
+  Loader2,
   Gauge,
   RotateCcw,
   Sparkles,
@@ -119,6 +123,44 @@ function ForecastPage() {
   const [name, setName] = useState("");
   const [open, setOpen] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
+  const [aiText, setAiText] = useState("");
+  const [aiMonth, setAiMonth] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const explain = useServerFn(explainForecast);
+
+  const askAi = async (focusMonth?: string) => {
+    setAiLoading(true);
+    setAiMonth(focusMonth ?? null);
+    setAiText("");
+    try {
+      const res = await explain({
+        data: {
+          drivers: inputs,
+          months: rows.map((r) => ({
+            month: r.month,
+            revenue: r.scenRevenue,
+            cost: r.scenExpense,
+            profit: r.scenProfit,
+            baseRevenue: r.baseRevenue,
+            baseCost: r.baseExpense,
+            baseProfit: r.baseProfit,
+          })),
+          ...(focusMonth ? { focusMonth } : {}),
+        },
+      });
+      setAiText(res.text);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "AI request failed.";
+      toast.error(
+        message.includes("Unauthorized")
+          ? "Sign in to use the AI explanation — demo mode has no AI access."
+          : message,
+      );
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
 
   const set = <K extends keyof ScenarioInputs>(key: K, value: ScenarioInputs[K]) =>
     setInputs((prev) => ({ ...prev, [key]: value }));
@@ -546,6 +588,30 @@ function ForecastPage() {
                   {inr((result.scenRevenueTotal / 12) * Math.min(0.35, inputs.dso / 365), true)} of cash, and
                   CAPEX of {inr(inputs.capex, true)} hits month one.
                 </p>
+
+                <div className="space-y-2 border-t border-border pt-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                      AI explanation{aiMonth ? ` · ${aiMonth}` : ""}
+                    </span>
+                    <Button size="sm" variant="outline" disabled={aiLoading} onClick={() => void askAi()}>
+                      {aiLoading ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="size-4" />
+                      )}
+                      Why it changed
+                    </Button>
+                  </div>
+                  {aiText ? (
+                    <p className="whitespace-pre-line rounded-md bg-secondary p-3 text-sm">{aiText}</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Ask AI to explain the month-by-month revenue, cost and profit movement, or press
+                      “Why?” on any month in the table.
+                    </p>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
@@ -584,7 +650,17 @@ function ForecastPage() {
                         const risky = r.scenProfit < 0 || r.scenCash < 0 || r.runway < 6;
                         return (
                           <TableRow key={r.month} className={cn(risky && "bg-danger-soft/60")}>
-                            <TableCell className="font-medium">{r.month}</TableCell>
+                            <TableCell className="font-medium">
+                              <button
+                                type="button"
+                                disabled={aiLoading}
+                                onClick={() => void askAi(r.month)}
+                                className="underline decoration-dotted underline-offset-4 hover:text-brand"
+                                title={`Why did ${r.month} change?`}
+                              >
+                                {r.month}
+                              </button>
+                            </TableCell>
                             <TableCell className="tabular text-right">{inr(r.baseRevenue, true)}</TableCell>
                             <TableCell className="tabular text-right">{inr(r.scenRevenue, true)}</TableCell>
                             <TableCell className="tabular text-right">{inr(r.baseExpense, true)}</TableCell>
