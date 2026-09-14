@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Download, FileSpreadsheet, FileText, Loader2, Printer } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Loader2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -36,7 +36,6 @@ import {
   totals,
 } from "@/lib/finance-data";
 import { auditFindings } from "@/lib/enterprise-data";
-import { exportElementToPdf } from "@/lib/pdf-export";
 
 export const Route = createFileRoute("/reports")({
   head: () => ({
