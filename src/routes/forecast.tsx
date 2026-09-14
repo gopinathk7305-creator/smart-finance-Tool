@@ -210,15 +210,79 @@ function ForecastPage() {
       })),
     );
 
-  const exportPdf = async () => {
-    if (!tableRef.current) return;
-    toast.info("Preparing PDF…");
-    await exportElementToPdf(
-      tableRef.current,
-      `fy-projection-${inputs.fy.replace(/\s/g, "-").toLowerCase()}.pdf`,
-      `${inputs.fy} Projection Statement`,
-    );
-  };
+  const buildReport = () => ({
+    page: "forecast" as const,
+    reportName: "Scenario Analysis, Sensitivity Assessment & Runway Projections",
+    fy: inputs.fy,
+    kpis: [
+      {
+        label: "Projected 12M Revenue (Excl. GST)",
+        value: inr(result.scenRevenueTotal, true),
+        delta: `${revDelta >= 0 ? "+" : ""}${revDelta.toFixed(1)}% vs baseline`,
+      },
+      {
+        label: "Projected 12M Net Profit (Post-Tax)",
+        value: inr(result.scenProfitTotal, true),
+        delta: `${profitDelta >= 0 ? "+" : ""}${profitDelta.toFixed(1)}% vs baseline`,
+      },
+      {
+        label: "Ending Cash Balance",
+        value: inr(rows[rows.length - 1]?.scenCash ?? 0, true),
+        delta: `Q3 advance tax ${inr(q3Tax, true)}`,
+      },
+      {
+        label: "Cash Runway",
+        value: result.runway >= 24 ? "24+ months" : `${result.runway.toFixed(1)} months`,
+        delta: runwayTone === "success" ? "healthy" : runwayTone === "warning" ? "monitor" : "critical",
+      },
+    ],
+    tables: [
+      {
+        title: `${inputs.fy} Projection Statement (April to March)`,
+        columns: [
+          "Month",
+          "Revenue",
+          "Opex",
+          "Payroll",
+          "EBITDA",
+          "Corp. Tax",
+          "Net Profit",
+          "Ending Cash",
+          "Runway",
+        ],
+        numericFrom: 1,
+        rows: rows.map((r) => [
+          `${r.month}${r.advanceTax > 0 ? " *" : ""}`,
+          inr(r.scenRevenue, true),
+          inr(r.opex, true),
+          inr(r.payroll, true),
+          inr(r.ebitda, true),
+          inr(r.tax, true),
+          inr(r.scenProfit, true),
+          inr(r.scenCash, true),
+          r.runway >= 24 ? "24+" : `${r.runway.toFixed(1)}m`,
+        ]),
+      },
+      {
+        title: "Scenario Drivers",
+        columns: ["Driver", "Setting"],
+        rows: [
+          ["Revenue growth", `${inputs.revenueGrowth}%`],
+          ["Churn", `${inputs.churn}%`],
+          ["Price / inflation", `${inputs.priceFactor}%`],
+          ["GST output rate", `${inputs.gstRate}%`],
+          ["Opex inflation", `${inputs.opexAdj}%`],
+          ["New hires", `${inputs.hires} at ${inr(inputs.avgSalary)} p.a. CTC (incl. PF 12% + ESI 3.25%)`],
+          ["CAPEX", inr(inputs.capex)],
+          ["DSO", `${inputs.dso} days`],
+        ],
+      },
+    ],
+    facts: `Baseline 12M revenue ${inr(result.baseRevenueTotal)} vs scenario ${inr(result.scenRevenueTotal)} (${revDelta.toFixed(1)}%). Baseline net profit ${inr(result.baseProfitTotal)} vs scenario ${inr(result.scenProfitTotal)} (${profitDelta.toFixed(1)}%). Cash runway ${result.runway.toFixed(1)} months. Drivers: revenue growth ${inputs.revenueGrowth}%, churn ${inputs.churn}%, opex ${inputs.opexAdj}%, ${inputs.hires} hires at ${inr(inputs.avgSalary)} CTC, CAPEX ${inr(inputs.capex)}, DSO ${inputs.dso} days, GST ${inputs.gstRate}%. Monthly detail: ${rows
+      .map((r) => `${r.month} rev ${inr(r.scenRevenue, true)} profit ${inr(r.scenProfit, true)} cash ${inr(r.scenCash, true)} runway ${r.runway.toFixed(1)}m`)
+      .join("; ")}. Data source: ${live ? "uploaded ledger" : "demo dataset"}.`,
+    chartEl: chartRef.current,
+  });
 
 
   const saveScenario = () => {
