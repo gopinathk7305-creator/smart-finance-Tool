@@ -3,6 +3,7 @@ import { AlertOctagon, CheckCircle2, Copy, ShieldAlert, Sparkles } from "lucide-
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { AiReportButton } from "@/components/finance/AiReportButton";
 import { AppShell } from "@/components/finance/AppShell";
 import { KpiCard } from "@/components/finance/KpiCard";
 import { Badge } from "@/components/ui/badge";
