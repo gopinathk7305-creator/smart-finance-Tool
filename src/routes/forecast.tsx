@@ -573,21 +573,26 @@ function ForecastPage() {
               </CardHeader>
               <CardContent className="space-y-3 text-sm leading-relaxed">
                 <p className="rounded-md bg-brand-soft p-3 text-brand">
-                  ⚡ Revenue growth of {inputs.revenueGrowth}% with {inputs.churn}% churn shifts 12-month
-                  revenue by {revDelta.toFixed(1)}% ({inr(result.scenRevenueTotal - result.baseRevenueTotal, true)}),
-                  while {inputs.hires} new hires add {inr(result.payrollImpact, true)} of annual payroll.
+                  🇮🇳 AI Corporate Insight: revenue growth of {inputs.revenueGrowth}% against{" "}
+                  {inputs.churn}% churn moves FY top-line by {revDelta.toFixed(1)}% (
+                  {inr(result.scenRevenueTotal - result.baseRevenueTotal, true)}). Adding {inputs.hires} team
+                  members at {inr(inputs.avgSalary, true)} CTC raises annual payroll by{" "}
+                  {inr(result.payrollImpact, true)} (incl. PF 12% &amp; ESI 3.25%).
                 </p>
                 <p className="text-muted-foreground">
-                  Net profit moves {profitDelta.toFixed(1)}% versus baseline and ending cash lands at{" "}
-                  {inr(result.endCash, true)} ({inr(result.cashImpact, true)} vs baseline). Runway is{" "}
-                  {result.runway >= 24 ? "beyond 24" : result.runway.toFixed(1)} months at a{" "}
-                  {result.netMargin.toFixed(1)}% net margin.
+                  Post-tax net profit moves {profitDelta.toFixed(1)}% versus baseline at a{" "}
+                  {result.netMargin.toFixed(1)}% net margin. Corporate tax for the year is{" "}
+                  {inr(result.taxTotal, true)} (25% + 7% surcharge + 4% cess), with the Q3 advance tax
+                  instalment of {inr(q3Tax, true)} due in December.
                 </p>
                 <p className="text-muted-foreground">
-                  A {inputs.dso}-day collection cycle delays{" "}
+                  GST output at {inputs.gstRate}% routes {inr(result.gstTotal, true)} through the books as a
+                  pass-through. A {inputs.dso}-day collection cycle (DSO) delays{" "}
                   {inr((result.scenRevenueTotal / 12) * Math.min(0.35, inputs.dso / 365), true)} of cash, and
-                  CAPEX of {inr(inputs.capex, true)} hits month one.
+                  CAPEX of {inr(inputs.capex, true)} hits month one. Runway lands at{" "}
+                  {result.runway >= 24 ? "beyond 24" : result.runway.toFixed(1)} months.
                 </p>
+
 
                 <div className="space-y-2 border-t border-border pt-3">
                   <div className="flex items-center justify-between gap-2">
