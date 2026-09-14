@@ -6,7 +6,6 @@ import {
   Banknote,
   Bookmark,
   Download,
-  FileText,
   Loader2,
   Gauge,
   RotateCcw,
@@ -75,7 +74,7 @@ import { useAuth } from "@/lib/auth";
 import { useDataset } from "@/lib/dataset";
 
 import { downloadCSV, inr } from "@/lib/finance-data";
-import { exportElementToPdf } from "@/lib/pdf-export";
+
 import {
   BASE_SCENARIO,
   FY_OPTIONS,
@@ -537,7 +536,7 @@ function ForecastPage() {
             />
           </div>
 
-          <Card className="border-border shadow-card">
+          <Card ref={chartRef} className="border-border shadow-card">
             <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
               <div>
                 <CardTitle className="text-base">Baseline vs Scenario</CardTitle>
