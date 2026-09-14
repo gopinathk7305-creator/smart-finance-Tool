@@ -490,9 +490,10 @@ function ForecastPage() {
                         type="monotone"
                         dataKey="lower"
                         name="Lower bound"
-                        stroke="transparent"
-                        fill="var(--background)"
-                        fillOpacity={1}
+                        stroke="#0284c7"
+                        strokeOpacity={0.25}
+                        strokeWidth={1}
+                        fill="transparent"
                         legendType="none"
                       />
                     )}
