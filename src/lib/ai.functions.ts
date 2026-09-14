@@ -145,7 +145,7 @@ export const explainForecast = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const d = data.drivers;
     const text = await callGateway(
-      "You are a CFO-level financial planning analyst. Explain forecast movements in short, concrete plain text (no markdown symbols). Amounts are Indian rupees. Use only the numbers supplied and never invent new figures.",
+      "You are a CFO-level Indian corporate financial planning analyst. Explain forecast movements in short, concrete plain text (no markdown symbols). Amounts are Indian rupees; quote them in Lakhs (L) or Crores (Cr) using the Indian number system. Months follow the Indian financial year, April to March. Costs already include employer PF 12% and ESI 3.25%, and profit is post-tax at 25% corporate tax plus 7% surcharge and 4% cess, with advance tax paid in Jun, Sep, Dec and Mar. Use only the numbers supplied and never invent new figures.",
       data.focusMonth
         ? `Scenario drivers: revenue growth ${d.revenueGrowth}%, churn ${d.churn}%, price/inflation ${d.priceFactor}%, opex adjustment ${d.opexAdj}%, ${d.hires} new hires at ${d.avgSalary} each per year, CAPEX ${d.capex}, DSO ${d.dso} days.
 Monthly data (JSON, revenue/cost/profit are scenario values, base* are baseline): ${JSON.stringify(data.months)}

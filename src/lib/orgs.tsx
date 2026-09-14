@@ -32,21 +32,21 @@ export interface DemoOrg extends Org {
 export const DEMO_ORGS: DemoOrg[] = [
   {
     id: "demo-techcorp",
-    name: "TechCorp Global",
+    name: "TechNova Solutions Pvt Ltd",
     scale: 1,
     vendors: ["Atlassian", "AWS", "Figma", "Brightline Agency", "Kapoor & Associates"],
     clients: ["Helios Retail", "Orbit Health", "Lumen Media", "Cobalt Labs", "Nimbus Cloud"],
   },
   {
     id: "demo-vertex",
-    name: "Vertex Logistics",
+    name: "Kaveri Logistics India",
     scale: 0.68,
     vendors: ["Northwind Supplies", "Vertex Components", "Airtel Business", "City Power Board", "Prestige Estates"],
     clients: ["Vanta Logistics", "Ferrous Steel Co", "Trident Motors", "Kestrel Tools", "Solstice Travel"],
   },
   {
     id: "demo-apex",
-    name: "Apex Retail",
+    name: "Apex Retail India",
     scale: 0.44,
     vendors: ["Meta Ads", "Google Ads", "Prestige Estates", "Northwind Supplies", "Atlassian"],
     clients: ["Zenith Foods", "Arcadia Realty", "Aurora Textiles", "Pinecrest Edu", "Sable Finance"],

@@ -22,7 +22,9 @@ import {
   BarChart,
   CartesianGrid,
   Legend,
+  ComposedChart,
   Line,
+
   LineChart,
   ResponsiveContainer,
   Tooltip,
@@ -73,13 +75,16 @@ import { downloadCSV, inr } from "@/lib/finance-data";
 import { exportElementToPdf } from "@/lib/pdf-export";
 import {
   BASE_SCENARIO,
+  FY_OPTIONS,
   PRESETS,
   loadScenarios,
   runForecast,
   saveScenarios,
+  type FinancialYear,
   type SavedScenario,
   type ScenarioInputs,
 } from "@/lib/forecast-engine";
+
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/forecast")({
@@ -108,11 +113,12 @@ export const Route = createFileRoute("/forecast")({
 });
 
 const TABS = [
-  { id: "profit", label: "Net Profit" },
-  { id: "revopex", label: "Revenue vs Opex" },
-  { id: "runway", label: "Cash Runway Trend" },
+  { id: "profit", label: "Net Profit (Post-Tax)" },
+  { id: "revopex", label: "Revenue vs Opex (Excl. GST)" },
+  { id: "runway", label: "Cash Runway & Buffer" },
   { id: "cumulative", label: "Cumulative Cash Flow" },
 ] as const;
+
 
 function ForecastPage() {
   const { txns, pays, live } = useDataset();
@@ -171,30 +177,39 @@ function ForecastPage() {
   const revDelta = pctChange(result.scenRevenueTotal, result.baseRevenueTotal);
   const profitDelta = pctChange(result.scenProfitTotal, result.baseProfitTotal);
   const runwayTone = result.runway > 12 ? "success" : result.runway >= 6 ? "warning" : "danger";
+  const q3Tax = rows.find((r) => r.month === "Dec")?.advanceTax ?? 0;
 
   const applyPreset = (key: keyof typeof PRESETS) =>
-    setInputs({ ...BASE_SCENARIO, ...PRESETS[key] });
+    setInputs({ ...BASE_SCENARIO, fy: inputs.fy, ...PRESETS[key] });
 
   const exportCsv = () =>
     downloadCSV(
-      "forecast-projection.csv",
+      `fy-projection-${inputs.fy.replace(/\s/g, "-").toLowerCase()}.csv`,
       rows.map((r) => ({
         Month: r.month,
-        "Baseline Revenue": r.baseRevenue,
-        "Scenario Revenue": r.scenRevenue,
-        "Baseline Expenses": r.baseExpense,
-        "Scenario Expenses": r.scenExpense,
-        "Net Profit": r.scenProfit,
-        "Projected Cash": r.scenCash,
-        "Runway (months)": r.runway,
+        "Revenue (Excl. GST)": r.scenRevenue,
+        "GST Output": r.gstOutput,
+        "Operating Expenses": r.opex,
+        "Payroll (incl. PF/ESI)": r.payroll,
+        EBITDA: r.ebitda,
+        "Corporate Tax": r.tax,
+        "Advance Tax Payout": r.advanceTax,
+        "Net Profit (Post-Tax)": r.scenProfit,
+        "Ending Cash Balance": r.scenCash,
+        "Runway (Months)": r.runway,
       })),
     );
 
   const exportPdf = async () => {
     if (!tableRef.current) return;
     toast.info("Preparing PDF…");
-    await exportElementToPdf(tableRef.current, "forecast-projection.pdf", "12-Month Projection");
+    await exportElementToPdf(
+      tableRef.current,
+      `fy-projection-${inputs.fy.replace(/\s/g, "-").toLowerCase()}.pdf`,
+      `${inputs.fy} Projection Statement`,
+    );
   };
+
 
   const saveScenario = () => {
     const trimmed = name.trim();
@@ -209,22 +224,39 @@ function ForecastPage() {
 
   return (
     <AppShell
-      title="Financial Forecasting & Multi-Scenario Modeling"
-      subtitle={`Interactive 12-Month Rolling Outlook & Stress Testing Engine · ${live ? "live data" : "demo data"}`}
+      title={`Financial Forecasting & Scenario Planning (${inputs.fy})`}
+      subtitle={`12-Month Rolling Indian Corporate Outlook & Runway Stress Testing · ${live ? "live data" : "demo data"}`}
     >
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Button variant="outline" size="sm" onClick={() => applyPreset("base")}>
           Base Case
         </Button>
         <Button variant="outline" size="sm" onClick={() => applyPreset("best")}>
-          Best Case (+25% Rev)
+          High Growth (+25% Rev)
         </Button>
         <Button variant="outline" size="sm" onClick={() => applyPreset("worst")}>
-          Worst Case (−15% Rev)
+          Conservative / Slowdown (−15% Rev)
         </Button>
         <Button variant="ghost" size="sm" onClick={() => setInputs(BASE_SCENARIO)}>
           <RotateCcw className="size-4" /> Reset All
         </Button>
+        <Tabs value={inputs.fy} onValueChange={(v) => set("fy", v as FinancialYear)}>
+          <TabsList>
+            {FY_OPTIONS.map((f) => (
+              <TabsTrigger key={f} value={f} className="text-xs">
+                {f}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <Button variant="outline" size="sm" onClick={exportPdf}>
+          <FileText className="size-4" /> Export PDF Report
+        </Button>
+        <Button variant="outline" size="sm" onClick={exportCsv}>
+          <Download className="size-4" /> Export CSV
+        </Button>
+
+
 
         <div className="ml-auto flex items-center gap-2">
           {saved.length > 0 && (
@@ -278,12 +310,14 @@ function ForecastPage() {
             <CardDescription>Tune drivers, results update instantly</CardDescription>
           </CardHeader>
           <CardContent>
-            <Accordion type="multiple" defaultValue={["rev", "cost", "cash"]}>
+            <Accordion type="multiple" defaultValue={["rev", "cost", "capex", "cash"]}>
               <AccordionItem value="rev">
-                <AccordionTrigger className="text-sm font-semibold">Revenue drivers</AccordionTrigger>
+                <AccordionTrigger className="text-sm font-semibold">
+                  Revenue &amp; billing drivers
+                </AccordionTrigger>
                 <AccordionContent className="space-y-6 pt-2">
                   <Lever
-                    label="Projected revenue growth"
+                    label="Projected annual revenue growth"
                     value={inputs.revenueGrowth}
                     min={-30}
                     max={100}
@@ -306,24 +340,33 @@ function ForecastPage() {
                     suffix="%"
                     onChange={(v) => set("priceFactor", v)}
                   />
+                  <Lever
+                    label="GST output rate"
+                    value={inputs.gstRate}
+                    min={0}
+                    max={28}
+                    suffix="%"
+                    onChange={(v) => set("gstRate", v)}
+                  />
                 </AccordionContent>
               </AccordionItem>
 
               <AccordionItem value="cost">
                 <AccordionTrigger className="text-sm font-semibold">
-                  Cost &amp; payroll drivers
+                  Expense &amp; payroll drivers (Indian norms)
                 </AccordionTrigger>
+
                 <AccordionContent className="space-y-6 pt-2">
                   <Lever
-                    label="Operating expenses adjustment"
+                    label="Opex inflation / cost increase"
                     value={inputs.opexAdj}
-                    min={-30}
-                    max={50}
+                    min={-20}
+                    max={40}
                     suffix="%"
                     onChange={(v) => set("opexAdj", v)}
                   />
                   <Lever
-                    label="New hires"
+                    label="New hires count"
                     value={inputs.hires}
                     min={0}
                     max={50}
@@ -331,7 +374,7 @@ function ForecastPage() {
                     onChange={(v) => set("hires", v)}
                   />
                   <Lever
-                    label="Avg annual salary per hire"
+                    label="Avg cost per employee (CTC p.a.)"
                     value={inputs.avgSalary}
                     min={300000}
                     max={5000000}
@@ -340,8 +383,19 @@ function ForecastPage() {
                     currency
                     onChange={(v) => set("avgSalary", v)}
                   />
+                  <p className="-mt-3 text-[11px] text-muted-foreground">
+                    Employer PF 12% and ESI 3.25% are auto-included on CTC.
+                  </p>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="capex">
+                <AccordionTrigger className="text-sm font-semibold">
+                  CAPEX &amp; tax drivers
+                </AccordionTrigger>
+                <AccordionContent className="space-y-6 pt-2">
                   <Lever
-                    label="Planned CAPEX (one-time)"
+                    label="Capital expenditure / asset purchase"
                     value={inputs.capex}
                     min={0}
                     max={50000000}
@@ -350,6 +404,10 @@ function ForecastPage() {
                     currency
                     onChange={(v) => set("capex", v)}
                   />
+                  <p className="-mt-3 text-[11px] text-muted-foreground">
+                    Advance tax is paid quarterly — Q1 Jun, Q2 Sep, Q3 Dec, Q4 Mar — at 25% corporate tax
+                    plus 7% surcharge and 4% cess.
+                  </p>
                 </AccordionContent>
               </AccordionItem>
 
@@ -357,15 +415,16 @@ function ForecastPage() {
                 <AccordionTrigger className="text-sm font-semibold">Cash flow drivers</AccordionTrigger>
                 <AccordionContent className="space-y-6 pt-2">
                   <Lever
-                    label="Days sales outstanding (DSO)"
+                    label="Average collection delay (DSO)"
                     value={inputs.dso}
-                    min={0}
+                    min={15}
                     max={90}
                     suffix=" d"
                     onChange={(v) => set("dso", v)}
                   />
                 </AccordionContent>
               </AccordionItem>
+
             </Accordion>
           </CardContent>
         </Card>
@@ -380,10 +439,11 @@ function ForecastPage() {
               icon={TrendingUp}
             />
             <KpiCard
-              label="Projected 12M Net Profit"
+              label="Projected 12M EBITDA / Net Profit"
               value={inr(result.scenProfitTotal, true)}
               delta={profitDelta}
-              hint={`net margin ${result.netMargin.toFixed(1)}%`}
+              hint={`net margin ${result.netMargin.toFixed(1)}% · after tax ${inr(result.taxTotal, true)}`}
+
               icon={Banknote}
               tone={result.scenProfitTotal >= result.baseProfitTotal ? "success" : "danger"}
             />
@@ -446,7 +506,7 @@ function ForecastPage() {
                     <Tooltip formatter={(v) => inr(Number(v))} />
                     <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
                     <Bar dataKey="scenRevenue" name="Revenue" fill="#0284c7" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="scenExpense" name="Opex" fill="#475569" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="scenExpense" name="Opex" fill="#334155" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 ) : tab === "runway" ? (
                   <LineChart data={rows}>
@@ -471,7 +531,8 @@ function ForecastPage() {
                     />
                   </LineChart>
                 ) : tab === "cumulative" ? (
-                  <AreaChart data={rows}>
+                  <ComposedChart data={rows}>
+
                     <defs>
                       <linearGradient id="cum" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#0284c7" stopOpacity={0.35} />
@@ -497,7 +558,17 @@ function ForecastPage() {
                       strokeWidth={2}
                       fill="url(#cum)"
                     />
-                  </AreaChart>
+                    <Line
+                      type="monotone"
+                      dataKey="advanceTax"
+                      name="Advance tax payout"
+                      stroke="#dc2626"
+                      strokeWidth={0}
+                      dot={{ r: 4, fill: "#dc2626" }}
+                      activeDot={{ r: 6 }}
+                    />
+                  </ComposedChart>
+
                 ) : (
                   <AreaChart data={rows}>
                     <defs>
@@ -544,7 +615,7 @@ function ForecastPage() {
                       type="monotone"
                       dataKey="baseProfit"
                       name="Baseline"
-                      stroke="#475569"
+                      stroke="#334155"
                       strokeDasharray="5 4"
                       strokeWidth={2}
                       fill="transparent"
@@ -573,21 +644,26 @@ function ForecastPage() {
               </CardHeader>
               <CardContent className="space-y-3 text-sm leading-relaxed">
                 <p className="rounded-md bg-brand-soft p-3 text-brand">
-                  ⚡ Revenue growth of {inputs.revenueGrowth}% with {inputs.churn}% churn shifts 12-month
-                  revenue by {revDelta.toFixed(1)}% ({inr(result.scenRevenueTotal - result.baseRevenueTotal, true)}),
-                  while {inputs.hires} new hires add {inr(result.payrollImpact, true)} of annual payroll.
+                  🇮🇳 AI Corporate Insight: revenue growth of {inputs.revenueGrowth}% against{" "}
+                  {inputs.churn}% churn moves FY top-line by {revDelta.toFixed(1)}% (
+                  {inr(result.scenRevenueTotal - result.baseRevenueTotal, true)}). Adding {inputs.hires} team
+                  members at {inr(inputs.avgSalary, true)} CTC raises annual payroll by{" "}
+                  {inr(result.payrollImpact, true)} (incl. PF 12% &amp; ESI 3.25%).
                 </p>
                 <p className="text-muted-foreground">
-                  Net profit moves {profitDelta.toFixed(1)}% versus baseline and ending cash lands at{" "}
-                  {inr(result.endCash, true)} ({inr(result.cashImpact, true)} vs baseline). Runway is{" "}
-                  {result.runway >= 24 ? "beyond 24" : result.runway.toFixed(1)} months at a{" "}
-                  {result.netMargin.toFixed(1)}% net margin.
+                  Post-tax net profit moves {profitDelta.toFixed(1)}% versus baseline at a{" "}
+                  {result.netMargin.toFixed(1)}% net margin. Corporate tax for the year is{" "}
+                  {inr(result.taxTotal, true)} (25% + 7% surcharge + 4% cess), with the Q3 advance tax
+                  instalment of {inr(q3Tax, true)} due in December.
                 </p>
                 <p className="text-muted-foreground">
-                  A {inputs.dso}-day collection cycle delays{" "}
+                  GST output at {inputs.gstRate}% routes {inr(result.gstTotal, true)} through the books as a
+                  pass-through. A {inputs.dso}-day collection cycle (DSO) delays{" "}
                   {inr((result.scenRevenueTotal / 12) * Math.min(0.35, inputs.dso / 365), true)} of cash, and
-                  CAPEX of {inr(inputs.capex, true)} hits month one.
+                  CAPEX of {inr(inputs.capex, true)} hits month one. Runway lands at{" "}
+                  {result.runway >= 24 ? "beyond 24" : result.runway.toFixed(1)} months.
                 </p>
+
 
                 <div className="space-y-2 border-t border-border pt-3">
                   <div className="flex items-center justify-between gap-2">
@@ -630,24 +706,25 @@ function ForecastPage() {
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-3">
                 <div ref={tableRef} className="max-h-[320px] overflow-auto rounded-md border border-border">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Month</TableHead>
-                        <TableHead className="text-right">Base Rev</TableHead>
-                        <TableHead className="text-right">Scen Rev</TableHead>
-                        <TableHead className="text-right">Base Exp</TableHead>
-                        <TableHead className="text-right">Scen Exp</TableHead>
+                        <TableHead className="text-right">Revenue (Excl. GST)</TableHead>
+                        <TableHead className="text-right">Operating Exp.</TableHead>
+                        <TableHead className="text-right">Payroll (incl. PF/ESI)</TableHead>
+                        <TableHead className="text-right">EBITDA</TableHead>
+                        <TableHead className="text-right">Corporate Tax</TableHead>
                         <TableHead className="text-right">Net Profit</TableHead>
-                        <TableHead className="text-right">Cash</TableHead>
+                        <TableHead className="text-right">Ending Cash</TableHead>
                         <TableHead className="text-right">Runway</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {rows.map((r) => {
-                        const risky = r.scenProfit < 0 || r.scenCash < 0 || r.runway < 6;
+                        const risky = r.scenProfit < 0 || r.scenCash < 0 || r.runway < 3;
                         return (
                           <TableRow key={r.month} className={cn(risky && "bg-danger-soft/60")}>
                             <TableCell className="font-medium">
@@ -659,12 +736,16 @@ function ForecastPage() {
                                 title={`Why did ${r.month} change?`}
                               >
                                 {r.month}
+                                {r.advanceTax > 0 ? " *" : ""}
                               </button>
                             </TableCell>
-                            <TableCell className="tabular text-right">{inr(r.baseRevenue, true)}</TableCell>
                             <TableCell className="tabular text-right">{inr(r.scenRevenue, true)}</TableCell>
-                            <TableCell className="tabular text-right">{inr(r.baseExpense, true)}</TableCell>
-                            <TableCell className="tabular text-right">{inr(r.scenExpense, true)}</TableCell>
+                            <TableCell className="tabular text-right">{inr(r.opex, true)}</TableCell>
+                            <TableCell className="tabular text-right">{inr(r.payroll, true)}</TableCell>
+                            <TableCell className="tabular text-right">{inr(r.ebitda, true)}</TableCell>
+                            <TableCell className="tabular text-right text-muted-foreground">
+                              {inr(r.tax, true)}
+                            </TableCell>
                             <TableCell
                               className={cn(
                                 "tabular text-right font-semibold",
@@ -683,7 +764,17 @@ function ForecastPage() {
                     </TableBody>
                   </Table>
                 </div>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[11px] text-muted-foreground">
+                    * quarterly advance tax payout month (Q1 Jun, Q2 Sep, Q3 Dec, Q4 Mar). Net profit is
+                    post-tax at 25% + 7% surcharge + 4% cess.
+                  </p>
+                  <Button variant="secondary" size="sm" onClick={exportCsv}>
+                    <Download className="size-4" /> Download FY Projection Statement
+                  </Button>
+                </div>
               </CardContent>
+
             </Card>
           </div>
         </div>
