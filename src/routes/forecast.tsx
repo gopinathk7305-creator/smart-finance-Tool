@@ -775,9 +775,7 @@ function ForecastPage() {
                   <Button variant="outline" size="sm" onClick={exportCsv}>
                     <Download className="size-4" /> CSV
                   </Button>
-                  <Button variant="outline" size="sm" onClick={exportPdf}>
-                    <FileText className="size-4" /> PDF
-                  </Button>
+                  <AiReportButton build={buildReport} label="AI PDF" />
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
