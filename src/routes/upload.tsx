@@ -105,7 +105,11 @@ function mapRows(key: DatasetKey, raw: Record<string, string>[], userId: string,
         txn_date: date,
         category: r["category"] || "Uncategorised",
         subcategory: r["subcategory"] || "",
-        type: (r["type"] ?? "").toLowerCase() === "income" ? "income" : "expense",
+        type: ["income", "revenue", "credit", "sales", "inflow", "in"].includes(
+          (r["type"] ?? "").trim().toLowerCase(),
+        )
+          ? "income"
+          : "expense",
         amount,
         vendor_client: r["vendor_client"] || r["vendor"] || r["client"] || "",
         status: (r["status"] ?? "paid").toLowerCase() === "pending" ? "pending" : "paid",
