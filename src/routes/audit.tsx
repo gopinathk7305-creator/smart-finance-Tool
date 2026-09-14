@@ -207,6 +207,7 @@ function AuditPage() {
             >
               Export log
             </Button>
+            <AiReportButton build={buildReport} size="default" />
           </div>
         </CardHeader>
         <CardContent>
