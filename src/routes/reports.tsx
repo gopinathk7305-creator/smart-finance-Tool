@@ -3,6 +3,7 @@ import { Download, FileSpreadsheet, FileText, Loader2, Printer } from "lucide-re
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { AiReportButton } from "@/components/finance/AiReportButton";
 import { AppShell } from "@/components/finance/AppShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
