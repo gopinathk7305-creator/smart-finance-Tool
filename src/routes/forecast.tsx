@@ -356,15 +356,15 @@ function ForecastPage() {
 
                 <AccordionContent className="space-y-6 pt-2">
                   <Lever
-                    label="Operating expenses adjustment"
+                    label="Opex inflation / cost increase"
                     value={inputs.opexAdj}
-                    min={-30}
-                    max={50}
+                    min={-20}
+                    max={40}
                     suffix="%"
                     onChange={(v) => set("opexAdj", v)}
                   />
                   <Lever
-                    label="New hires"
+                    label="New hires count"
                     value={inputs.hires}
                     min={0}
                     max={50}
@@ -372,7 +372,7 @@ function ForecastPage() {
                     onChange={(v) => set("hires", v)}
                   />
                   <Lever
-                    label="Avg annual salary per hire"
+                    label="Avg cost per employee (CTC p.a.)"
                     value={inputs.avgSalary}
                     min={300000}
                     max={5000000}
@@ -381,8 +381,19 @@ function ForecastPage() {
                     currency
                     onChange={(v) => set("avgSalary", v)}
                   />
+                  <p className="-mt-3 text-[11px] text-muted-foreground">
+                    Employer PF 12% and ESI 3.25% are auto-included on CTC.
+                  </p>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="capex">
+                <AccordionTrigger className="text-sm font-semibold">
+                  CAPEX &amp; tax drivers
+                </AccordionTrigger>
+                <AccordionContent className="space-y-6 pt-2">
                   <Lever
-                    label="Planned CAPEX (one-time)"
+                    label="Capital expenditure / asset purchase"
                     value={inputs.capex}
                     min={0}
                     max={50000000}
@@ -391,6 +402,10 @@ function ForecastPage() {
                     currency
                     onChange={(v) => set("capex", v)}
                   />
+                  <p className="-mt-3 text-[11px] text-muted-foreground">
+                    Advance tax is paid quarterly — Q1 Jun, Q2 Sep, Q3 Dec, Q4 Mar — at 25% corporate tax
+                    plus 7% surcharge and 4% cess.
+                  </p>
                 </AccordionContent>
               </AccordionItem>
 
@@ -398,15 +413,16 @@ function ForecastPage() {
                 <AccordionTrigger className="text-sm font-semibold">Cash flow drivers</AccordionTrigger>
                 <AccordionContent className="space-y-6 pt-2">
                   <Lever
-                    label="Days sales outstanding (DSO)"
+                    label="Average collection delay (DSO)"
                     value={inputs.dso}
-                    min={0}
+                    min={15}
                     max={90}
                     suffix=" d"
                     onChange={(v) => set("dso", v)}
                   />
                 </AccordionContent>
               </AccordionItem>
+
             </Accordion>
           </CardContent>
         </Card>
