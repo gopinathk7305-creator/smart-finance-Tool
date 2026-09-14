@@ -6,7 +6,6 @@ import {
   Banknote,
   Bookmark,
   Download,
-  FileText,
   Loader2,
   Gauge,
   RotateCcw,
@@ -33,6 +32,7 @@ import {
 } from "recharts";
 import { toast } from "sonner";
 
+import { AiReportButton } from "@/components/finance/AiReportButton";
 import { AppShell } from "@/components/finance/AppShell";
 import { KpiCard } from "@/components/finance/KpiCard";
 import {
@@ -74,7 +74,7 @@ import { useAuth } from "@/lib/auth";
 import { useDataset } from "@/lib/dataset";
 
 import { downloadCSV, inr } from "@/lib/finance-data";
-import { exportElementToPdf } from "@/lib/pdf-export";
+
 import {
   BASE_SCENARIO,
   FY_OPTIONS,
@@ -133,6 +133,7 @@ function ForecastPage() {
   const [name, setName] = useState("");
   const [open, setOpen] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<HTMLDivElement>(null);
   const [aiText, setAiText] = useState("");
   const [aiMonth, setAiMonth] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -210,15 +211,79 @@ function ForecastPage() {
       })),
     );
 
-  const exportPdf = async () => {
-    if (!tableRef.current) return;
-    toast.info("Preparing PDF…");
-    await exportElementToPdf(
-      tableRef.current,
-      `fy-projection-${inputs.fy.replace(/\s/g, "-").toLowerCase()}.pdf`,
-      `${inputs.fy} Projection Statement`,
-    );
-  };
+  const buildReport = () => ({
+    page: "forecast" as const,
+    reportName: "Scenario Analysis, Sensitivity Assessment & Runway Projections",
+    fy: inputs.fy,
+    kpis: [
+      {
+        label: "Projected 12M Revenue (Excl. GST)",
+        value: inr(result.scenRevenueTotal, true),
+        delta: `${revDelta >= 0 ? "+" : ""}${revDelta.toFixed(1)}% vs baseline`,
+      },
+      {
+        label: "Projected 12M Net Profit (Post-Tax)",
+        value: inr(result.scenProfitTotal, true),
+        delta: `${profitDelta >= 0 ? "+" : ""}${profitDelta.toFixed(1)}% vs baseline`,
+      },
+      {
+        label: "Ending Cash Balance",
+        value: inr(rows[rows.length - 1]?.scenCash ?? 0, true),
+        delta: `Q3 advance tax ${inr(q3Tax, true)}`,
+      },
+      {
+        label: "Cash Runway",
+        value: result.runway >= 24 ? "24+ months" : `${result.runway.toFixed(1)} months`,
+        delta: runwayTone === "success" ? "healthy" : runwayTone === "warning" ? "monitor" : "critical",
+      },
+    ],
+    tables: [
+      {
+        title: `${inputs.fy} Projection Statement (April to March)`,
+        columns: [
+          "Month",
+          "Revenue",
+          "Opex",
+          "Payroll",
+          "EBITDA",
+          "Corp. Tax",
+          "Net Profit",
+          "Ending Cash",
+          "Runway",
+        ],
+        numericFrom: 1,
+        rows: rows.map((r) => [
+          `${r.month}${r.advanceTax > 0 ? " *" : ""}`,
+          inr(r.scenRevenue, true),
+          inr(r.opex, true),
+          inr(r.payroll, true),
+          inr(r.ebitda, true),
+          inr(r.tax, true),
+          inr(r.scenProfit, true),
+          inr(r.scenCash, true),
+          r.runway >= 24 ? "24+" : `${r.runway.toFixed(1)}m`,
+        ]),
+      },
+      {
+        title: "Scenario Drivers",
+        columns: ["Driver", "Setting"],
+        rows: [
+          ["Revenue growth", `${inputs.revenueGrowth}%`],
+          ["Churn", `${inputs.churn}%`],
+          ["Price / inflation", `${inputs.priceFactor}%`],
+          ["GST output rate", `${inputs.gstRate}%`],
+          ["Opex inflation", `${inputs.opexAdj}%`],
+          ["New hires", `${inputs.hires} at ${inr(inputs.avgSalary)} p.a. CTC (incl. PF 12% + ESI 3.25%)`],
+          ["CAPEX", inr(inputs.capex)],
+          ["DSO", `${inputs.dso} days`],
+        ],
+      },
+    ],
+    facts: `Baseline 12M revenue ${inr(result.baseRevenueTotal)} vs scenario ${inr(result.scenRevenueTotal)} (${revDelta.toFixed(1)}%). Baseline net profit ${inr(result.baseProfitTotal)} vs scenario ${inr(result.scenProfitTotal)} (${profitDelta.toFixed(1)}%). Cash runway ${result.runway.toFixed(1)} months. Drivers: revenue growth ${inputs.revenueGrowth}%, churn ${inputs.churn}%, opex ${inputs.opexAdj}%, ${inputs.hires} hires at ${inr(inputs.avgSalary)} CTC, CAPEX ${inr(inputs.capex)}, DSO ${inputs.dso} days, GST ${inputs.gstRate}%. Monthly detail: ${rows
+      .map((r) => `${r.month} rev ${inr(r.scenRevenue, true)} profit ${inr(r.scenProfit, true)} cash ${inr(r.scenCash, true)} runway ${r.runway.toFixed(1)}m`)
+      .join("; ")}. Data source: ${live ? "uploaded ledger" : "demo dataset"}.`,
+    chartEl: chartRef.current,
+  });
 
 
   const saveScenario = () => {
@@ -259,9 +324,7 @@ function ForecastPage() {
             ))}
           </TabsList>
         </Tabs>
-        <Button variant="outline" size="sm" onClick={exportPdf}>
-          <FileText className="size-4" /> Export PDF Report
-        </Button>
+        <AiReportButton build={buildReport} label="Download AI Report" />
         <Button variant="outline" size="sm" onClick={exportCsv}>
           <Download className="size-4" /> Export CSV
         </Button>
@@ -473,7 +536,7 @@ function ForecastPage() {
             />
           </div>
 
-          <Card className="border-border shadow-card">
+          <Card ref={chartRef} className="border-border shadow-card">
             <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
               <div>
                 <CardTitle className="text-base">Baseline vs Scenario</CardTitle>
@@ -711,9 +774,7 @@ function ForecastPage() {
                   <Button variant="outline" size="sm" onClick={exportCsv}>
                     <Download className="size-4" /> CSV
                   </Button>
-                  <Button variant="outline" size="sm" onClick={exportPdf}>
-                    <FileText className="size-4" /> PDF
-                  </Button>
+                  <AiReportButton build={buildReport} label="AI PDF" />
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">

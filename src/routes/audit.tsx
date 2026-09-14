@@ -3,6 +3,7 @@ import { AlertOctagon, CheckCircle2, Copy, ShieldAlert, Sparkles } from "lucide-
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { AiReportButton } from "@/components/finance/AiReportButton";
 import { AppShell } from "@/components/finance/AppShell";
 import { KpiCard } from "@/components/finance/KpiCard";
 import { Badge } from "@/components/ui/badge";
@@ -118,6 +119,48 @@ function AuditPage() {
   const high = findings.filter((f) => f.severity === "high").length;
   const exposure = findings.reduce((s, f) => s + f.amount, 0);
   const duplicates = findings.filter((f) => f.rule === "Duplicate invoice").length;
+  const riskScore = Math.min(
+    100,
+    Math.round((high * 12 + (findings.length - high) * 5) + (duplicates ? 8 : 0)),
+  );
+
+  const buildReport = () => ({
+    page: "audit" as const,
+    reportName: "Forensic Audit Trail & Compliance Register",
+    fy: "FY 2026-27",
+    kpis: [
+      { label: "Total Exceptions", value: String(findings.length), delta: `${open} unresolved` },
+      { label: "High Severity", value: String(high), delta: "Immediate review" },
+      { label: "Duplicate Invoices", value: String(duplicates), delta: "Same vendor ≤ 7 days" },
+      { label: "Flagged Value", value: inr(exposure, true), delta: `Risk score ${riskScore}/100` },
+    ],
+    tables: [
+      {
+        title: "Audit Exception Register",
+        columns: ["ID", "Rule", "Severity", "Party", "Date", "Amount", "Status"],
+        numericFrom: 5,
+        rows: findings.map((f) => [
+          f.id,
+          f.rule,
+          f.severity,
+          f.party,
+          f.date,
+          inr(f.amount),
+          STATUS_LABEL[statusOf(f.id)],
+        ]),
+      },
+      {
+        title: "Immutable Audit Trail",
+        columns: ["Timestamp", "User", "Action", "Module"],
+        rows: immutableAuditTrail.map((l) => [l.timestamp, l.email, l.action, l.module]),
+      },
+    ],
+    facts: `Transactions audited: ${txns.length}. Exceptions raised: ${findings.length} (${high} high severity, ${open} unresolved, ${duplicates} duplicate invoices). Total flagged exposure ${inr(exposure)}. Composite risk score ${riskScore} of 100. Rules applied: duplicate invoice within 7 days, round-figure high value transfers, out-of-hours postings, category variance above 25%. Findings detail: ${findings
+      .slice(0, 12)
+      .map((f) => `${f.id} ${f.rule} ${f.party} ${inr(f.amount)} — ${f.detail}`)
+      .join(" | ")}`,
+    chartEl: null,
+  });
 
   return (
     <AppShell title="Internal Audit & Compliance" subtitle={live ? "Scanning your uploaded ledger" : "Sample ledger · upload transactions for a real scan"}>
@@ -164,6 +207,7 @@ function AuditPage() {
             >
               Export log
             </Button>
+            <AiReportButton build={buildReport} size="default" />
           </div>
         </CardHeader>
         <CardContent>

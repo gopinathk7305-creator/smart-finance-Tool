@@ -12,6 +12,7 @@ import {
   Legend,
 } from "recharts";
 
+import { AiReportButton } from "@/components/finance/AiReportButton";
 import { AppShell } from "@/components/finance/AppShell";
 import { KpiCard } from "@/components/finance/KpiCard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,8 +72,64 @@ function PnlPage() {
     netMargin: (m.profit / m.revenue) * 100,
   }));
 
+  const buildReport = () => ({
+    page: "pnl" as const,
+    reportName: "Income Statement, EBITDA Bridge & Tax Compliance Breakdown",
+    fy: "FY 2026-27",
+    kpis: [
+      {
+        label: "Gross Profit",
+        value: inr(t.grossProfit, true),
+        delta: `${((t.grossProfit / t.revenue) * 100).toFixed(1)}% margin`,
+      },
+      { label: "EBITDA", value: inr(t.ebitda, true), delta: `${((t.ebitda / t.revenue) * 100).toFixed(1)}% of revenue` },
+      { label: "Net Profit (Post-Tax)", value: inr(t.netProfit, true), delta: "After tax & interest" },
+      { label: "Net Margin", value: `${((t.netProfit / t.revenue) * 100).toFixed(1)}%`, delta: "FY 2026-27" },
+    ],
+    tables: [
+      {
+        title: "Profit & Loss Statement",
+        columns: ["Line item", "Amount", "% of revenue"],
+        numericFrom: 1,
+        rows: rows.map((r) => [
+          r.label,
+          r.value < 0 ? `(${inr(Math.abs(r.value))})` : inr(r.value),
+          `${((r.value / t.revenue) * 100).toFixed(1)}%`,
+        ]),
+      },
+      {
+        title: "GST & Corporate Tax Position",
+        columns: ["Particulars", "Amount"],
+        numericFrom: 1,
+        rows: [
+          ["Output GST on sales (18%)", inr(gst.outputGst)],
+          ["Input tax credit on purchases", `(${inr(gst.inputCredit)})`],
+          ["Net GST payable", inr(gst.payable)],
+          ["Earnings before tax", inr(t.ebitda - t.depreciation - t.interest)],
+          ["Corporate tax @ 25%", `(${inr(t.tax)})`],
+          ["Net profit after tax", inr(t.netProfit)],
+        ],
+      },
+      {
+        title: "Monthly Margin Trend",
+        columns: ["Month", "Gross margin %", "Net margin %"],
+        numericFrom: 1,
+        rows: marginSeries.map((m) => [
+          m.month,
+          `${m.grossMargin.toFixed(1)}%`,
+          `${m.netMargin.toFixed(1)}%`,
+        ]),
+      },
+    ],
+    facts: `Revenue ${inr(t.revenue)}, COGS ${inr(t.cogs)}, gross profit ${inr(t.grossProfit)}, opex ${inr(t.opex)}, EBITDA ${inr(t.ebitda)}, depreciation ${inr(t.depreciation)}, interest ${inr(t.interest)}, corporate tax ${inr(t.tax)}, net profit ${inr(t.netProfit)}. Output GST ${inr(gst.outputGst)}, input credit ${inr(gst.inputCredit)}, net GST payable ${inr(gst.payable)}.`,
+    chartEl: null,
+  });
+
   return (
     <AppShell title="Financial Analysis & P&L" subtitle="FY2026 statement of profit and loss">
+      <div className="mb-4 flex justify-end">
+        <AiReportButton build={buildReport} />
+      </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard label="Gross Profit" value={inr(t.grossProfit, true)} icon={TrendingUp} tone="success" hint={`${((t.grossProfit / t.revenue) * 100).toFixed(1)}% margin`} />
         <KpiCard label="EBITDA" value={inr(t.ebitda, true)} icon={Activity} hint={`${((t.ebitda / t.revenue) * 100).toFixed(1)}% of revenue`} />
