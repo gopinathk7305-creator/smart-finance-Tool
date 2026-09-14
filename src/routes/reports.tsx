@@ -118,35 +118,59 @@ function buildRows(key: ReportKey): Record<string, unknown>[] {
   }));
 }
 
+const PAGE_KEY: Record<ReportKey, "pnl" | "payroll" | "audit" | "reports"> = {
+  pnl: "pnl",
+  summary: "reports",
+  payroll: "payroll",
+  audit: "audit",
+  aging: "reports",
+};
+
 function ReportsPage() {
   const [report, setReport] = useState<ReportKey>("pnl");
   const [range, setRange] = useState("ytd");
   const [format, setFormat] = useState("csv");
-  const [busy, setBusy] = useState(false);
+  const [busy] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
   const rows = buildRows(report);
   const preview = rows.slice(0, 20);
 
+  const buildReport = () => {
+    const columns = Object.keys(rows[0] ?? {});
+    return {
+      page: PAGE_KEY[report],
+      reportName: REPORTS[report],
+      fy: "FY 2026-27",
+      kpis: columns
+        .filter((c) => typeof rows[0]?.[c] === "number")
+        .slice(0, 4)
+        .map((c) => ({
+          label: `Total ${c.replace(/_/g, " ")}`,
+          value: inr(rows.reduce((s, r) => s + (Number(r[c]) || 0), 0), true),
+          delta: `${rows.length} rows · ${range.toUpperCase()}`,
+        })),
+      tables: [
+        {
+          title: `${REPORTS[report]} — ${range.toUpperCase()}`,
+          columns: columns.map((c) => c.replace(/_/g, " ")),
+          numericFrom: 1,
+          rows: rows.map((r) =>
+            columns.map((c) =>
+              typeof r[c] === "number" && c !== "aging_bucket" ? inr(Number(r[c])) : String(r[c] ?? ""),
+            ),
+          ),
+        },
+      ],
+      facts: `${REPORTS[report]} for range ${range.toUpperCase()} with ${rows.length} line items. Sample rows: ${rows
+        .slice(0, 12)
+        .map((r) => columns.map((c) => `${c}: ${String(r[c])}`).join(", "))
+        .join(" | ")}`,
+      chartEl: printRef.current,
+    };
+  };
+
   const run = async () => {
-    if (format === "pdf") {
-      if (!printRef.current) return;
-      setBusy(true);
-      toast.info("Rendering PDF…");
-      try {
-        await exportElementToPdf(
-          printRef.current,
-          `${report}-${range}.pdf`,
-          `${REPORTS[report]} · ${range.toUpperCase()}`,
-        );
-        toast.success(`${REPORTS[report]} PDF downloaded`);
-      } catch {
-        toast.error("PDF generation failed");
-      } finally {
-        setBusy(false);
-      }
-      return;
-    }
     downloadCSV(`${report}-${range}.csv`, rows);
     toast.success(`${REPORTS[report]} downloaded`);
   };
