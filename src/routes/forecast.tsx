@@ -133,6 +133,7 @@ function ForecastPage() {
   const [name, setName] = useState("");
   const [open, setOpen] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<HTMLDivElement>(null);
   const [aiText, setAiText] = useState("");
   const [aiMonth, setAiMonth] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
