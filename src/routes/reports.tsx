@@ -224,21 +224,20 @@ function ReportsPage() {
                 <SelectContent>
                   <SelectItem value="csv">CSV</SelectItem>
                   <SelectItem value="excel">Excel (.csv)</SelectItem>
-                  <SelectItem value="pdf">PDF document</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <Button className="w-full" onClick={run} disabled={busy}>
-              {busy ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : format === "pdf" ? (
-                <Printer className="size-4" />
-              ) : (
-                <Download className="size-4" />
-              )}
+              {busy ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
               Generate {format.toUpperCase()}
             </Button>
+            <AiReportButton
+              build={buildReport}
+              label="Download AI Report (PDF)"
+              size="default"
+              className="w-full"
+            />
           </CardContent>
         </Card>
 
