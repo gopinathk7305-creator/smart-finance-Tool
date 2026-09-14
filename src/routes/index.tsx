@@ -151,6 +151,7 @@ function Dashboard() {
         />
       </div>
 
+      <div ref={chartsRef}>
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <Card className="border-border shadow-card lg:col-span-2">
           <CardHeader>
