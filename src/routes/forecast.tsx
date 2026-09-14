@@ -486,14 +486,13 @@ function ForecastPage() {
                       />
                     )}
                     {band && (
-                      <Area
+                      <Line
                         type="monotone"
                         dataKey="lower"
-                        name="Lower bound"
                         stroke="#0284c7"
-                        strokeOpacity={0.25}
+                        strokeOpacity={0.3}
                         strokeWidth={1}
-                        fill="transparent"
+                        dot={false}
                         legendType="none"
                       />
                     )}
