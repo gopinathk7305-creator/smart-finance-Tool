@@ -119,6 +119,44 @@ function ForecastPage() {
   const [name, setName] = useState("");
   const [open, setOpen] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
+  const [aiText, setAiText] = useState("");
+  const [aiMonth, setAiMonth] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const explain = useServerFn(explainForecast);
+
+  const askAi = async (focusMonth?: string) => {
+    setAiLoading(true);
+    setAiMonth(focusMonth ?? null);
+    setAiText("");
+    try {
+      const res = await explain({
+        data: {
+          drivers: inputs,
+          months: rows.map((r) => ({
+            month: r.month,
+            revenue: r.scenRevenue,
+            cost: r.scenExpense,
+            profit: r.scenProfit,
+            baseRevenue: r.baseRevenue,
+            baseCost: r.baseExpense,
+            baseProfit: r.baseProfit,
+          })),
+          ...(focusMonth ? { focusMonth } : {}),
+        },
+      });
+      setAiText(res.text);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "AI request failed.";
+      toast.error(
+        message.includes("Unauthorized")
+          ? "Sign in to use the AI explanation — demo mode has no AI access."
+          : message,
+      );
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
 
   const set = <K extends keyof ScenarioInputs>(key: K, value: ScenarioInputs[K]) =>
     setInputs((prev) => ({ ...prev, [key]: value }));
