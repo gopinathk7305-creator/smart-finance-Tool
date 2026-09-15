@@ -175,6 +175,7 @@ export function runEtl(
   fileName: string,
   autoFix: boolean,
 ): EtlResult {
+  const raw = mapSchema(rawInput);
   const issues: Issue[] = [];
   const rows: Record<string, unknown>[] = [];
   const seen = new Set<string>();
