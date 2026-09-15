@@ -314,6 +314,113 @@ function AuditPage() {
       </Card>
 
       <Card className="mt-4 border-border shadow-card">
+        <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 space-y-0">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <History className="size-4 text-brand" /> Persisted Audit History
+            </CardTitle>
+            <CardDescription>
+              {hist.live
+                ? `${visibleHistory.length} of ${hist.history.length} stored exceptions for this organization`
+                : "Sign in to keep exceptions between uploads"}
+            </CardDescription>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Select value={histRule} onValueChange={setHistRule}>
+              <SelectTrigger className="w-56 bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All rules</SelectItem>
+                {historyRules.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {r}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={histStatus} onValueChange={setHistStatus}>
+              <SelectTrigger className="w-40 bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="open">Open</SelectItem>
+                <SelectItem value="reviewed">Reviewed</SelectItem>
+                <SelectItem value="closed">Closed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Logged</TableHead>
+                  <TableHead>Rule</TableHead>
+                  <TableHead>Severity</TableHead>
+                  <TableHead>Party / Category</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead>Source</TableHead>
+                  <TableHead className="text-right">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {visibleHistory.map((h) => (
+                  <TableRow key={h.id}>
+                    <TableCell className="tabular whitespace-nowrap text-xs text-muted-foreground">
+                      {h.created_at.slice(0, 10)}
+                    </TableCell>
+                    <TableCell>{h.rule}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={h.severity === "high" ? "destructive" : "secondary"}
+                        className="capitalize"
+                      >
+                        {h.severity}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{h.party}</TableCell>
+                    <TableCell className="tabular whitespace-nowrap">{h.date}</TableCell>
+                    <TableCell className="tabular text-right">{inr(h.amount)}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground capitalize">{h.origin}</TableCell>
+                    <TableCell className="text-right">
+                      <Select
+                        value={h.status}
+                        onValueChange={(v) => void hist.setStatus(h.id, v as FindingStatus)}
+                      >
+                        <SelectTrigger className="ml-auto w-32 bg-background">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(["open", "reviewed", "closed"] as FindingStatus[]).map((s) => (
+                            <SelectItem key={s} value={s}>
+                              {FINDING_STATUS_LABEL[s]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {visibleHistory.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
+                      {hist.live
+                        ? "No stored exceptions yet — upload a ledger or run an AI scan."
+                        : "Audit history is available once you sign in."}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mt-4 border-border shadow-card">
         <CardHeader>
           <CardTitle className="text-base">Immutable Audit Trail</CardTitle>
           <CardDescription>Who changed what and when — append-only</CardDescription>
