@@ -247,7 +247,8 @@ export async function generateReportPdf(spec: ReportSpec, narrative: ReportNarra
         : need.map((w, i) => {
             const distributable = Math.max(0, tableW - minimumTotal);
             const weightTotal = Math.max(1, needed - minimumTotal);
-            return minimums[i] + (Math.max(0, w - minimums[i]) / weightTotal) * distributable;
+            const minimum = minimums[i] ?? 42;
+            return minimum + (Math.max(0, w - minimum) / weightTotal) * distributable;
           });
       const xAt = (i: number) => M + widths.slice(0, i).reduce((a, b) => a + b, 0);
       const wAt = (i: number) => widths[i] ?? 0;
