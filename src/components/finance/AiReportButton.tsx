@@ -1,4 +1,4 @@
-import { FileText, Loader2, Download, Sparkles } from "lucide-react";
+import { ChevronDown, Download, FileText, Image as ImageIcon, Loader2, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -11,12 +11,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/lib/auth";
 import { ALL, useOrg } from "@/lib/orgs";
 import { generateReportNarrative } from "@/lib/report-ai.functions";
 import {
   fallbackNarrative,
   generateReportPdf,
+  generateSnapshotPdf,
   type ReportNarrative,
   type ReportSpec,
 } from "@/lib/report-doc";
@@ -32,9 +41,17 @@ interface Props {
   className?: string;
 }
 
+/** the live page container captured for the visual snapshot */
+function captureTarget(): HTMLElement | null {
+  return (
+    document.querySelector<HTMLElement>("[data-page-capture]") ??
+    document.querySelector<HTMLElement>("main")
+  );
+}
+
 export function AiReportButton({
   build,
-  label = "Download AI Report",
+  label = "Export Options",
   variant = "outline",
   size = "sm",
   className,
@@ -44,15 +61,36 @@ export function AiReportButton({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [snapping, setSnapping] = useState(false);
   const [spec, setSpec] = useState<ReportSpec | null>(null);
   const [narrative, setNarrative] = useState<ReportNarrative | null>(null);
 
+  const fullSpec = (): ReportSpec => ({
+    ...build(),
+    org: orgName === "All organizations" ? "All Entities (Consolidated)" : orgName,
+    ...(vendor && vendor !== ALL ? { vendor } : {}),
+  });
+
+  const snapshot = async () => {
+    const el = captureTarget();
+    if (!el) {
+      toast.error("Nothing on screen to capture yet.");
+      return;
+    }
+    setSnapping(true);
+    const id = toast.loading("Capturing high-resolution dashboard snapshot…");
+    try {
+      await generateSnapshotPdf(fullSpec(), el);
+      toast.success("Visual dashboard snapshot downloaded", { id });
+    } catch {
+      toast.error("Snapshot export failed", { id });
+    } finally {
+      setSnapping(false);
+    }
+  };
+
   const analyse = async () => {
-    const full: ReportSpec = {
-      ...build(),
-      org: orgName === "All organizations" ? "All Entities (Consolidated)" : orgName,
-      ...(vendor && vendor !== ALL ? { vendor } : {}),
-    };
+    const full = fullSpec();
     setSpec(full);
     setNarrative(null);
     setOpen(true);
@@ -86,12 +124,13 @@ export function AiReportButton({
   const download = async () => {
     if (!spec || !narrative) return;
     setDownloading(true);
+    const id = toast.loading("Generating Formal AI Executive Report…");
     try {
       await generateReportPdf(spec, narrative);
-      toast.success(`${spec.reportName} PDF downloaded`);
+      toast.success(`${spec.reportName} document downloaded`, { id });
       setOpen(false);
     } catch {
-      toast.error("PDF generation failed");
+      toast.error("PDF generation failed", { id });
     } finally {
       setDownloading(false);
     }
@@ -99,38 +138,80 @@ export function AiReportButton({
 
   return (
     <>
-      <Button variant={variant} size={size} className={className} onClick={() => void analyse()}>
-        <FileText className="size-4" /> {label}
-      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            data-export-hide
+            variant={variant}
+            size={size}
+            className={className}
+            disabled={snapping}
+          >
+            {snapping ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Download className="size-4" />
+            )}
+            {label}
+            <ChevronDown className="size-3.5 opacity-60" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-80">
+          <DropdownMenuLabel>PDF export options</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="flex-col items-start gap-0.5 py-2.5"
+            onSelect={() => void snapshot()}
+          >
+            <span className="flex items-center gap-2 text-sm font-medium">
+              <ImageIcon className="size-4 text-brand" /> Visual Dashboard Snapshot
+            </span>
+            <span className="pl-6 text-xs text-muted-foreground">
+              High-resolution capture of this page, charts and KPI cards included.
+            </span>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="flex-col items-start gap-0.5 py-2.5"
+            onSelect={() => void analyse()}
+          >
+            <span className="flex items-center gap-2 text-sm font-medium">
+              <FileText className="size-4 text-brand" /> Formal Executive Document
+            </span>
+            <span className="pl-6 text-xs text-muted-foreground">
+              AI-written narrative, structured tables, sign-off block, letterhead.
+            </span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Report Preview</DialogTitle>
+            <DialogTitle>Formal Executive Document</DialogTitle>
             <DialogDescription>
               {spec ? `${spec.reportName} · ${spec.org} · ${spec.fy}` : ""}
             </DialogDescription>
           </DialogHeader>
 
           {busy && (
-            <div className="flex items-center gap-3 rounded-lg border border-border bg-secondary/50 p-4 text-sm">
+            <div className="flex items-center gap-3 rounded-xl border border-border bg-secondary/60 p-4 text-sm">
               <Loader2 className="size-4 animate-spin text-brand" />
-              AI is analyzing data and generating document…
+              Generating Formal AI Executive Report…
             </div>
           )}
 
           {!busy && narrative && (
             <div className="space-y-4">
-              <div className="space-y-2 text-sm leading-relaxed">
+              <div className="space-y-3 text-sm leading-relaxed">
                 {narrative.summary.split(/\n\n+/).map((p, i) => (
                   <p key={i}>{p}</p>
                 ))}
               </div>
 
               {narrative.takeaways.length > 0 && (
-                <div className="rounded-lg border border-brand/40 bg-brand-soft p-4">
-                  <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-brand">
-                    <Sparkles className="size-3.5" /> Key takeaways
+                <div className="rounded-xl border-l-4 border-brand bg-brand-soft p-4">
+                  <p className="mb-2 flex items-center gap-2 text-xs font-bold tracking-wide text-brand uppercase">
+                    <Sparkles className="size-3.5" /> Executive takeaways
                   </p>
                   <ul className="list-disc space-y-1 pl-5 text-sm">
                     {narrative.takeaways.map((t, i) => (
@@ -140,26 +221,12 @@ export function AiReportButton({
                 </div>
               )}
 
-              {spec && spec.kpis.length > 0 && (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {spec.kpis.map((k) => (
-                    <div key={k.label} className="rounded-md border border-border px-3 py-2">
-                      <p className="text-xs text-muted-foreground">{k.label}</p>
-                      <p className="tabular text-sm font-semibold">
-                        {k.value}
-                        {k.delta ? <span className="ml-2 text-xs text-brand">{k.delta}</span> : null}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
               {spec && (
                 <p className="text-xs text-muted-foreground">
-                  Document includes {spec.tables.length} data table
-                  {spec.tables.length === 1 ? "" : "s"}
-                  {spec.chartEl ? " and page charts" : ""}, with page numbers, confidentiality notice
-                  and sign-off block.
+                  Document includes {spec.tables.length} structured data table
+                  {spec.tables.length === 1 ? "" : "s"}, corporate letterhead, page numbers,
+                  confidentiality notice and a Finance Head sign-off block. KPI boxes and charts are
+                  intentionally excluded — use the visual snapshot export for those.
                 </p>
               )}
             </div>
@@ -170,8 +237,12 @@ export function AiReportButton({
               Cancel
             </Button>
             <Button onClick={() => void download()} disabled={busy || downloading || !narrative}>
-              {downloading ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
-              Download PDF
+              {downloading ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Download className="size-4" />
+              )}
+              Download Document
             </Button>
           </DialogFooter>
         </DialogContent>
