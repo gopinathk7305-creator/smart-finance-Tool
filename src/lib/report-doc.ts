@@ -344,6 +344,9 @@ export async function generateSnapshotPdf(spec: ReportSpec, el: HTMLElement) {
     ignoreElements: (node) => node instanceof HTMLElement && node.dataset["exportHide"] !== undefined,
   });
 
+  // trim trailing blank space so the snapshot doesn't produce an empty last page
+  const trimmed = trimBottomWhitespace(canvas);
+
   const pdf = new jsPDF({ orientation: "p", unit: "pt", format: "a4" });
   pdf.setCharSpace(0);
   const W = pdf.internal.pageSize.getWidth();
@@ -354,9 +357,9 @@ export async function generateSnapshotPdf(spec: ReportSpec, el: HTMLElement) {
   const ref = docRefId(spec.page);
 
   const imgW = W - M * 2;
-  const imgH = (canvas.height * imgW) / canvas.width;
+  const imgH = (trimmed.height * imgW) / trimmed.width;
   const band = H - HEAD - FOOT;
-  const img = canvas.toDataURL("image/jpeg", 0.94);
+  const img = trimmed.toDataURL("image/jpeg", 0.94);
 
   const T = (t: unknown, x: number, y: number, opts?: { align?: "left" | "center" | "right" }) =>
     pdf.text(pdfSafe(t), x, y, opts);
