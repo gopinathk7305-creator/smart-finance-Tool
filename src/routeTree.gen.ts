@@ -14,6 +14,7 @@ import { Route as AuditRouteImport } from './routes/audit'
 import { Route as BudgetRouteImport } from './routes/budget'
 import { Route as CashflowRouteImport } from './routes/cashflow'
 import { Route as CategoriesRouteImport } from './routes/categories'
+import { Route as ComplianceRouteImport } from './routes/compliance'
 import { Route as ForecastRouteImport } from './routes/forecast'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PayrollRouteImport } from './routes/payroll'
@@ -45,6 +46,11 @@ const CashflowRoute = CashflowRouteImport.update({
 const CategoriesRoute = CategoriesRouteImport.update({
   id: '/categories',
   path: '/categories',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ComplianceRoute = ComplianceRouteImport.update({
+  id: '/compliance',
+  path: '/compliance',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ForecastRoute = ForecastRouteImport.update({
@@ -89,6 +95,7 @@ export interface FileRoutesByFullPath {
   '/budget': typeof BudgetRoute
   '/cashflow': typeof CashflowRoute
   '/categories': typeof CategoriesRoute
+  '/compliance': typeof ComplianceRoute
   '/forecast': typeof ForecastRoute
   '/login': typeof LoginRoute
   '/payroll': typeof PayrollRoute
@@ -103,6 +110,7 @@ export interface FileRoutesByTo {
   '/budget': typeof BudgetRoute
   '/cashflow': typeof CashflowRoute
   '/categories': typeof CategoriesRoute
+  '/compliance': typeof ComplianceRoute
   '/forecast': typeof ForecastRoute
   '/login': typeof LoginRoute
   '/payroll': typeof PayrollRoute
@@ -118,6 +126,7 @@ export interface FileRoutesById {
   '/budget': typeof BudgetRoute
   '/cashflow': typeof CashflowRoute
   '/categories': typeof CategoriesRoute
+  '/compliance': typeof ComplianceRoute
   '/forecast': typeof ForecastRoute
   '/login': typeof LoginRoute
   '/payroll': typeof PayrollRoute
@@ -134,6 +143,7 @@ export interface FileRouteTypes {
     | '/budget'
     | '/cashflow'
     | '/categories'
+    | '/compliance'
     | '/forecast'
     | '/login'
     | '/payroll'
@@ -148,6 +158,7 @@ export interface FileRouteTypes {
     | '/budget'
     | '/cashflow'
     | '/categories'
+    | '/compliance'
     | '/forecast'
     | '/login'
     | '/payroll'
@@ -162,6 +173,7 @@ export interface FileRouteTypes {
     | '/budget'
     | '/cashflow'
     | '/categories'
+    | '/compliance'
     | '/forecast'
     | '/login'
     | '/payroll'
@@ -177,6 +189,7 @@ export interface RootRouteChildren {
   BudgetRoute: typeof BudgetRoute
   CashflowRoute: typeof CashflowRoute
   CategoriesRoute: typeof CategoriesRoute
+  ComplianceRoute: typeof ComplianceRoute
   ForecastRoute: typeof ForecastRoute
   LoginRoute: typeof LoginRoute
   PayrollRoute: typeof PayrollRoute
@@ -221,6 +234,13 @@ declare module '@tanstack/react-router' {
       path: '/categories'
       fullPath: '/categories'
       preLoaderRoute: typeof CategoriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/compliance': {
+      id: '/compliance'
+      path: '/compliance'
+      fullPath: '/compliance'
+      preLoaderRoute: typeof ComplianceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/forecast': {
@@ -281,6 +301,7 @@ const rootRouteChildren: RootRouteChildren = {
   BudgetRoute: BudgetRoute,
   CashflowRoute: CashflowRoute,
   CategoriesRoute: CategoriesRoute,
+  ComplianceRoute: ComplianceRoute,
   ForecastRoute: ForecastRoute,
   LoginRoute: LoginRoute,
   PayrollRoute: PayrollRoute,

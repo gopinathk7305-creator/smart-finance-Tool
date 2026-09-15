@@ -15,6 +15,13 @@
       "when": 1789445177307,
       "tag": "0001_create_expense_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789454509367,
+      "tag": "0002_compliance_fx_audit_org",
+      "breakpoints": true
     }
   ]
 }

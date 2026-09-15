@@ -23,6 +23,10 @@ const TEMPLATE: Record<string, string> = {
     "Salary Register & Statutory Deductions Summary: total CTC breakdown, PF 12% / ESI 3.25% / slab-wise TDS compliance status and tax liability.",
   audit:
     "Forensic Audit Trail & Compliance Register: total audited transactions, flagged anomalies, risk score and recommended audit actions.",
+  budget:
+    "Budget Plan, Variance Analysis & Forecast Gap Statement: compare planned spend to actual spend and to the twelve-month forecast, naming the categories driving the gap.",
+  compliance:
+    "Statutory Compliance & Filings Status Report: GST, TDS, PF/ESI and advance-tax filing position, overdue exposure and late-fee risk.",
   reports: "Consolidated Management Report: summarise the selected statement and its control implications.",
 };
 
