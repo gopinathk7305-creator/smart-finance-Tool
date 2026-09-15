@@ -527,28 +527,26 @@ function UploadPage() {
                   No issues detected — the dataset is ready to sync.
                 </p>
               ) : (
-                <div className="max-h-72 overflow-y-auto rounded-md border border-border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Row</TableHead>
-                        <TableHead>Field</TableHead>
-                        <TableHead>Value</TableHead>
-                        <TableHead>Issue</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {p.issues.slice(0, 60).map((i, idx) => (
-                        <TableRow key={idx}>
-                          <TableCell className="tabular">{i.row}</TableCell>
-                          <TableCell>{i.field}</TableCell>
-                          <TableCell className="max-w-40 truncate">{i.value}</TableCell>
-                          <TableCell className={`text-xs ${issueTone(i.severity)}`}>{i.issue}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                <VirtualTable
+                  rows={p.issues}
+                  height={288}
+                  head={
+                    <>
+                      <th className="w-16 p-2">Row</th>
+                      <th className="w-28 p-2">Field</th>
+                      <th className="w-32 p-2">Value</th>
+                      <th className="p-2">Issue</th>
+                    </>
+                  }
+                  row={(i) => (
+                    <>
+                      <td className="tabular w-16 p-2">{i.row}</td>
+                      <td className="w-28 p-2">{i.field}</td>
+                      <td className="w-32 truncate p-2">{i.value}</td>
+                      <td className={`p-2 text-xs ${issueTone(i.severity)}`}>{i.issue}</td>
+                    </>
+                  )}
+                />
               )}
 
               {fixed && fixes.length > 0 && (
