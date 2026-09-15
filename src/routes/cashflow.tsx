@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import { ArrowDownCircle, ArrowUpCircle, Banknote, Building2 } from "lucide-react";
 import { useState } from "react";
 import {
