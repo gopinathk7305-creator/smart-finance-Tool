@@ -41,7 +41,10 @@ import { logActivity, useAuth } from "@/lib/auth";
 import { ALL, useOrg } from "@/lib/orgs";
 import { useDataset } from "@/lib/dataset";
 import { useInsights } from "@/lib/insights";
-import { type DatasetKey, type EtlResult, issueTone, readTabular, runEtl } from "@/lib/etl";
+import { VirtualTable } from "@/components/finance/VirtualTable";
+import { type DatasetKey, type EtlResult, issueTone, runEtl, streamTabular } from "@/lib/etl";
+
+const BATCH_SIZE = 5000;
 
 export const Route = createFileRoute("/upload")({
   head: () => ({
