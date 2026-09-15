@@ -64,7 +64,11 @@ function PnlPage() {
 
   const rows: { label: string; value: number; kind?: "sub" | "total" | "grand" }[] = [
     { label: "Gross Revenue", value: t.revenue, kind: "total" },
-    { label: "Cost of Goods Sold (COGS)", value: -t.cogs, kind: "sub" },
+    {
+      label: cogsNames.length ? `Cost of Goods Sold (${cogsNames.join(", ")})` : "Cost of Goods Sold",
+      value: -t.cogs,
+      kind: "sub",
+    },
     { label: "Gross Profit", value: t.grossProfit, kind: "total" },
     ...opexLines.map((o) => ({ label: o.label, value: -o.value, kind: "sub" as const })),
     { label: "EBITDA", value: t.ebitda, kind: "total" },
@@ -150,7 +154,10 @@ function PnlPage() {
           <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
             <div>
               <CardTitle className="text-base">Profit & Loss Statement</CardTitle>
-              <CardDescription>Consolidated, fiscal year 2026</CardDescription>
+              <CardDescription>
+                Consolidated, fiscal year 2026 ·{" "}
+                {liveCats ? "your expense categories" : "starter expense categories"}
+              </CardDescription>
             </div>
             <div className="flex items-center gap-2">
               <Switch id="pct" checked={showPct} onCheckedChange={setShowPct} />
