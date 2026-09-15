@@ -30,6 +30,8 @@ export interface ReportSpec {
   tables: ReportTable[];
   /** plain-text facts handed to the AI narrative */
   facts: string;
+  /** optional formal note repeated in the document footer */
+  complianceNote?: string;
   /** chart container captured into the visual snapshot */
   chartEl?: HTMLElement | null;
 }
@@ -223,7 +225,7 @@ export async function generateReportPdf(spec: ReportSpec, narrative: ReportNarra
       const tableW = W - M * 2;
       const numericFrom = table.numericFrom ?? cols;
       const labelCols = Math.max(numericFrom, 1);
-      const rowH = 19;
+      const baseRowH = 19;
       const PAD = 8;
       const BODY_FS = 8.5;
 
@@ -238,28 +240,47 @@ export async function generateReportPdf(spec: ReportSpec, narrative: ReportNarra
         return w + PAD * 2;
       });
       const needed = need.reduce((a, b) => a + b, 0);
-      const widths =
-        needed <= tableW
-          ? need.map((w, i) => (i < labelCols ? w + (tableW - needed) / labelCols : w))
-          : need.map((w) => (w / needed) * tableW);
+      const minimums = table.columns.map((_, i) => (i < labelCols ? 42 : 54));
+      const minimumTotal = minimums.reduce((a, b) => a + b, 0);
+      const extraNeeds = need.map((w, i) => Math.max(0, w - (minimums[i] ?? 42)));
+      const extraNeedTotal = Math.max(1, extraNeeds.reduce((a, b) => a + b, 0));
+      const widths = needed <= tableW
+        ? need.map((w, i) => (i < labelCols ? w + (tableW - needed) / labelCols : w))
+        : need.map((w, i) => {
+            const distributable = Math.max(0, tableW - minimumTotal);
+            const minimum = minimums[i] ?? 42;
+            return minimum + ((extraNeeds[i] ?? 0) / extraNeedTotal) * distributable;
+          });
       const xAt = (i: number) => M + widths.slice(0, i).reduce((a, b) => a + b, 0);
       const wAt = (i: number) => widths[i] ?? 0;
 
       const drawHead = () => {
+        const headerLines = table.columns.map(
+          (c, i) => pdf.splitTextToSize(pdfSafe(c), Math.max(8, wAt(i) - PAD * 2)) as string[],
+        );
+        const headH = Math.max(baseRowH, 8 + Math.max(...headerLines.map((lines) => lines.length)) * 9);
         pdf.setFillColor(...NAVY);
-        pdf.rect(M, y, tableW, rowH, "F");
+        pdf.rect(M, y, tableW, headH, "F");
         pdf.setFont("helvetica", "bold");
         pdf.setFontSize(8);
         pdf.setTextColor(255, 255, 255);
-        table.columns.forEach((c, i) => {
+        headerLines.forEach((lines, i) => {
           const right = i >= labelCols;
-          T(c, right ? xAt(i) + wAt(i) - PAD : xAt(i) + PAD, y + 12.5, right ? { align: "right" } : undefined);
+          lines.forEach((line, li) =>
+            T(line, right ? xAt(i) + wAt(i) - PAD : xAt(i) + PAD, y + 11 + li * 9, right ? { align: "right" } : undefined),
+          );
         });
-        y += rowH;
+        y += headH;
       };
 
       drawHead();
       table.rows.forEach((r, ri) => {
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(BODY_FS);
+        const cellLines = r.map((cell, i) =>
+          pdf.splitTextToSize(pdfSafe(cell), Math.max(8, wAt(i) - PAD * 2)) as string[],
+        );
+        const rowH = Math.max(baseRowH, 8 + Math.max(...cellLines.map((lines) => lines.length)) * 10);
         if (y + rowH > BOTTOM) {
           pdf.addPage();
           y = M;
@@ -272,17 +293,12 @@ export async function generateReportPdf(spec: ReportSpec, narrative: ReportNarra
         pdf.setDrawColor(...HAIRLINE);
         pdf.setLineWidth(0.4);
         pdf.line(M, y + rowH, W - M, y + rowH);
-        pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(8.5);
         pdf.setTextColor(30, 41, 59);
-        r.forEach((cell, i) => {
+        cellLines.forEach((lines, i) => {
           const right = i >= labelCols;
-          const text = pdfSafe(cell);
-          // numeric cells are never truncated (columns are measured to fit)
-          const out = right
-            ? text
-            : ((pdf.splitTextToSize(text, wAt(i) - PAD * 2) as string[])[0] ?? text);
-          T(out, right ? xAt(i) + wAt(i) - PAD : xAt(i) + PAD, y + 12.5, right ? { align: "right" } : undefined);
+          lines.forEach((line, li) =>
+            T(line, right ? xAt(i) + wAt(i) - PAD : xAt(i) + PAD, y + 12.5 + li * 10, right ? { align: "right" } : undefined),
+          );
         });
         y += rowH;
       });
@@ -318,7 +334,10 @@ export async function generateReportPdf(spec: ReportSpec, narrative: ReportNarra
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(7.5);
     pdf.setTextColor(...SLATE);
-    T("Confidential - For internal management use only. Not for external circulation.", M, H - 40);
+    const footerNote = spec.complianceNote
+      ? (pdf.splitTextToSize(pdfSafe(spec.complianceNote), W - M * 2) as string[])[0]
+      : "Confidential - For internal management use only. Not for external circulation.";
+    T(footerNote, M, H - 40);
     T(ref, M, H - 28);
     T(`Page ${p} of ${pages}`, W - M, H - 28, { align: "right" });
   }
