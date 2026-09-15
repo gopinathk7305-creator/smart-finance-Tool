@@ -55,6 +55,20 @@ export function useDataset(): Dataset {
     void queryClient.invalidateQueries({ queryKey: ["dataset"] });
   }, [queryClient]);
 
+  // Realtime cloud sync: any insert/update/delete on the ingested tables
+  // refreshes every page that reads the dataset.
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase.channel(`dataset-sync-${user.id}`);
+    ["transactions", "payroll_records", "budget_targets", "arap_records"].forEach((table) => {
+      channel.on("postgres_changes", { event: "*", schema: "public", table }, () => refresh());
+    });
+    channel.subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [user, refresh]);
+
   const rowCount = data ? data.t.length + data.p.length + data.b.length + data.a.length : 0;
 
   if (!data || rowCount === 0) {
