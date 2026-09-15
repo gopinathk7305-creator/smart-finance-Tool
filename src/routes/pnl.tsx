@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { actualsByCategory, inr, monthlySummary, totals } from "@/lib/finance-data";
 import { gstSummary } from "@/lib/enterprise-data";
+import { useCategories } from "@/lib/categories";
 import { useDataset } from "@/lib/dataset";
 import { cn } from "@/lib/utils";
 
@@ -45,12 +46,19 @@ export const Route = createFileRoute("/pnl")({
 function PnlPage() {
   const [showPct, setShowPct] = useState(true);
   const { txns } = useDataset();
-  const t = totals(txns);
+  const { categories, cogsNames, live: liveCats } = useCategories();
+  const t = totals(txns, cogsNames);
   const cats = actualsByCategory(txns);
   const series = monthlySummary(txns);
   const gst = gstSummary(t.revenue, t.expense);
 
-  const opexLines = ["Payroll", "Office Rent", "Marketing", "Utilities", "Software Subscriptions", "Legal"]
+  // Expense lines below gross profit follow the user's own category definitions,
+  // plus any ledger category they have not defined yet.
+  const belowGross = categories.filter((c) => c.kind !== "cogs").map((c) => c.name);
+  const extras = [...cats.keys()].filter(
+    (c) => !categories.some((cat) => cat.name.toLowerCase() === c.toLowerCase()),
+  );
+  const opexLines = [...belowGross, ...extras]
     .map((c) => ({ label: c, value: cats.get(c) ?? 0 }))
     .filter((r) => r.value > 0);
 
