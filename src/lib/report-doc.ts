@@ -341,6 +341,7 @@ export async function generateSnapshotPdf(spec: ReportSpec, el: HTMLElement) {
     backgroundColor: "#ffffff",
     useCORS: true,
     logging: false,
+    ignoreElements: (node) => node instanceof HTMLElement && node.dataset["exportHide"] !== undefined,
   });
 
   const pdf = new jsPDF({ orientation: "p", unit: "pt", format: "a4" });
@@ -391,10 +392,11 @@ export async function generateSnapshotPdf(spec: ReportSpec, el: HTMLElement) {
     pdf.setFontSize(7.5);
     pdf.setTextColor(...SLATE);
     T("Confidential - For internal management use only.", M, H - 14);
-    T(`Page ${page + 1}`, W - M, H - 14, { align: "right" });
 
     drawn += band;
     page += 1;
+    // skip a near-empty trailing page
+    if (imgH - drawn < 24) break;
   }
 
   const pages = pdf.getNumberOfPages();
