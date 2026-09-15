@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 
+import { AiInsightsDock } from "@/components/finance/AiInsightsDock";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -264,6 +265,7 @@ export function AppShell({
         <main data-page-capture className="flex-1 p-4 md:p-6">
           {children}
         </main>
+        <AiInsightsDock />
       </div>
     </div>
   );
