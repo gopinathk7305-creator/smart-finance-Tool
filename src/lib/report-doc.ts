@@ -330,6 +330,47 @@ export async function generateReportPdf(spec: ReportSpec, narrative: ReportNarra
 // 2. VISUAL DASHBOARD SNAPSHOT
 // ---------------------------------------------------------------------------
 
+/** Crops uniform blank space off the bottom of a captured canvas. */
+function trimBottomWhitespace(src: HTMLCanvasElement): HTMLCanvasElement {
+  try {
+    const ctx = src.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return src;
+    const { width, height } = src;
+    let lastContent = height - 1;
+    const step = 2;
+    for (let y = height - 1; y >= 0; y -= step) {
+      const row = ctx.getImageData(0, y, width, 1).data;
+      let dirty = false;
+      for (let x = 0; x < row.length; x += 4 * 6) {
+        const r = row[x]!;
+        const g = row[x + 1]!;
+        const b = row[x + 2]!;
+        if (r < 246 || g < 246 || b < 246) {
+          dirty = true;
+          break;
+        }
+      }
+      if (dirty) {
+        lastContent = y;
+        break;
+      }
+    }
+    const keep = Math.min(height, lastContent + 24);
+    if (keep >= height - 4) return src;
+    const out = document.createElement("canvas");
+    out.width = width;
+    out.height = keep;
+    const octx = out.getContext("2d");
+    if (!octx) return src;
+    octx.fillStyle = "#ffffff";
+    octx.fillRect(0, 0, width, keep);
+    octx.drawImage(src, 0, 0);
+    return out;
+  } catch {
+    return src;
+  }
+}
+
 export async function generateSnapshotPdf(spec: ReportSpec, el: HTMLElement) {
   const [{ jsPDF }, { default: html2canvas }] = await Promise.all([
     import("jspdf"),
