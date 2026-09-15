@@ -140,7 +140,13 @@ export function AiReportButton({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant={variant} size={size} className={className} disabled={snapping}>
+          <Button
+            data-export-hide
+            variant={variant}
+            size={size}
+            className={className}
+            disabled={snapping}
+          >
             {snapping ? (
               <Loader2 className="size-4 animate-spin" />
             ) : (
