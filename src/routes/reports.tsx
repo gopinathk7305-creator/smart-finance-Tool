@@ -421,16 +421,16 @@ function ReportsPage() {
         </Card>
       </div>
 
-       <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+       <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {(Object.keys(REPORTS) as ReportKey[]).map((k) => (
-           <Card key={k} className="group flex min-h-44 flex-col border-border shadow-card transition-shadow hover:shadow-md">
+           <Card key={k} className="group flex min-h-40 flex-col border-border shadow-card transition-shadow hover:shadow-md">
              <CardContent className="flex flex-1 items-start gap-3 pt-6">
               <span className="flex size-9 items-center justify-center rounded-md bg-brand-soft text-brand">
                 {k === "payroll" ? <FileSpreadsheet className="size-4" /> : <FileText className="size-4" />}
               </span>
                <div className="min-w-0">
                 <p className="text-sm font-semibold">{REPORTS[k]}</p>
-                 <p className="mt-1 text-xs text-muted-foreground">Formal FY 2026-27 reporting pack</p>
+                 <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Formal FY 2026-27 reporting pack</p>
               </div>
             </CardContent>
              <div className="grid grid-cols-2 border-t border-border">
