@@ -1,12 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Download, FileSpreadsheet, FileText, Loader2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { Download, FileSpreadsheet, FileText, Image as ImageIcon, Loader2 } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { AiReportButton } from "@/components/finance/AiReportButton";
 import { AppShell } from "@/components/finance/AppShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -27,7 +34,6 @@ import {
   downloadCSV,
   grossPay,
   inr,
-  netPay,
   monthlySummary,
   totals,
   type ArApRecord,
@@ -35,14 +41,16 @@ import {
   type PayrollRecord,
   type Transaction,
 } from "@/lib/finance-data";
-import { auditFindings, computeTax } from "@/lib/enterprise-data";
+import { auditFindings, computeTax, gstSummary } from "@/lib/enterprise-data";
 import { useAuth } from "@/lib/auth";
 import { useDataset } from "@/lib/dataset";
 import { ALL, useOrg } from "@/lib/orgs";
+import { corporateTax } from "@/lib/tax";
 import { generateReportNarrative } from "@/lib/report-ai.functions";
 import {
   fallbackNarrative,
   generateReportPdf,
+  generateSnapshotPdf,
   type ReportNarrative,
   type ReportSpec,
 } from "@/lib/report-doc";
@@ -50,33 +58,63 @@ import {
 export const Route = createFileRoute("/reports")({
   head: () => ({
     meta: [
-      { title: "Reports & Export — Finance IQ" },
+      { title: "Report Builder — Finance IQ" },
       {
         name: "description",
         content:
-          "Build and download P&L, executive summary, payroll ledger and AR/AP aging reports as CSV or PDF.",
+          "Interactive Indian-FY report builder: P&L, executive summary, payroll tax, audit log, AR/AP aging and GST liability with CSV and AI PDF export.",
       },
-      { property: "og:title", content: "Reports & Export — Finance IQ" },
+      { property: "og:title", content: "Report Builder — Finance IQ" },
       {
         property: "og:description",
-        content: "One-click financial report builder with CSV and print-to-PDF output.",
+        content:
+          "Slice financial reports by quarter and vendor, preview live and export CSV or a formal AI executive PDF.",
       },
-       { property: "og:type", content: "website" },
-       { name: "twitter:card", content: "summary" },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: ReportsPage,
 });
 
 const REPORTS = {
-  pnl: "Profit & Loss Statement",
+  pnl: "Profit & Loss Statement (P&L)",
   summary: "Executive Financial Summary",
-  payroll: "Payroll Tax Sheet",
-  audit: "Audit Exception Log",
-  aging: "AR/AP Aging",
+  payroll: "Statutory Compliance & Payroll Tax Sheet",
+  audit: "Audit Exception & Risk Log",
+  aging: "AR / AP Aging Analysis",
+  gst: "GST Liability & Filing Summary",
 } as const;
 
 type ReportKey = keyof typeof REPORTS;
+
+const RANGES = {
+  ytd: "YTD FY 2026-27",
+  q1: "Q1 (Apr-Jun 2026)",
+  q2: "Q2 (Jul-Sep 2026)",
+  q3: "Q3 (Oct-Dec 2026)",
+  q4: "Q4 (Jan-Mar 2027)",
+  custom: "Custom Range",
+} as const;
+
+type RangeKey = keyof typeof RANGES;
+
+/** Indian FY 2026-27 quarter windows as inclusive ISO date bounds. */
+const QUARTER_BOUNDS: Record<Exclude<RangeKey, "ytd" | "custom">, [string, string]> = {
+  q1: ["2026-04-01", "2026-06-30"],
+  q2: ["2026-07-01", "2026-09-30"],
+  q3: ["2026-10-01", "2026-12-31"],
+  q4: ["2027-01-01", "2027-03-31"],
+};
+
+function windowFor(range: RangeKey, from: string, to: string): [string, string] | null {
+  if (range === "ytd") return null;
+  if (range === "custom") return from && to ? [from, to] : null;
+  return QUARTER_BOUNDS[range];
+}
+
+const inWindow = (iso: string, bounds: [string, string] | null) =>
+  !bounds || (iso.slice(0, 10) >= bounds[0] && iso.slice(0, 10) <= bounds[1]);
 
 function agingBand(record: ArApRecord) {
   if (record.status === "settled") return "Current";
@@ -96,17 +134,22 @@ function buildRows(
   araps: ArApRecord[],
 ): Record<string, unknown>[] {
   const t = totals(txns);
+  const ebit = t.ebitda - t.depreciation - t.interest;
+  const tx = corporateTax(ebit, 0.25, "7");
   if (key === "pnl")
     return [
-      { line: "Gross Revenue", amount: t.revenue },
-      { line: "COGS", amount: -t.cogs },
+      { line: "Gross Revenue (excl. GST)", amount: t.revenue },
+      { line: "Cost of Goods Sold", amount: -t.cogs },
       { line: "Gross Profit", amount: t.grossProfit },
       { line: "Operating Expenses", amount: -t.opex },
       { line: "EBITDA", amount: t.ebitda },
-      { line: "Depreciation", amount: -t.depreciation },
-      { line: "Interest", amount: -t.interest },
-      { line: "Corporate Tax (25%)", amount: -Math.round(t.tax) },
-      { line: "Net Profit", amount: Math.round(t.netProfit) },
+      { line: "Depreciation & Amortisation", amount: -t.depreciation },
+      { line: "Finance Cost", amount: -t.interest },
+      { line: "EBIT (Taxable Profit)", amount: ebit },
+      { line: "Corporate Tax @ 25%", amount: -Math.round(tx.base) },
+      { line: "Surcharge @ 7%", amount: -Math.round(tx.surcharge) },
+      { line: "Health & Education Cess @ 4%", amount: -Math.round(tx.cess) },
+      { line: "Net Profit After Tax", amount: Math.round(tx.netProfit) },
     ];
   if (key === "summary")
     return [
@@ -114,7 +157,11 @@ function buildRows(
       { metric: "Cost of Goods Sold", amount: t.cogs, management_view: "Direct operating cost" },
       { metric: "Operating Expenses", amount: t.opex, management_view: "Indirect operating cost" },
       { metric: "EBITDA", amount: t.ebitda, management_view: "Operating earnings" },
-      { metric: "Net Profit", amount: t.netProfit, management_view: "Post-tax earnings" },
+      {
+        metric: "Net Profit After Tax",
+        amount: Math.round(tx.netProfit),
+        management_view: "Post-tax earnings",
+      },
       {
         metric: "Approved Budget",
         amount: buds.reduce((sum, b) => sum + b.budgeted_amount, 0),
@@ -145,9 +192,23 @@ function buildRows(
       amount: f.amount,
       finding: f.detail,
       recommended_action:
-        f.severity === "high" ? "Hold and investigate" : f.severity === "medium" ? "Verify documents" : "Manager review",
+        f.severity === "high"
+          ? "Hold and investigate"
+          : f.severity === "medium"
+            ? "Verify documents"
+            : "Manager review",
       approval_status: "Open",
     }));
+  if (key === "gst") {
+    const g = gstSummary(t.revenue, t.expense);
+    return [
+      { particulars: "Taxable Outward Supplies (Revenue)", amount: t.revenue },
+      { particulars: "Output GST @ 18% (GSTR-1)", amount: g.outputGst },
+      { particulars: "Eligible Input Tax Credit", amount: g.inputCredit },
+      { particulars: "Net GST Payable (GSTR-3B)", amount: g.payable },
+      { particulars: "Taxable Inward Supplies (Expenses)", amount: t.expense },
+    ];
+  }
   const bands = ["Current", "1-30 Days", "31-60 Days", "61-90 Days", "90+ Days"];
   return (["AR", "AP"] as const).flatMap((type) =>
     bands.map((band) => {
@@ -164,34 +225,64 @@ function buildRows(
   );
 }
 
-const PAGE_KEY: Record<ReportKey, "pnl" | "payroll" | "audit" | "reports"> = {
+const PAGE_KEY: Record<ReportKey, ReportSpec["page"]> = {
   pnl: "pnl",
   summary: "reports",
   payroll: "payroll",
   audit: "audit",
   aging: "reports",
+  gst: "compliance",
 };
 
 function ReportsPage() {
   const { session } = useAuth();
-  const { orgName, vendor } = useOrg();
-  const { txns, pays, buds, araps } = useDataset();
+  const { orgName, vendor, setVendor } = useOrg();
+  const { txns, pays, buds, araps, vendors } = useDataset();
   const [report, setReport] = useState<ReportKey>("pnl");
-  const [range, setRange] = useState("ytd");
-  const [format, setFormat] = useState("csv");
-  const [busyReport, setBusyReport] = useState<ReportKey | null>(null);
-  const printRef = useRef<HTMLDivElement>(null);
+  const [range, setRange] = useState<RangeKey>("ytd");
+  const [from, setFrom] = useState("2026-04-01");
+  const [to, setTo] = useState("2027-03-31");
+  const [busy, setBusy] = useState<null | "csv" | "snapshot" | "formal">(null);
+  const [modal, setModal] = useState(false);
+  const previewRef = useRef<HTMLDivElement>(null);
 
-  const rows = buildRows(report, txns, pays, buds, araps);
-  const preview = rows.slice(0, 20);
+  const bounds = windowFor(range, from, to);
+
+  const scoped = useMemo(() => {
+    return {
+      txns: txns.filter((t) => inWindow(t.date, bounds)),
+      pays: bounds
+        ? pays.filter((p) => {
+            const d = Date.parse(`${p.month_year}-01`);
+            return Number.isNaN(d)
+              ? true
+              : new Date(d).toISOString().slice(0, 10) >= bounds[0] &&
+                  new Date(d).toISOString().slice(0, 10) <= bounds[1];
+          })
+        : pays,
+      buds,
+      araps: araps.filter((r) => inWindow(r.invoice_date, bounds)),
+    };
+  }, [txns, pays, buds, araps, bounds]);
+
+  const rows = buildRows(report, scoped.txns, scoped.pays, scoped.buds, scoped.araps);
+  const preview = rows.slice(0, 30);
+  const columns = Object.keys(rows[0] ?? {});
+  const rangeLabel = range === "custom" ? `${from} to ${to}` : RANGES[range];
 
   const buildReport = (key: ReportKey = report): Omit<ReportSpec, "org" | "vendor"> => {
-    const reportRows = buildRows(key, txns, pays, buds, araps);
-    const t = totals(txns);
-    const months = monthlySummary(txns);
+    const reportRows = buildRows(key, scoped.txns, scoped.pays, scoped.buds, scoped.araps);
+    const t = totals(scoped.txns);
+    const ebit = t.ebitda - t.depreciation - t.interest;
+    const tx = corporateTax(ebit, 0.25, "7");
+    const g = gstSummary(t.revenue, t.expense);
+    const months = monthlySummary(scoped.txns);
     const finalCash = months.at(-1)?.cash ?? 0;
-    const monthlyBurn = months.slice(-3).reduce((sum, m) => sum + Math.max(0, m.expense - m.revenue), 0) / 3;
-    const overdue = araps.filter((r) => r.status === "outstanding" && agingBand(r) !== "Current");
+    const monthlyBurn =
+      months.slice(-3).reduce((sum, m) => sum + Math.max(0, m.expense - m.revenue), 0) / 3;
+    const overdue = scoped.araps.filter(
+      (r) => r.status === "outstanding" && agingBand(r) !== "Current",
+    );
     const overdueValue = overdue.reduce((sum, r) => sum + r.amount, 0);
     const titles: Record<ReportKey, string> = {
       pnl: "Profit & Loss Statement",
@@ -199,48 +290,82 @@ function ReportsPage() {
       payroll: "Detailed Salary & Statutory Tax Register",
       audit: "Forensic Audit Trail & Risk Register",
       aging: "AR/AP Aging Analysis",
+      gst: "GST Liability & Filing Summary",
     };
     const facts: Record<ReportKey, string> = {
-      pnl: `Operating income ${inr(t.revenue)}, total expenses ${inr(t.expense)}, COGS ${inr(t.cogs)}, EBITDA ${inr(t.ebitda)}, corporate tax at 25% ${inr(t.tax)}, and net profit ${inr(t.netProfit)}. Operating expense variance against income is ${inr(t.opex - t.revenue)}.`,
-      summary: `Management overview: revenue ${inr(t.revenue)}, expenses ${inr(t.expense)}, net profit ${inr(t.netProfit)}, closing modeled cash ${inr(finalCash)}, and recent monthly cash burn ${inr(monthlyBurn)}. Budget-versus-actual lines: ${reportRows.length}.`,
-      payroll: `Salary register covers ${pays.length} employees. Gross pay ${inr(pays.reduce((s, p) => s + grossPay(p), 0))}, PF at 12% ${inr(pays.reduce((s, p) => s + computeTax(p).pf, 0))}, ESI ${inr(pays.reduce((s, p) => s + computeTax(p).esi, 0))}, slab-wise TDS including 4% cess ${inr(pays.reduce((s, p) => s + computeTax(p).monthlyTds, 0))}, and net take-home ${inr(pays.reduce((s, p) => s + computeTax(p).net, 0))}. Compliance certificate: figures are system-computed and require Finance Head approval before statutory filing.`,
-      audit: `Forensic review of ${txns.length} transactions identified ${reportRows.length} exceptions. Duplicate transactions: ${reportRows.filter((r) => r["rule"] === "Duplicate invoice").length}; high-value or round-sum warnings: ${reportRows.filter((r) => String(r["rule"]).includes("Round-figure")).length}; variance warnings: ${reportRows.filter((r) => r["rule"] === "Category variance").length}. Every exception remains open until approved by the audit owner.`,
-      aging: `Receivables and payables reviewed: ${araps.length}. Overdue invoices: ${overdue.length}, total overdue exposure ${inr(overdueValue)}. Amount overdue beyond 90 days: ${inr(overdue.filter((r) => agingBand(r) === "90+ Days").reduce((s, r) => s + r.amount, 0))}. This concentration may pressure near-term cash flow and requires collection or payment prioritisation.`,
+      pnl: `Period ${rangeLabel}. Operating income ${inr(t.revenue)}, COGS ${inr(t.cogs)}, gross profit ${inr(t.grossProfit)}, operating expenses ${inr(t.opex)}, EBITDA ${inr(t.ebitda)}, depreciation ${inr(t.depreciation)}, finance cost ${inr(t.interest)}, EBIT ${inr(ebit)}. Corporate tax 25% ${inr(tx.base)} plus 7% surcharge ${inr(tx.surcharge)} plus 4% cess ${inr(tx.cess)} equals ${inr(tx.total)} at an effective rate of ${tx.effectiveRate.toFixed(2)}%. Net profit after tax ${inr(tx.netProfit)}.`,
+      summary: `Period ${rangeLabel}. Management overview: revenue ${inr(t.revenue)}, expenses ${inr(t.expense)}, net profit after tax ${inr(tx.netProfit)}, closing modeled cash ${inr(finalCash)}, recent monthly cash burn ${inr(monthlyBurn)}.`,
+      payroll: `Period ${rangeLabel}. Salary register covers ${scoped.pays.length} employees. Gross pay ${inr(scoped.pays.reduce((s, p) => s + grossPay(p), 0))}, PF at 12% ${inr(scoped.pays.reduce((s, p) => s + computeTax(p).pf, 0))}, ESI ${inr(scoped.pays.reduce((s, p) => s + computeTax(p).esi, 0))}, slab-wise TDS including 4% cess ${inr(scoped.pays.reduce((s, p) => s + computeTax(p).monthlyTds, 0))}, net take-home ${inr(scoped.pays.reduce((s, p) => s + computeTax(p).net, 0))}.`,
+      audit: `Period ${rangeLabel}. Forensic review of ${scoped.txns.length} transactions identified ${reportRows.length} exceptions. Every exception remains open until approved by the audit owner.`,
+      aging: `Period ${rangeLabel}. Receivables and payables reviewed: ${scoped.araps.length}. Overdue invoices: ${overdue.length}, total overdue exposure ${inr(overdueValue)}. Beyond 90 days: ${inr(overdue.filter((r) => agingBand(r) === "90+ Days").reduce((s, r) => s + r.amount, 0))}.`,
+      gst: `Period ${rangeLabel}. Taxable outward supplies ${inr(t.revenue)} carry output GST at 18% of ${inr(g.outputGst)}. Eligible input tax credit is ${inr(g.inputCredit)}, leaving net GST payable of ${inr(g.payable)} for GSTR-3B. GSTR-1 is due on the 11th and GSTR-3B on the 20th of the following month.`,
     };
     const kpisByReport: Record<ReportKey, { label: string; value: string; delta?: string }[]> = {
       pnl: [
         { label: "Revenue", value: inr(t.revenue, true) },
         { label: "EBITDA", value: inr(t.ebitda, true) },
-        { label: "Corporate Tax", value: inr(t.tax, true), delta: "25%" },
-        { label: "Net Profit", value: inr(t.netProfit, true) },
+        { label: "Tax Payable", value: inr(tx.total, true), delta: "25%+7%+4%" },
+        { label: "Net Profit", value: inr(tx.netProfit, true) },
       ],
       summary: [
         { label: "Revenue", value: inr(t.revenue, true) },
         { label: "Expenses", value: inr(t.expense, true) },
         { label: "Closing Cash", value: inr(finalCash, true) },
-        { label: "Net Profit", value: inr(t.netProfit, true) },
+        { label: "Net Profit", value: inr(tx.netProfit, true) },
       ],
       payroll: [
-        { label: "Employees", value: String(pays.length) },
-        { label: "Gross Pay", value: inr(pays.reduce((s, p) => s + grossPay(p), 0), true) },
-        { label: "PF 12%", value: inr(pays.reduce((s, p) => s + computeTax(p).pf, 0), true) },
-        { label: "Net Take-home", value: inr(pays.reduce((s, p) => s + computeTax(p).net, 0), true) },
+        { label: "Employees", value: String(scoped.pays.length) },
+        { label: "Gross Pay", value: inr(scoped.pays.reduce((s, p) => s + grossPay(p), 0), true) },
+        { label: "PF 12%", value: inr(scoped.pays.reduce((s, p) => s + computeTax(p).pf, 0), true) },
+        {
+          label: "Net Take-home",
+          value: inr(scoped.pays.reduce((s, p) => s + computeTax(p).net, 0), true),
+        },
       ],
       audit: [
-        { label: "Transactions", value: String(txns.length) },
+        { label: "Transactions", value: String(scoped.txns.length) },
         { label: "Exceptions", value: String(reportRows.length) },
-        { label: "High Risk", value: String(reportRows.filter((r) => r["severity"] === "high").length) },
-        { label: "Exposure", value: inr(reportRows.reduce((s, r) => s + Number(r["amount"] ?? 0), 0), true) },
+        {
+          label: "High Risk",
+          value: String(reportRows.filter((r) => r["severity"] === "high").length),
+        },
+        {
+          label: "Exposure",
+          value: inr(reportRows.reduce((s, r) => s + Number(r["amount"] ?? 0), 0), true),
+        },
       ],
       aging: [
-        { label: "Open Invoices", value: String(araps.filter((r) => r.status === "outstanding").length) },
+        {
+          label: "Open Invoices",
+          value: String(scoped.araps.filter((r) => r.status === "outstanding").length),
+        },
         { label: "Overdue Value", value: inr(overdueValue, true) },
-        { label: "90+ Days", value: inr(overdue.filter((r) => agingBand(r) === "90+ Days").reduce((s, r) => s + r.amount, 0), true) },
-        { label: "AR Balance", value: inr(araps.filter((r) => r.type === "AR" && r.status === "outstanding").reduce((s, r) => s + r.amount, 0), true) },
+        {
+          label: "90+ Days",
+          value: inr(
+            overdue.filter((r) => agingBand(r) === "90+ Days").reduce((s, r) => s + r.amount, 0),
+            true,
+          ),
+        },
+        {
+          label: "AR Balance",
+          value: inr(
+            scoped.araps
+              .filter((r) => r.type === "AR" && r.status === "outstanding")
+              .reduce((s, r) => s + r.amount, 0),
+            true,
+          ),
+        },
+      ],
+      gst: [
+        { label: "Output GST", value: inr(g.outputGst, true), delta: "18%" },
+        { label: "Input Credit", value: inr(g.inputCredit, true) },
+        { label: "Net Payable", value: inr(g.payable, true) },
+        { label: "Taxable Supplies", value: inr(t.revenue, true) },
       ],
     };
 
-    const columns = Object.keys(reportRows[0] ?? {});
+    const cols = Object.keys(reportRows[0] ?? {});
     return {
       page: PAGE_KEY[key],
       reportName: titles[key],
@@ -248,12 +373,14 @@ function ReportsPage() {
       kpis: kpisByReport[key],
       tables: [
         {
-          title: `${titles[key]} — ${range.toUpperCase()}`,
-          columns: columns.map((c) => c.replace(/_/g, " ")),
+          title: `${titles[key]} — ${rangeLabel}`,
+          columns: cols.map((c) => c.replace(/_/g, " ")),
           numericFrom: key === "audit" ? 5 : key === "payroll" ? 3 : 1,
           rows: reportRows.map((r) =>
-            columns.map((c) =>
-              typeof r[c] === "number" && c !== "aging_bucket" ? inr(Number(r[c])) : String(r[c] ?? ""),
+            cols.map((c) =>
+              typeof r[c] === "number" && c !== "aging_bucket" && c !== "invoice_count"
+                ? inr(Number(r[c]))
+                : String(r[c] ?? ""),
             ),
           ),
         },
@@ -265,29 +392,41 @@ function ReportsPage() {
               "Compliance Certificate: PF, ESI, slab-wise TDS and 4% cess computations are subject to Finance Head verification before statutory filing.",
           }
         : {}),
-      chartEl: printRef.current,
     };
   };
 
-  const run = async () => {
+  const fullSpec = (key: ReportKey): ReportSpec => ({
+    ...buildReport(key),
+    org: orgName === "All organizations" ? "All Entities (Consolidated)" : orgName,
+    ...(vendor !== ALL ? { vendor } : {}),
+  });
+
+  const exportCsv = () => {
     downloadCSV(`${report}-${range}.csv`, rows);
-    toast.success(`${REPORTS[report]} downloaded`);
+    toast.success(`${REPORTS[report]} CSV downloaded`);
+    setModal(false);
   };
 
-  const quickCsv = (key: ReportKey) => {
-    downloadCSV(`${key}-${range}.csv`, buildRows(key, txns, pays, buds, araps));
-    toast.success(`${REPORTS[key]} CSV downloaded`);
+  const exportSnapshot = async () => {
+    const el = previewRef.current;
+    if (!el) return;
+    setBusy("snapshot");
+    const id = toast.loading("Capturing visual dashboard snapshot…");
+    try {
+      await generateSnapshotPdf(fullSpec(report), el);
+      toast.success("Snapshot PDF downloaded", { id });
+      setModal(false);
+    } catch {
+      toast.error("Snapshot export failed", { id });
+    } finally {
+      setBusy(null);
+    }
   };
 
-  const downloadFormalPdf = async (key: ReportKey) => {
-    const partial = buildReport(key);
-    const full: ReportSpec = {
-      ...partial,
-      org: orgName === "All organizations" ? "All Entities (Consolidated)" : orgName,
-      ...(vendor !== ALL ? { vendor } : {}),
-    };
-    setBusyReport(key);
-    const toastId = toast.loading(`Generating formal ${REPORTS[key]} PDF...`);
+  const exportFormal = async () => {
+    const full = fullSpec(report);
+    setBusy("formal");
+    const id = toast.loading(`Generating formal ${REPORTS[report]} PDF…`);
     try {
       let narrative: ReportNarrative = fallbackNarrative(full);
       if (session) {
@@ -305,23 +444,25 @@ function ReportsPage() {
         if (result.summary) narrative = result;
       }
       await generateReportPdf(full, narrative);
-      toast.success(`${REPORTS[key]} PDF downloaded`, { id: toastId });
+      toast.success(`${REPORTS[report]} PDF downloaded`, { id });
+      setModal(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "PDF generation failed", { id: toastId });
+      toast.error(error instanceof Error ? error.message : "PDF generation failed", { id });
     } finally {
-      setBusyReport(null);
+      setBusy(null);
     }
   };
 
   return (
-    <AppShell title="Reports & Export" subtitle="Build board-ready financial reports">
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="border-border shadow-card">
+    <AppShell title="Report Builder" subtitle="Slice, preview and export board-ready reports">
+      <div className="grid gap-4 lg:grid-cols-10">
+        {/* Left: slicers */}
+        <Card className="border-border shadow-card lg:col-span-3">
           <CardHeader>
-            <CardTitle className="text-base">Report builder</CardTitle>
-            <CardDescription>Pick a report, range and format</CardDescription>
+            <CardTitle className="text-base">Report slicers</CardTitle>
+            <CardDescription>Report type, period and entity</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-5">
             <div className="space-y-2">
               <Label>Report type</Label>
               <Select value={report} onValueChange={(v) => setReport(v as ReportKey)}>
@@ -329,9 +470,9 @@ function ReportsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(REPORTS).map(([k, v]) => (
+                  {(Object.keys(REPORTS) as ReportKey[]).map((k, i) => (
                     <SelectItem key={k} value={k}>
-                      {v}
+                      {i + 1}. {REPORTS[k]}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -340,122 +481,205 @@ function ReportsPage() {
 
             <div className="space-y-2">
               <Label>Date range</Label>
-              <Select value={range} onValueChange={setRange}>
-                <SelectTrigger className="bg-background">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="month">This month</SelectItem>
-                  <SelectItem value="q4">Q4 2026</SelectItem>
-                  <SelectItem value="ytd">YTD 2026</SelectItem>
-                  <SelectItem value="fy">Full FY2026</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex flex-wrap gap-1.5">
+                {(Object.keys(RANGES) as RangeKey[]).map((k) => (
+                  <Button
+                    key={k}
+                    size="sm"
+                    variant={range === k ? "default" : "outline"}
+                    className="h-7 px-2.5 text-xs"
+                    onClick={() => setRange(k)}
+                  >
+                    {k === "ytd" ? "YTD FY 2026-27" : k === "custom" ? "Custom" : k.toUpperCase()}
+                  </Button>
+                ))}
+              </div>
+              {range === "custom" && (
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+                  <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
-              <Label>File format</Label>
-              <Select value={format} onValueChange={setFormat}>
+              <Label>Entity / vendor</Label>
+              <Select value={vendor} onValueChange={setVendor}>
                 <SelectTrigger className="bg-background">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="csv">CSV</SelectItem>
-                  <SelectItem value="excel">Excel (.csv)</SelectItem>
+                  <SelectItem value={ALL}>All vendors &amp; clients</SelectItem>
+                  {vendors.map((v) => (
+                    <SelectItem key={v} value={v}>
+                      {v}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
 
-             <Button className="w-full" onClick={run} disabled={busyReport !== null}>
-               <Download className="size-4" />
-              Generate {format.toUpperCase()}
-            </Button>
-            <AiReportButton
-              build={buildReport}
-              label="Download AI Report (PDF)"
-              size="default"
-              className="w-full"
-            />
+            <div className="space-y-2 border-t border-border pt-4">
+              <Label>Quick download</Label>
+              <Button variant="outline" className="w-full justify-start" onClick={exportCsv}>
+                <FileSpreadsheet className="size-4" /> Export CSV
+              </Button>
+              <Button
+                className="w-full justify-start"
+                disabled={busy !== null}
+                onClick={() => void exportFormal()}
+              >
+                {busy === "formal" ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <FileText className="size-4" />
+                )}
+                Export Formal PDF Report
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="border-border shadow-card lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-base">{REPORTS[report]} preview</CardTitle>
-            <CardDescription>
-              {rows.length} rows · showing first {preview.length}
-            </CardDescription>
-          </CardHeader>
-          <CardContent ref={printRef}>
-            <div className="mb-3 border-b border-border pb-2">
-              <p className="text-sm font-bold">Finance IQ · {REPORTS[report]}</p>
-              <p className="text-xs text-muted-foreground">
-                Fiscal year 2026 · {range.toUpperCase()} · generated {new Date().toLocaleDateString("en-IN")}
-              </p>
+        {/* Right: live preview */}
+        <Card className="border-border shadow-card lg:col-span-7">
+          <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle className="text-base">{REPORTS[report]} Preview</CardTitle>
+              <CardDescription>
+                FY 2026-27 · {rangeLabel} · {vendor === ALL ? "all vendors" : vendor} ·{" "}
+                {rows.length} record{rows.length === 1 ? "" : "s"}
+              </CardDescription>
             </div>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {Object.keys(preview[0] ?? {}).map((h) => (
-                      <TableHead key={h} className="capitalize">
-                        {h.replace(/_/g, " ")}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {preview.map((r, i) => (
-                    <TableRow key={i}>
-                      {Object.entries(r).map(([k, v]) => (
-                        <TableCell key={k} className="tabular whitespace-nowrap">
-                          {typeof v === "number" && k !== "aging_bucket" ? inr(v) : String(v)}
-                        </TableCell>
+            <Button data-export-hide onClick={() => setModal(true)} disabled={busy !== null}>
+              <Download className="size-4" /> Download Report
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div ref={previewRef}>
+              <div className="mb-3 border-b border-border pb-2">
+                <p className="text-sm font-bold">
+                  {orgName} · {REPORTS[report]}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Indian Financial Year 2026-27 · {rangeLabel} · generated{" "}
+                  {new Date().toLocaleDateString("en-IN")}
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {columns.map((h, i) => (
+                        <TableHead key={h} className={i === 0 ? "capitalize" : "capitalize text-right"}>
+                          {h.replace(/_/g, " ")}
+                        </TableHead>
                       ))}
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {preview.map((r, i) => (
+                      <TableRow key={i}>
+                        {columns.map((k) => {
+                          const v = r[k];
+                          const numeric = typeof v === "number" && k !== "aging_bucket";
+                          return (
+                            <TableCell
+                              key={k}
+                              className={
+                                numeric
+                                  ? "text-right font-mono tabular-nums whitespace-nowrap"
+                                  : "whitespace-nowrap"
+                              }
+                            >
+                              {numeric && k !== "invoice_count" ? inr(Number(v)) : String(v ?? "")}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    ))}
+                    {preview.length === 0 && (
+                      <TableRow>
+                        <TableCell className="py-8 text-center text-sm text-muted-foreground">
+                          No records in this period — upload data or widen the date range.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+              {rows.length > preview.length && (
+                <p className="pt-3 text-xs text-muted-foreground">
+                  Showing first {preview.length} of {rows.length} rows. Exports include every row.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
 
-       <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {(Object.keys(REPORTS) as ReportKey[]).map((k) => (
-           <Card key={k} className="group flex min-h-40 flex-col border-border shadow-card transition-shadow hover:shadow-md">
-             <CardContent className="flex flex-1 items-start gap-3 pt-6">
-              <span className="flex size-9 items-center justify-center rounded-md bg-brand-soft text-brand">
-                {k === "payroll" ? <FileSpreadsheet className="size-4" /> : <FileText className="size-4" />}
+      <Dialog open={modal} onOpenChange={setModal}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Select export options</DialogTitle>
+            <DialogDescription>
+              {REPORTS[report]} · FY 2026-27 · {rangeLabel}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={exportCsv}
+              className="flex w-full items-start gap-3 rounded-xl border border-border p-3 text-left transition-colors hover:border-brand hover:bg-brand-soft"
+            >
+              <FileSpreadsheet className="mt-0.5 size-5 text-brand" />
+              <span>
+                <span className="block text-sm font-semibold">CSV / Excel Spreadsheet</span>
+                <span className="block text-xs text-muted-foreground">
+                  Raw data format for financial analysis.
+                </span>
               </span>
-               <div className="min-w-0">
-                <p className="text-sm font-semibold">{REPORTS[k]}</p>
-                 <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Formal FY 2026-27 reporting pack</p>
-              </div>
-            </CardContent>
-             <div className="grid grid-cols-2 border-t border-border">
-               <Button
-                 variant="ghost"
-                 size="sm"
-                 className="h-10 rounded-none border-r border-border text-brand hover:bg-brand-soft hover:text-brand"
-                 onClick={() => quickCsv(k)}
-               >
-                 <FileSpreadsheet className="size-4" /> Quick CSV
-               </Button>
-               <Button
-                 variant="ghost"
-                 size="sm"
-                 className="h-10 rounded-none text-brand hover:bg-brand-soft hover:text-brand"
-                 disabled={busyReport !== null}
-                 onClick={() => void downloadFormalPdf(k)}
-               >
-                 {busyReport === k ? <Loader2 className="size-4 animate-spin" /> : <FileText className="size-4" />}
-                 PDF Document
-               </Button>
-             </div>
-          </Card>
-        ))}
-      </div>
+            </button>
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => void exportSnapshot()}
+              className="flex w-full items-start gap-3 rounded-xl border border-border p-3 text-left transition-colors hover:border-brand hover:bg-brand-soft disabled:opacity-60"
+            >
+              {busy === "snapshot" ? (
+                <Loader2 className="mt-0.5 size-5 animate-spin text-brand" />
+              ) : (
+                <ImageIcon className="mt-0.5 size-5 text-brand" />
+              )}
+              <span>
+                <span className="block text-sm font-semibold">Visual Dashboard Snapshot (PDF)</span>
+                <span className="block text-xs text-muted-foreground">
+                  Includes the live preview styling exactly as shown.
+                </span>
+              </span>
+            </button>
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => void exportFormal()}
+              className="flex w-full items-start gap-3 rounded-xl border border-border p-3 text-left transition-colors hover:border-brand hover:bg-brand-soft disabled:opacity-60"
+            >
+              {busy === "formal" ? (
+                <Loader2 className="mt-0.5 size-5 animate-spin text-brand" />
+              ) : (
+                <FileText className="mt-0.5 size-5 text-brand" />
+              )}
+              <span>
+                <span className="block text-sm font-semibold">
+                  Formal AI Executive Document (PDF)
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  Multi-page letterhead report with AI insights and audit notes.
+                </span>
+              </span>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }
