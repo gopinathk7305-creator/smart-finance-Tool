@@ -333,7 +333,7 @@ export async function generateReportPdf(spec: ReportSpec, narrative: ReportNarra
 export async function generateSnapshotPdf(spec: ReportSpec, el: HTMLElement) {
   const [{ jsPDF }, { default: html2canvas }] = await Promise.all([
     import("jspdf"),
-    import("html2canvas"),
+    import("html2canvas-pro"),
   ]);
 
   const canvas = await html2canvas(el, {
