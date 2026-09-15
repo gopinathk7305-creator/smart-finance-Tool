@@ -71,6 +71,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/lib/auth";
+import { useCategories } from "@/lib/categories";
 import { useDataset } from "@/lib/dataset";
 
 import { downloadCSV, inr } from "@/lib/finance-data";
@@ -125,6 +126,7 @@ const TABS = [
 function ForecastPage() {
   const { txns, pays, live } = useDataset();
   const { session } = useAuth();
+  const { payrollNames } = useCategories();
 
   const [inputs, setInputs] = useState<ScenarioInputs>(BASE_SCENARIO);
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("profit");
@@ -182,7 +184,10 @@ function ForecastPage() {
   const set = <K extends keyof ScenarioInputs>(key: K, value: ScenarioInputs[K]) =>
     setInputs((prev) => ({ ...prev, [key]: value }));
 
-  const result = useMemo(() => runForecast(inputs, txns, pays), [inputs, txns, pays]);
+  const result = useMemo(
+    () => runForecast(inputs, txns, pays, payrollNames),
+    [inputs, txns, pays, payrollNames],
+  );
   const { rows } = result;
 
   const revDelta = pctChange(result.scenRevenueTotal, result.baseRevenueTotal);

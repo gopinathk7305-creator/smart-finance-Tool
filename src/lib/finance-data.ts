@@ -306,10 +306,19 @@ export function actualsByCategory(txns: Transaction[] = transactions) {
   return map;
 }
 
-export function totals(txns: Transaction[] = transactions) {
+/**
+ * @param cogsCategories category names that roll up into cost of goods sold.
+ *   Defaults to the built-in "COGS" bucket when the user has not defined their own.
+ */
+export function totals(txns: Transaction[] = transactions, cogsCategories: string[] = ["COGS"]) {
   const revenue = txns.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
   const expense = txns.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
-  const cogs = actualsByCategory(txns).get("COGS") ?? 0;
+  const byCat = actualsByCategory(txns);
+  const wanted = new Set(cogsCategories.map((c) => c.toLowerCase()));
+  let cogs = 0;
+  byCat.forEach((v, k) => {
+    if (wanted.has(k.toLowerCase())) cogs += v;
+  });
   const grossProfit = revenue - cogs;
   const opex = expense - cogs;
   const ebitda = grossProfit - opex;

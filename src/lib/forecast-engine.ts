@@ -112,11 +112,19 @@ export interface ForecastResult {
   cashImpact: number;
 }
 
-/** Deterministic 12-month Indian-FY scenario model driven by the selected entity's ledger. */
+/**
+ * Deterministic 12-month Indian-FY scenario model driven by the selected entity's ledger.
+ *
+ * @param payrollCategories user-defined expense categories that count as people cost.
+ *   When the ledger carries spend in those categories it defines the payroll baseline,
+ *   so the split between payroll and other operating expenses follows the user's own
+ *   category setup instead of a fixed assumption.
+ */
 export function runForecast(
   inputs: ScenarioInputs,
   txns: Transaction[],
   pays: PayrollRecord[],
+  payrollCategories: string[] = ["Payroll"],
 ): ForecastResult {
   const series = monthlySummary(txns);
   const last = series[series.length - 1]!;
@@ -131,7 +139,18 @@ export function runForecast(
   const lastRev = avg((s) => s.revenue) || 1;
   const lastExp = avg((s) => s.expense) || 1;
 
-  const basePayroll = pays.length ? pays.reduce((s, p) => s + grossPay(p), 0) : lastExp * 0.45;
+  // Monthly people cost taken from the user's own payroll categories in the ledger.
+  const payrollNames = new Set(payrollCategories.map((c) => c.toLowerCase()));
+  const ledgerPayroll =
+    txns
+      .filter((t) => t.type === "expense" && payrollNames.has(t.category.toLowerCase()))
+      .reduce((s, t) => s + t.amount, 0) / sample.length;
+
+  const basePayroll = ledgerPayroll
+    ? ledgerPayroll
+    : pays.length
+      ? pays.reduce((s, p) => s + grossPay(p), 0)
+      : lastExp * 0.45;
   const baseOpex = Math.max(0, lastExp - basePayroll);
   const hirePayroll = (inputs.hires * inputs.avgSalary * STATUTORY_LOAD) / 12;
 

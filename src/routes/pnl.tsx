@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { actualsByCategory, inr, monthlySummary, totals } from "@/lib/finance-data";
 import { gstSummary } from "@/lib/enterprise-data";
+import { useCategories } from "@/lib/categories";
 import { useDataset } from "@/lib/dataset";
 import { cn } from "@/lib/utils";
 
@@ -45,18 +46,29 @@ export const Route = createFileRoute("/pnl")({
 function PnlPage() {
   const [showPct, setShowPct] = useState(true);
   const { txns } = useDataset();
-  const t = totals(txns);
+  const { categories, cogsNames, live: liveCats } = useCategories();
+  const t = totals(txns, cogsNames);
   const cats = actualsByCategory(txns);
   const series = monthlySummary(txns);
   const gst = gstSummary(t.revenue, t.expense);
 
-  const opexLines = ["Payroll", "Office Rent", "Marketing", "Utilities", "Software Subscriptions", "Legal"]
+  // Expense lines below gross profit follow the user's own category definitions,
+  // plus any ledger category they have not defined yet.
+  const belowGross = categories.filter((c) => c.kind !== "cogs").map((c) => c.name);
+  const extras = [...cats.keys()].filter(
+    (c) => !categories.some((cat) => cat.name.toLowerCase() === c.toLowerCase()),
+  );
+  const opexLines = [...belowGross, ...extras]
     .map((c) => ({ label: c, value: cats.get(c) ?? 0 }))
     .filter((r) => r.value > 0);
 
   const rows: { label: string; value: number; kind?: "sub" | "total" | "grand" }[] = [
     { label: "Gross Revenue", value: t.revenue, kind: "total" },
-    { label: "Cost of Goods Sold (COGS)", value: -t.cogs, kind: "sub" },
+    {
+      label: cogsNames.length ? `Cost of Goods Sold (${cogsNames.join(", ")})` : "Cost of Goods Sold",
+      value: -t.cogs,
+      kind: "sub",
+    },
     { label: "Gross Profit", value: t.grossProfit, kind: "total" },
     ...opexLines.map((o) => ({ label: o.label, value: -o.value, kind: "sub" as const })),
     { label: "EBITDA", value: t.ebitda, kind: "total" },
@@ -142,7 +154,10 @@ function PnlPage() {
           <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
             <div>
               <CardTitle className="text-base">Profit & Loss Statement</CardTitle>
-              <CardDescription>Consolidated, fiscal year 2026</CardDescription>
+              <CardDescription>
+                Consolidated, fiscal year 2026 ·{" "}
+                {liveCats ? "your expense categories" : "starter expense categories"}
+              </CardDescription>
             </div>
             <div className="flex items-center gap-2">
               <Switch id="pct" checked={showPct} onCheckedChange={setShowPct} />
