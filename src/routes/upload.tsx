@@ -98,6 +98,7 @@ function UploadPage() {
   const { user } = useAuth();
   const { refresh, live } = useDataset();
   const { orgId, liveOrgs, orgName } = useOrg();
+  const { openInsights } = useInsights();
   const scopeOrgId = liveOrgs && orgId !== ALL ? orgId : null;
   const [active, setActive] = useState<DatasetKey>("transactions");
   const [dragging, setDragging] = useState(false);
