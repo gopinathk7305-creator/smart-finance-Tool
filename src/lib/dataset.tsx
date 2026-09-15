@@ -59,7 +59,7 @@ export function useDataset(): Dataset {
   // refreshes every page that reads the dataset.
   useEffect(() => {
     if (!user) return;
-    const channel = supabase.channel(`dataset-sync-${user.id}`);
+    const channel = supabase.channel(`dataset-sync-${user.id}-${Math.random().toString(36).slice(2)}`);
     ["transactions", "payroll_records", "budget_targets", "arap_records"].forEach((table) => {
       channel.on("postgres_changes", { event: "*", schema: "public", table }, () => refresh());
     });
