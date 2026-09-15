@@ -283,6 +283,20 @@ function UploadPage() {
           : "Demo mode — sign in to upload real files"
       }
     >
+      {progress && (
+        <Card className="mb-4 border-brand shadow-card" data-testid="upload-progress">
+          <CardContent className="space-y-2 pt-6">
+            <div className="flex items-center justify-between text-sm font-medium">
+              <span>{progress.label}</span>
+              <span className="tabular text-muted-foreground">
+                {Math.round(progress.pct)}% {progress.eta}
+              </span>
+            </div>
+            <Progress value={progress.pct} className="h-2" />
+          </CardContent>
+        </Card>
+      )}
+
       <Tabs value={active} onValueChange={(v) => setActive(v as DatasetKey)}>
         <TabsList className="flex-wrap">
           {DATASETS.map((d) => (
