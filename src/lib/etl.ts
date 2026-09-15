@@ -112,11 +112,65 @@ export function cleanTaxId(v: unknown, kind: "gstin" | "pan"): { value: string; 
   return { value, valid: (kind === "gstin" ? GSTIN_RE : PAN_RE).test(value) };
 }
 
+/* ---------------------------------------------- dynamic schema mapping */
+
+/**
+ * Any custom dataset works: header variants are mapped onto the canonical
+ * field names the pipeline understands, whatever the file calls them.
+ */
+const ALIASES: Record<string, string[]> = {
+  date: ["date", "txn_date", "transaction_date", "posting_date", "voucher_date", "bill_date", "entry_date"],
+  amount: ["amount", "total", "total_amount", "value", "net_amount", "grand_total", "debit", "credit", "amt"],
+  category: ["category", "expense_type", "expense_category", "head", "account_head", "ledger", "gl_account"],
+  subcategory: ["subcategory", "sub_category", "sub_head", "detail"],
+  type: ["type", "txn_type", "transaction_type", "direction", "nature", "dr_cr"],
+  vendor_client: ["vendor_client", "vendor", "client", "customer", "party", "supplier", "payee", "counterparty"],
+  status: ["status", "payment_status", "state", "paid_status"],
+  gstin: ["gstin", "gst_no", "gst_number", "gst", "tax_id", "gstin_no"],
+  pan: ["pan", "pan_no", "pan_number"],
+  party_name: ["party_name", "party", "vendor", "client", "customer", "supplier", "account_name"],
+  invoice_date: ["invoice_date", "bill_date", "doc_date", "date"],
+  due_date: ["due_date", "maturity_date", "payment_due", "due"],
+  month_year: ["month_year", "month", "period", "salary_month", "pay_period"],
+  employee_id: ["employee_id", "emp_id", "employee_code", "empcode", "staff_id"],
+  name: ["name", "employee_name", "emp_name", "full_name"],
+  department: ["department", "dept", "division", "cost_centre", "cost_center"],
+  basic_pay: ["basic_pay", "basic", "basic_salary", "base_pay"],
+  allowances: ["allowances", "allowance", "hra", "other_allowances"],
+  deductions: ["deductions", "deduction", "other_deductions"],
+  pf_deduction: ["pf_deduction", "pf", "provident_fund", "epf"],
+  tds_deduction: ["tds_deduction", "tds", "income_tax", "tax_deducted"],
+  fiscal_year: ["fiscal_year", "fy", "financial_year", "year"],
+  budgeted_amount: ["budgeted_amount", "budget", "planned_amount", "plan", "target", "budget_amount"],
+};
+
+const canon = (h: string) => h.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+
+/** Rewrites every row's keys onto canonical field names, keeping originals too. */
+export function mapSchema(rows: Record<string, string>[]): Record<string, string>[] {
+  if (!rows.length) return rows;
+  const headers = Object.keys(rows[0]!);
+  const map = new Map<string, string>();
+  Object.entries(ALIASES).forEach(([field, variants]) => {
+    const hit = headers.find((h) => variants.includes(canon(h)));
+    if (hit) map.set(hit, field);
+  });
+  return rows.map((r) => {
+    const out: Record<string, string> = {};
+    Object.entries(r).forEach(([k, v]) => {
+      out[canon(k)] = v;
+      const field = map.get(k);
+      if (field && out[field] === undefined) out[field] = v;
+    });
+    return out;
+  });
+}
+
 /* ---------------------------------------------- pipeline */
 
 export function runEtl(
   key: DatasetKey,
-  raw: Record<string, string>[],
+  rawInput: Record<string, string>[],
   userId: string,
   fileName: string,
   autoFix: boolean,
