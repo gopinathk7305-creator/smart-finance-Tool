@@ -40,6 +40,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { logActivity, useAuth } from "@/lib/auth";
 import { ALL, useOrg } from "@/lib/orgs";
 import { useDataset } from "@/lib/dataset";
+import { useInsights } from "@/lib/insights";
 import { type DatasetKey, type EtlResult, issueTone, readTabular, runEtl } from "@/lib/etl";
 
 export const Route = createFileRoute("/upload")({
@@ -97,6 +98,7 @@ function UploadPage() {
   const { user } = useAuth();
   const { refresh, live } = useDataset();
   const { orgId, liveOrgs, orgName } = useOrg();
+  const { openInsights } = useInsights();
   const scopeOrgId = liveOrgs && orgId !== ALL ? orgId : null;
   const [active, setActive] = useState<DatasetKey>("transactions");
   const [dragging, setDragging] = useState(false);
@@ -189,6 +191,8 @@ function UploadPage() {
     void history.refetch();
     setAuditOpen(false);
     toast.success(`${p.rows.length} rows synced — every page refreshed`);
+    // Automated AI insight pop-up, once the fresh rows have landed in state.
+    window.setTimeout(() => openInsights(p.fileName), 900);
   };
 
   const deleteDataset = async (table: TableName, file: string) => {

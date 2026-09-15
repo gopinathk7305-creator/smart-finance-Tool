@@ -113,6 +113,37 @@ Maximum 20 findings, most severe first. Use only amounts and parties present in 
     }
   });
 
+export interface DatasetInsightInput {
+  org: string;
+  recordCount: number;
+  revenue: number;
+  expense: number;
+  net: number;
+  margin: number;
+  from: string;
+  to: string;
+  runway: number;
+  drivers: { label: string; value: number }[];
+  spend: { label: string; value: number }[];
+  risks: string[];
+}
+
+export const explainDataset = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: DatasetInsightInput) => input)
+  .handler(async ({ data }) => {
+    const text = await callGateway(
+      "You are a CFO-level Indian corporate finance analyst. Write a crisp executive overview of an uploaded finance dataset in 3 sentences of plain text (no markdown). Amounts are Indian rupees quoted in Lakhs (L) or Crores (Cr) using the Indian number system. Use only the supplied numbers.",
+      `Entity: ${data.org}. Records ingested: ${data.recordCount}. Period ${data.from} to ${data.to}.
+Total revenue ${data.revenue}. Net expenses ${data.expense}. Net position ${data.net} at ${data.margin.toFixed(1)}% margin. Cash runway ${data.runway.toFixed(1)} months.
+Top revenue drivers: ${data.drivers.map((d) => `${d.label} ${d.value}`).join("; ") || "none"}.
+Largest expense categories: ${data.spend.map((d) => `${d.label} ${d.value}`).join("; ") || "none"}.
+Detected risks: ${data.risks.join("; ")}.
+Summarise the dataset health, name the biggest driver and the single most urgent risk. Under 80 words.`,
+    );
+    return { text };
+  });
+
 export interface ForecastMonth {
   month: string;
   revenue: number;
