@@ -1,4 +1,7 @@
-// Executive-standard multi-page PDF document generator (jsPDF + html2canvas).
+// Executive-standard PDF document generators (jsPDF + html2canvas).
+// Two modes:
+//   1. generateReportPdf()      -> formal, word-processor style multi-page document
+//   2. generateSnapshotPdf()    -> high-res visual snapshot of the live page
 
 export interface ReportKpi {
   label: string;
@@ -27,7 +30,7 @@ export interface ReportSpec {
   tables: ReportTable[];
   /** plain-text facts handed to the AI narrative */
   facts: string;
-  /** chart container captured into Section 4 */
+  /** chart container captured into the visual snapshot */
   chartEl?: HTMLElement | null;
 }
 
@@ -37,9 +40,29 @@ export interface ReportNarrative {
 }
 
 const NAVY = [15, 23, 42] as const;
-const SKY = [2, 132, 199] as const;
+const INDIGO = [79, 70, 229] as const;
 const SLATE = [100, 116, 139] as const;
-const ZEBRA = [241, 245, 249] as const;
+const ZEBRA = [248, 250, 252] as const;
+const HAIRLINE = [226, 232, 240] as const;
+
+/**
+ * jsPDF's built-in Helvetica is WinAnsi encoded and has no glyph for the rupee
+ * sign or typographic punctuation — those render as broken, letter-spaced
+ * garbage ("¹ 3 . 7 C r"). Normalise every string before it is drawn.
+ */
+export function pdfSafe(input: unknown): string {
+  return String(input ?? "")
+    .replace(/\u20B9\s?/g, "INR ")
+    .replace(/[\u2018\u2019\u201B]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2013\u2014\u2212]/g, "-")
+    .replace(/[\u2022\u00B7\u25CF]/g, "-")
+    .replace(/\u2026/g, "...")
+    .replace(/\u00A0/g, " ")
+    .replace(/[^\x20-\x7E\n]/g, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
 
 export function docRefId(page: string) {
   const d = new Date();
@@ -52,19 +75,39 @@ export function istNow() {
   return new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", hour12: true });
 }
 
+function fileSlug(spec: ReportSpec, suffix: string) {
+  const slug = spec.reportName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  return `${slug}-${spec.fy.replace(/\s+/g, "-").toLowerCase()}-${suffix}.pdf`;
+}
+
+const GSTIN_DEFAULT = "29AABCT1332L1ZQ";
+const ADDRESS_DEFAULT = "Prestige Tech Park, Outer Ring Road, Bengaluru 560103, India";
+
+// ---------------------------------------------------------------------------
+// 1. FORMAL EXECUTIVE DOCUMENT
+// ---------------------------------------------------------------------------
+
 export async function generateReportPdf(spec: ReportSpec, narrative: ReportNarrative) {
-  const [{ jsPDF }, html2canvasMod] = await Promise.all([
-    import("jspdf"),
-    spec.chartEl ? import("html2canvas") : Promise.resolve(null),
-  ]);
+  const { jsPDF } = await import("jspdf");
 
   const pdf = new jsPDF({ orientation: "p", unit: "pt", format: "a4" });
+  pdf.setCharSpace(0);
   const W = pdf.internal.pageSize.getWidth();
   const H = pdf.internal.pageSize.getHeight();
-  const M = 40;
-  const BOTTOM = H - 56;
+  const M = 56;
+  const BOTTOM = H - 84;
   const ref = docRefId(spec.page);
   let y = M;
+
+  const T = (
+    text: unknown,
+    x: number,
+    ty: number,
+    opts?: { align?: "left" | "center" | "right" },
+  ) => pdf.text(pdfSafe(text), x, ty, opts);
 
   const ensure = (need: number) => {
     if (y + need <= BOTTOM) return;
@@ -72,147 +115,132 @@ export async function generateReportPdf(spec: ReportSpec, narrative: ReportNarra
     y = M;
   };
 
-  const sectionTitle = (text: string) => {
-    ensure(34);
-    pdf.setFillColor(...SKY);
-    pdf.rect(M, y, 3, 14, "F");
+  const heading = (text: string) => {
+    ensure(40);
     pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(11);
+    pdf.setFontSize(10.5);
     pdf.setTextColor(...NAVY);
-    pdf.text(text.toUpperCase(), M + 10, y + 11);
-    y += 24;
+    T(text.toUpperCase(), M, y);
+    y += 8;
+    pdf.setDrawColor(...HAIRLINE);
+    pdf.setLineWidth(0.6);
+    pdf.line(M, y, W - M, y);
+    y += 18;
   };
 
-  const body = (text: string, size = 9.5, color: readonly number[] = [40, 48, 62]) => {
+  const paragraph = (text: string, size = 10) => {
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(size);
-    pdf.setTextColor(color[0]!, color[1]!, color[2]!);
-    for (const line of pdf.splitTextToSize(text, W - M * 2) as string[]) {
-      ensure(14);
-      pdf.text(line, M, y);
-      y += 13;
+    pdf.setTextColor(38, 46, 60);
+    const lines = pdf.splitTextToSize(pdfSafe(text), W - M * 2) as string[];
+    for (const line of lines) {
+      ensure(16);
+      T(line, M, y);
+      y += 15;
     }
+    y += 8;
   };
 
-  // ---- Header & branding -------------------------------------------------
-  pdf.setFillColor(...NAVY);
-  pdf.rect(0, 0, W, 84, "F");
-  pdf.setTextColor(255, 255, 255);
+  // ---- Corporate letterhead ---------------------------------------------
   pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(14);
-  pdf.text(spec.org, M, 32);
+  pdf.setFontSize(17);
+  pdf.setTextColor(...NAVY);
+  T(spec.org, M, y + 6);
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(8.5);
-  const leftLines = [
-    spec.vendor ? `Vendor / Entity: ${spec.vendor}` : "Vendor / Entity: All",
-    `GSTIN: ${spec.gstin ?? "29AABCT1332L1ZQ"}`,
-    spec.address ?? "Prestige Tech Park, Outer Ring Road, Bengaluru 560103, India",
-  ];
-  leftLines.forEach((l, i) => pdf.text(l, M, 48 + i * 11));
+  pdf.setTextColor(...SLATE);
+  T(`GSTIN: ${spec.gstin ?? GSTIN_DEFAULT}`, M, y + 22);
+  T(spec.address ?? ADDRESS_DEFAULT, M, y + 34);
+  if (spec.vendor) T(`Entity / Vendor scope: ${spec.vendor}`, M, y + 46);
 
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(11);
-  pdf.text(spec.reportName, W - M, 30, { align: "right" });
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(8.5);
-  [`Generated: ${istNow()} IST`, `Financial Year: ${spec.fy}`, `Doc Ref: ${ref}`].forEach((l, i) =>
-    pdf.text(l, W - M, 46 + i * 11, { align: "right" }),
-  );
-  pdf.setDrawColor(...SKY);
-  pdf.setLineWidth(1.5);
-  pdf.line(0, 84, W, 84);
-  y = 108;
+  T(`Doc Ref: ${ref}`, W - M, y + 6, { align: "right" });
+  T(`Date: ${istNow()} IST`, W - M, y + 18, { align: "right" });
+  T(`Financial Year: ${spec.fy}`, W - M, y + 30, { align: "right" });
 
-  // ---- Section 1: AI executive summary ----------------------------------
-  sectionTitle("Section 1 · AI Executive Summary & Key Insights");
-  body(narrative.summary || "Narrative unavailable for this run.");
-  y += 6;
+  y += spec.vendor ? 62 : 52;
+  pdf.setDrawColor(...NAVY);
+  pdf.setLineWidth(1.2);
+  pdf.line(M, y, W - M, y);
+  y += 30;
 
+  // ---- Title block -------------------------------------------------------
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(15);
+  pdf.setTextColor(...NAVY);
+  T(spec.reportName, W / 2, y, { align: "center" });
+  y += 16;
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(9);
+  pdf.setTextColor(...SLATE);
+  T("Formal Executive Document - Management Reporting Pack", W / 2, y, { align: "center" });
+  y += 30;
+
+  // ---- Narrative summary -------------------------------------------------
+  heading("1. Executive Narrative Summary");
+  const paras = (narrative.summary || "Narrative unavailable for this run.")
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  for (const p of paras) paragraph(p);
+
+  // ---- Takeaways callout -------------------------------------------------
   if (narrative.takeaways.length) {
-    const boxTop = y;
     const lines = narrative.takeaways.flatMap(
-      (t) => pdf.splitTextToSize(`•  ${t}`, W - M * 2 - 24) as string[],
+      (t) => pdf.splitTextToSize(pdfSafe(`-  ${t}`), W - M * 2 - 40) as string[],
     );
-    const boxH = 26 + lines.length * 12;
-    ensure(boxH + 10);
-    pdf.setFillColor(240, 249, 255);
-    pdf.setDrawColor(...SKY);
-    pdf.setLineWidth(0.6);
-    pdf.rect(M, boxTop, W - M * 2, boxH, "FD");
+    const boxH = 34 + lines.length * 13;
+    ensure(boxH + 16);
+    const top = y;
+    pdf.setFillColor(249, 250, 255);
+    pdf.rect(M, top, W - M * 2, boxH, "F");
+    pdf.setFillColor(...INDIGO);
+    pdf.rect(M, top, 3.5, boxH, "F");
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(9);
     pdf.setTextColor(...NAVY);
-    pdf.text("KEY TAKEAWAYS", M + 12, boxTop + 16);
+    T("EXECUTIVE TAKEAWAYS", M + 18, top + 20);
     pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(9.5);
     pdf.setTextColor(30, 41, 59);
-    lines.forEach((l, i) => pdf.text(l, M + 12, boxTop + 30 + i * 12));
-    y = boxTop + boxH + 18;
+    lines.forEach((l, i) => T(l, M + 18, top + 36 + i * 13));
+    y = top + boxH + 26;
   }
 
-  // ---- Section 2: KPI grid ----------------------------------------------
-  if (spec.kpis.length) {
-    sectionTitle("Section 2 · Metrics & KPI Highlights");
-    const perRow = 2;
-    const gap = 12;
-    const cardW = (W - M * 2 - gap * (perRow - 1)) / perRow;
-    const cardH = 54;
-    spec.kpis.forEach((k, i) => {
-      const col = i % perRow;
-      if (col === 0) ensure(cardH + gap);
-      const x = M + col * (cardW + gap);
-      pdf.setFillColor(248, 250, 252);
-      pdf.setDrawColor(226, 232, 240);
-      pdf.setLineWidth(0.6);
-      pdf.rect(x, y, cardW, cardH, "FD");
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(8);
-      pdf.setTextColor(...SLATE);
-      pdf.text(k.label.toUpperCase(), x + 10, y + 17);
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(14);
-      pdf.setTextColor(...NAVY);
-      pdf.text(k.value, x + 10, y + 38);
-      if (k.delta) {
-        pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(8);
-        pdf.setTextColor(...SKY);
-        pdf.text(k.delta, x + cardW - 10, y + 38, { align: "right" });
-      }
-      if (col === perRow - 1 || i === spec.kpis.length - 1) y += cardH + gap;
-    });
-    y += 6;
-  }
-
-  // ---- Section 3: data tables -------------------------------------------
+  // ---- Structured tables -------------------------------------------------
   if (spec.tables.length) {
-    sectionTitle("Section 3 · Structured Data Tables");
+    heading("2. Structured Financial Data");
     for (const table of spec.tables) {
-      ensure(60);
+      ensure(70);
       pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(9.5);
+      pdf.setFontSize(10);
       pdf.setTextColor(...NAVY);
-      pdf.text(table.title, M, y);
-      y += 12;
+      T(table.title, M, y);
+      y += 14;
 
       const cols = table.columns.length;
-      const colW = (W - M * 2) / cols;
-      const rowH = 17;
+      const tableW = W - M * 2;
       const numericFrom = table.numericFrom ?? cols;
+      const labelCols = Math.max(numericFrom, 1);
+      const numCols = cols - labelCols;
+      // give label columns more room, numeric columns a consistent width
+      const numW = numCols > 0 ? Math.min(96, (tableW * 0.62) / numCols) : 0;
+      const labelW = (tableW - numW * numCols) / labelCols;
+      const xAt = (i: number) => (i < labelCols ? M + i * labelW : M + labelCols * labelW + (i - labelCols) * numW);
+      const wAt = (i: number) => (i < labelCols ? labelW : numW);
+      const rowH = 19;
+      const PAD = 8;
 
       const drawHead = () => {
         pdf.setFillColor(...NAVY);
-        pdf.rect(M, y, W - M * 2, rowH, "F");
+        pdf.rect(M, y, tableW, rowH, "F");
         pdf.setFont("helvetica", "bold");
         pdf.setFontSize(8);
         pdf.setTextColor(255, 255, 255);
         table.columns.forEach((c, i) => {
-          const right = i >= numericFrom;
-          pdf.text(
-            String(c),
-            right ? M + (i + 1) * colW - 6 : M + i * colW + 6,
-            y + 11.5,
-            right ? { align: "right" } : undefined,
-          );
+          const right = i >= labelCols;
+          T(c, right ? xAt(i) + wAt(i) - PAD : xAt(i) + PAD, y + 12.5, right ? { align: "right" } : undefined);
         });
         y += rowH;
       };
@@ -226,99 +254,152 @@ export async function generateReportPdf(spec: ReportSpec, narrative: ReportNarra
         }
         if (ri % 2 === 1) {
           pdf.setFillColor(...ZEBRA);
-          pdf.rect(M, y, W - M * 2, rowH, "F");
+          pdf.rect(M, y, tableW, rowH, "F");
         }
+        pdf.setDrawColor(...HAIRLINE);
+        pdf.setLineWidth(0.4);
+        pdf.line(M, y + rowH, W - M, y + rowH);
         pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(8);
+        pdf.setFontSize(8.5);
         pdf.setTextColor(30, 41, 59);
         r.forEach((cell, i) => {
-          const right = i >= numericFrom;
-          const text = String(cell ?? "");
-          const clipped =
-            (pdf.splitTextToSize(text, colW - 12) as string[])[0] ?? text;
-          pdf.text(
-            clipped,
-            right ? M + (i + 1) * colW - 6 : M + i * colW + 6,
-            y + 11.5,
-            right ? { align: "right" } : undefined,
-          );
+          const right = i >= labelCols;
+          const text = pdfSafe(cell);
+          const clipped = (pdf.splitTextToSize(text, wAt(i) - PAD * 2) as string[])[0] ?? text;
+          T(clipped, right ? xAt(i) + wAt(i) - PAD : xAt(i) + PAD, y + 12.5, right ? { align: "right" } : undefined);
         });
         y += rowH;
       });
-      pdf.setDrawColor(226, 232, 240);
-      pdf.line(M, y, W - M, y);
-      y += 20;
+      y += 24;
     }
   }
 
-  // ---- Section 4: charts -------------------------------------------------
-  if (spec.chartEl && html2canvasMod) {
-    try {
-      const html2canvas = html2canvasMod.default;
-      const canvas = await html2canvas(spec.chartEl, {
-        scale: 2,
-        backgroundColor: "#ffffff",
-        useCORS: true,
-        logging: false,
-      });
-      const img = canvas.toDataURL("image/jpeg", 0.92);
-      const imgW = W - M * 2;
-      const imgH = (canvas.height * imgW) / canvas.width;
-      sectionTitle("Section 4 · Charts & Visual Analytics");
-      const usable = BOTTOM - M;
-      let drawn = 0;
-      let first = true;
-      while (drawn < imgH) {
-        if (!first) {
-          pdf.addPage();
-          y = M;
-        }
-        const avail = BOTTOM - y;
-        pdf.addImage(img, "JPEG", M, y - drawn, imgW, imgH, undefined, "FAST");
-        // mask anything spilling above/below the drawable band
-        pdf.setFillColor(255, 255, 255);
-        pdf.rect(0, 0, W, y, "F");
-        pdf.rect(0, BOTTOM, W, H - BOTTOM, "F");
-        drawn += avail;
-        y = BOTTOM;
-        first = false;
-        if (drawn > usable * 12) break;
-      }
-      y = BOTTOM;
-    } catch {
-      // chart capture is best-effort
-    }
-  }
+  // ---- Sign-off ----------------------------------------------------------
+  ensure(110);
+  heading("3. Approval & Sign-off");
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(9);
+  pdf.setTextColor(...SLATE);
+  T("Prepared by: AI Finance Engine (Finance IQ)", M, y);
+  T("Approved by: Finance Head", W / 2 + 20, y);
+  y += 42;
+  pdf.setDrawColor(...HAIRLINE);
+  pdf.setLineWidth(0.8);
+  pdf.line(M, y, M + 170, y);
+  pdf.line(W / 2 + 20, y, W / 2 + 190, y);
+  y += 13;
+  pdf.setFontSize(8);
+  T("Authorised Signatory", M, y);
+  T("Approved by Finance Head", W / 2 + 20, y);
 
-  // ---- Section 5: footer & sign-off on every page -------------------------
+  // ---- Footer on every page ---------------------------------------------
   const pages = pdf.getNumberOfPages();
   for (let p = 1; p <= pages; p += 1) {
     pdf.setPage(p);
-    pdf.setDrawColor(226, 232, 240);
+    pdf.setDrawColor(...HAIRLINE);
     pdf.setLineWidth(0.6);
-    pdf.line(M, H - 46, W - M, H - 46);
+    pdf.line(M, H - 56, W - M, H - 56);
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(7.5);
     pdf.setTextColor(...SLATE);
-    pdf.text(
-      "Confidential - For Internal Management Use Only | Generated via AI Finance Platform",
-      M,
-      H - 32,
-    );
-    pdf.text("Prepared by AI Engine | Reviewed by Authorized Signatory", M, H - 22);
-    pdf.text(`Page ${p} of ${pages}`, W - M, H - 22, { align: "right" });
-    pdf.text(ref, W - M, H - 32, { align: "right" });
+    T("Confidential - For internal management use only. Not for external circulation.", M, H - 40);
+    T(ref, M, H - 28);
+    T(`Page ${p} of ${pages}`, W - M, H - 28, { align: "right" });
   }
 
-  const slug = spec.reportName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  pdf.save(`${slug}-${spec.fy.replace(/\s+/g, "-").toLowerCase()}.pdf`);
+  pdf.save(fileSlug(spec, "executive"));
+}
+
+// ---------------------------------------------------------------------------
+// 2. VISUAL DASHBOARD SNAPSHOT
+// ---------------------------------------------------------------------------
+
+export async function generateSnapshotPdf(spec: ReportSpec, el: HTMLElement) {
+  const [{ jsPDF }, { default: html2canvas }] = await Promise.all([
+    import("jspdf"),
+    import("html2canvas"),
+  ]);
+
+  const canvas = await html2canvas(el, {
+    scale: 2,
+    backgroundColor: "#ffffff",
+    useCORS: true,
+    logging: false,
+  });
+
+  const pdf = new jsPDF({ orientation: "p", unit: "pt", format: "a4" });
+  pdf.setCharSpace(0);
+  const W = pdf.internal.pageSize.getWidth();
+  const H = pdf.internal.pageSize.getHeight();
+  const M = 28;
+  const HEAD = 74;
+  const FOOT = 34;
+  const ref = docRefId(spec.page);
+
+  const imgW = W - M * 2;
+  const imgH = (canvas.height * imgW) / canvas.width;
+  const band = H - HEAD - FOOT;
+  const img = canvas.toDataURL("image/jpeg", 0.94);
+
+  const T = (t: unknown, x: number, y: number, opts?: { align?: "left" | "center" | "right" }) =>
+    pdf.text(pdfSafe(t), x, y, opts);
+
+  let drawn = 0;
+  let page = 0;
+  while (drawn < imgH && page < 12) {
+    if (page > 0) pdf.addPage();
+
+    pdf.addImage(img, "JPEG", M, HEAD - drawn, imgW, imgH, undefined, "FAST");
+    // mask spill outside the drawable band
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(0, 0, W, HEAD, "F");
+    pdf.rect(0, H - FOOT, W, FOOT, "F");
+
+    pdf.setFillColor(...NAVY);
+    pdf.rect(0, 0, W, 52, "F");
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(12);
+    T(spec.org, M, 24);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(8);
+    T(`${spec.reportName} - Visual Dashboard Snapshot`, M, 38);
+    T(`${spec.fy}  |  ${istNow()} IST`, W - M, 24, { align: "right" });
+    T(`Doc Ref: ${ref}`, W - M, 38, { align: "right" });
+
+    pdf.setDrawColor(...INDIGO);
+    pdf.setLineWidth(1.5);
+    pdf.line(0, 52, W, 52);
+
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(...SLATE);
+    T("Confidential - For internal management use only.", M, H - 14);
+    T(`Page ${page + 1}`, W - M, H - 14, { align: "right" });
+
+    drawn += band;
+    page += 1;
+  }
+
+  const pages = pdf.getNumberOfPages();
+  for (let p = 1; p <= pages; p += 1) {
+    pdf.setPage(p);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(...SLATE);
+    T(`Page ${p} of ${pages}`, W - M, H - 14, { align: "right" });
+  }
+
+  pdf.save(fileSlug(spec, "snapshot"));
 }
 
 /** Deterministic fallback narrative when the AI gateway is unavailable (demo mode). */
 export function fallbackNarrative(spec: ReportSpec): ReportNarrative {
   const kpiLine = spec.kpis.map((k) => `${k.label}: ${k.value}`).join("; ");
   return {
-    summary: `${spec.reportName} for ${spec.org} covering ${spec.fy}. Headline metrics — ${kpiLine}. ${spec.facts}\n\nThis document was produced without the AI narrative engine (no signed-in session), so the commentary below is derived directly from the figures on the page rather than generated analysis. All amounts are in Indian rupees and follow the Indian numbering system.`,
-    takeaways: spec.kpis.slice(0, 3).map((k) => `${k.label} stands at ${k.value}${k.delta ? ` (${k.delta})` : ""}.`),
+    summary: `${spec.reportName} for ${spec.org} covering ${spec.fy}. Headline metrics — ${kpiLine}.\n\n${spec.facts}\n\nThis document was produced without the AI narrative engine (no signed-in session), so the commentary is derived directly from the figures on the page rather than generated analysis. All amounts are in Indian rupees and follow the Indian numbering system.`,
+    takeaways: spec.kpis
+      .slice(0, 3)
+      .map((k) => `${k.label} stands at ${k.value}${k.delta ? ` (${k.delta})` : ""}.`),
   };
 }
