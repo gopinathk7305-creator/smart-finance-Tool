@@ -110,6 +110,7 @@ function UploadPage() {
   const [auditOpen, setAuditOpen] = useState(false);
   const [committing, setCommitting] = useState(false);
   const [fixed, setFixed] = useState(false);
+  const [progress, setProgress] = useState<{ label: string; pct: number; eta: string } | null>(null);
 
   const history = useQuery({
     queryKey: ["upload-history", user?.id ?? "anon", scopeOrgId ?? "all"],
@@ -151,20 +152,37 @@ function UploadPage() {
       return;
     }
     let raw: Record<string, string>[];
+    setActive(key);
+    setProgress({ label: `Parsing ${file.name}…`, pct: 2, eta: "" });
     try {
-      raw = await readTabular(file);
+      raw = await streamTabular(
+        file,
+        (p) => {
+          const pct = p.bytesTotal ? Math.min(99, (p.bytesDone / p.bytesTotal) * 100) : 50;
+          setProgress({
+            label: `Parsing file… ${p.rows.toLocaleString("en-IN")} rows read`,
+            pct,
+            eta: p.etaSeconds != null ? `~${Math.ceil(p.etaSeconds)}s remaining` : "",
+          });
+        },
+        BATCH_SIZE,
+      );
     } catch (e) {
+      setProgress(null);
       toast.error(e instanceof Error ? e.message : "Could not read that file.");
       return;
     }
     if (!raw.length) {
+      setProgress(null);
       toast.error("That file has no data rows.");
       return;
     }
+    setProgress({ label: `Cleaning ${raw.length.toLocaleString("en-IN")} rows…`, pct: 100, eta: "" });
+    await new Promise((r) => window.setTimeout(r, 30));
     setRawCache((s) => ({ ...s, [key]: raw }));
     setFixed(false);
     const result = parse(key, raw, file.name, false);
-    setActive(key);
+    setProgress(null);
     setAuditOpen(true);
     toast.success(`${file.name} cleaned — ${result.clean} of ${result.total} rows validated`);
   };
@@ -183,12 +201,30 @@ function UploadPage() {
     const ds = DATASETS.find((d) => d.key === key)!;
     if (!p || !p.rows.length) return;
     setCommitting(true);
-    const { error } = await supabase.from(ds.table).insert(p.rows as never);
-    setCommitting(false);
-    if (error) {
-      toast.error(error.message);
-      return;
+    const batches: Record<string, unknown>[][] = [];
+    for (let i = 0; i < p.rows.length; i += BATCH_SIZE) batches.push(p.rows.slice(i, i + BATCH_SIZE));
+    const started = Date.now();
+    for (let b = 0; b < batches.length; b += 1) {
+      const done = b / batches.length;
+      const elapsed = (Date.now() - started) / 1000;
+      setProgress({
+        label: `Batch inserting into cloud database… (Batch ${b + 1} of ${batches.length})`,
+        pct: done * 100,
+        eta: done > 0 ? `~${Math.ceil(elapsed / done - elapsed)}s remaining` : "",
+      });
+      const { error } = await supabase.from(ds.table).insert(batches[b]! as never);
+      if (error) {
+        setCommitting(false);
+        setProgress(null);
+        toast.error(error.message);
+        return;
+      }
+      // let the UI paint between batches and release the chunk from memory
+      batches[b] = [];
+      await new Promise((r) => window.setTimeout(r, 0));
     }
+    setCommitting(false);
+    setProgress(null);
     await logActivity(`Synced ${p.rows.length} clean ${ds.label} rows to cloud`, "Data Upload");
     refresh();
     void history.refetch();
