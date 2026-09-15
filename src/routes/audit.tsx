@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { AlertOctagon, CheckCircle2, Copy, ShieldAlert, Sparkles } from "lucide-react";
-import { useMemo, useState } from "react";
+import { AlertOctagon, CheckCircle2, Copy, History, ShieldAlert, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { AiReportButton } from "@/components/finance/AiReportButton";
@@ -31,6 +31,12 @@ import {
   type AuditStatus,
 } from "@/lib/enterprise-data";
 import { scanLedgerWithAi } from "@/lib/ai.functions";
+import {
+  FINDING_STATUS_LABEL,
+  useAuditHistory,
+  type FindingInput,
+  type FindingStatus,
+} from "@/lib/audit-history";
 import { useDataset } from "@/lib/dataset";
 import { downloadCSV, inr } from "@/lib/finance-data";
 
@@ -62,6 +68,10 @@ const STATUS_LABEL: Record<AuditStatus, string> = {
 
 function AuditPage() {
   const { txns, live } = useDataset();
+  const hist = useAuditHistory();
+  const [histRule, setHistRule] = useState("all");
+  const [histStatus, setHistStatus] = useState("all");
+  const persisted = useRef(false);
   const ruleFindings = useMemo(() => auditFindings(live ? txns : undefined), [txns, live]);
   const [aiFindings, setAiFindings] = useState<AuditFinding[]>([]);
   const [scanning, setScanning] = useState(false);
@@ -69,6 +79,36 @@ function AuditPage() {
   const [ruleFilter, setRuleFilter] = useState("all");
 
   const findings = useMemo(() => [...aiFindings, ...ruleFindings], [aiFindings, ruleFindings]);
+
+  const asInput = (f: AuditFinding, origin: string): FindingInput => ({
+    rule: f.rule,
+    severity: f.severity,
+    party: f.party,
+    date: f.date,
+    amount: f.amount,
+    detail: f.detail,
+    origin,
+  });
+
+  // Rule-engine exceptions are written to the organization's audit history once
+  // per visit, so flagged rows survive later uploads and page reloads.
+  useEffect(() => {
+    if (!hist.live || hist.loading || persisted.current || !live || ruleFindings.length === 0) return;
+    persisted.current = true;
+    void hist
+      .persist(ruleFindings.map((f) => asInput(f, "rules")))
+      .then((count) => {
+        if (count) toast.success(`${count} new exception(s) added to audit history`);
+      })
+      .catch(() => undefined);
+  }, [hist, live, ruleFindings]);
+
+  const historyRules = Array.from(new Set(hist.history.map((h) => h.rule)));
+  const visibleHistory = hist.history.filter(
+    (h) =>
+      (histRule === "all" || h.rule === histRule) &&
+      (histStatus === "all" || h.status === histStatus),
+  );
 
   const runAiScan = async () => {
     setScanning(true);
@@ -96,6 +136,7 @@ function AuditPage() {
         detail: f.detail,
       }));
       setAiFindings(mapped);
+      if (hist.live) await hist.persist(mapped.map((f) => asInput(f, "ai")));
       toast.success(
         mapped.length ? `AI scan flagged ${mapped.length} items` : "AI scan found no new anomalies",
       );
