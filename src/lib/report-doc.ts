@@ -278,8 +278,11 @@ export async function generateReportPdf(spec: ReportSpec, narrative: ReportNarra
         r.forEach((cell, i) => {
           const right = i >= labelCols;
           const text = pdfSafe(cell);
-          const clipped = (pdf.splitTextToSize(text, wAt(i) - PAD * 2) as string[])[0] ?? text;
-          T(clipped, right ? xAt(i) + wAt(i) - PAD : xAt(i) + PAD, y + 12.5, right ? { align: "right" } : undefined);
+          // numeric cells are never truncated (columns are measured to fit)
+          const out = right
+            ? text
+            : ((pdf.splitTextToSize(text, wAt(i) - PAD * 2) as string[])[0] ?? text);
+          T(out, right ? xAt(i) + wAt(i) - PAD : xAt(i) + PAD, y + 12.5, right ? { align: "right" } : undefined);
         });
         y += rowH;
       });
