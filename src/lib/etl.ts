@@ -367,3 +367,61 @@ export function runEtl(
 
 export const issueTone = (s: Severity) =>
   s === "error" ? "text-danger" : s === "warning" ? "text-warning" : "text-success";
+
+/* ---------------------------------------------- streaming reader (large files) */
+
+export interface StreamProgress {
+  phase: "parsing";
+  rows: number;
+  bytesDone: number;
+  bytesTotal: number;
+  etaSeconds: number | null;
+}
+
+/**
+ * Streams a CSV in 5,000-row chunks inside a Web Worker so the UI thread never
+ * blocks on 50,000+ row files. Excel files fall back to the buffered reader.
+ */
+export async function streamTabular(
+  file: File,
+  onProgress: (p: StreamProgress) => void,
+  chunkSize = 5000,
+): Promise<Record<string, string>[]> {
+  if (!/\.csv$/i.test(file.name)) {
+    const rows = await readTabular(file);
+    onProgress({ phase: "parsing", rows: rows.length, bytesDone: file.size, bytesTotal: file.size, etaSeconds: 0 });
+    return rows;
+  }
+
+  const Papa = (await import("papaparse")).default;
+  const started = Date.now();
+  const all: Record<string, string>[] = [];
+
+  return new Promise((resolve, reject) => {
+    Papa.parse<Record<string, string>>(file, {
+      header: true,
+      skipEmptyLines: true,
+      worker: true,
+      chunkSize: chunkSize * 120,
+      transformHeader: (h) => h.trim().toLowerCase().replace(/\s+/g, "_"),
+      chunk: (results, parser) => {
+        for (const row of results.data) {
+          if (row && Object.keys(row).length) all.push(row);
+        }
+        const bytesDone = results.meta.cursor || 0;
+        const elapsed = (Date.now() - started) / 1000;
+        const ratio = file.size > 0 ? bytesDone / file.size : 1;
+        onProgress({
+          phase: "parsing",
+          rows: all.length,
+          bytesDone,
+          bytesTotal: file.size,
+          etaSeconds: ratio > 0.02 && elapsed > 0.4 ? Math.max(0, elapsed / ratio - elapsed) : null,
+        });
+        void parser;
+      },
+      complete: () => resolve(all),
+      error: (err: Error) => reject(err),
+    });
+  });
+}
