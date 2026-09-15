@@ -88,6 +88,23 @@ function CashFlowPage() {
         />
       </div>
 
+      {arApRecords.length === 0 && (
+        <Card className="mt-4 border-warning/30 bg-warning-soft shadow-card">
+          <CardHeader>
+            <CardTitle className="text-base">No receivables or payables loaded</CardTitle>
+            <CardDescription>
+              Upload a receivables / payables CSV (party name, type AR or AP, invoice date, due date,
+              amount, status) on the Data Upload page and these aging buckets fill automatically.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link to="/upload" className="text-sm font-semibold text-brand underline">
+              Go to Data Upload
+            </Link>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         {(["AR", "AP"] as const).map((type) => (
           <Card key={type} className="border-border shadow-card">
