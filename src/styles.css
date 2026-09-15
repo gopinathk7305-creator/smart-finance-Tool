@@ -119,9 +119,9 @@
   --danger: oklch(0.637 0.222 12.5);
   --danger-foreground: oklch(0.985 0 0);
   --danger-soft: oklch(0.955 0.03 12.5);
-  --brand: oklch(0.588 0.145 243);
+  --brand: oklch(0.511 0.226 277.1);
   --brand-foreground: oklch(0.985 0 0);
-  --brand-soft: oklch(0.955 0.028 243);
+  --brand-soft: oklch(0.958 0.024 277.1);
 }
 
 .dark {
@@ -174,4 +174,15 @@
   .tabular {
     font-variant-numeric: tabular-nums;
   }
+
+  /* enterprise data displays: digits always align vertically */
+  table {
+    font-variant-numeric: tabular-nums;
+  }
 }
+
+@utility glass {
+  background-color: color-mix(in oklch, var(--color-card) 78%, transparent);
+  backdrop-filter: blur(12px) saturate(140%);
+}
+

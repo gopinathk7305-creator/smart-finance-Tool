@@ -143,7 +143,7 @@ export function AppShell({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border bg-card/95 px-4 backdrop-blur md:px-6">
+        <header className="glass sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border px-4 md:px-6">
           <div className="min-w-0">
             <h1 className="truncate text-base font-semibold tracking-tight">{title}</h1>
             {subtitle && (
@@ -259,7 +259,9 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="flex-1 p-4 md:p-6">{children}</main>
+        <main data-page-capture className="flex-1 p-4 md:p-6">
+          {children}
+        </main>
       </div>
     </div>
   );
