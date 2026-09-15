@@ -155,8 +155,32 @@ export function InsightsProvider({ children }: { children: ReactNode }) {
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
+/**
+ * Safe to call anywhere. If a subtree renders outside InsightsProvider
+ * (e.g. during hot reload or an isolated error boundary) it falls back to
+ * local state instead of crashing the page.
+ */
 export function useInsights(): InsightsCtx {
   const ctx = useContext(Ctx);
-  if (!ctx) throw new Error("useInsights must be used inside InsightsProvider");
-  return ctx;
+  const [open, setOpen] = useState(false);
+  const [sourceFile, setSourceFile] = useState("");
+  const { txns, pays, araps, buds } = useDataset();
+  const insights = useMemo(
+    () => computeInsights(txns, pays.length, araps, buds.length),
+    [txns, pays, araps, buds],
+  );
+  const fallback = useMemo<InsightsCtx>(
+    () => ({
+      insights,
+      open,
+      setOpen,
+      sourceFile,
+      openInsights: (fileName?: string) => {
+        if (fileName) setSourceFile(fileName);
+        setOpen(true);
+      },
+    }),
+    [insights, open, sourceFile],
+  );
+  return ctx ?? fallback;
 }
