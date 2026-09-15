@@ -109,17 +109,18 @@ function buildRows(
       { line: "Net Profit", amount: Math.round(t.netProfit) },
     ];
   if (key === "summary")
-    return buds.map((b) => {
-      const actual = txns
-        .filter((t) => t.type === "expense" && t.category === b.category)
-        .reduce((sum, t) => sum + t.amount, 0);
-      return {
-      category: b.category,
-      budgeted: b.budgeted_amount,
-      actual,
-      variance: actual - b.budgeted_amount,
-      };
-    });
+    return [
+      { metric: "Operating Revenue", amount: t.revenue, management_view: "Income generated" },
+      { metric: "Cost of Goods Sold", amount: t.cogs, management_view: "Direct operating cost" },
+      { metric: "Operating Expenses", amount: t.opex, management_view: "Indirect operating cost" },
+      { metric: "EBITDA", amount: t.ebitda, management_view: "Operating earnings" },
+      { metric: "Net Profit", amount: t.netProfit, management_view: "Post-tax earnings" },
+      {
+        metric: "Approved Budget",
+        amount: buds.reduce((sum, b) => sum + b.budgeted_amount, 0),
+        management_view: "Annual expense allocation",
+      },
+    ];
   if (key === "payroll")
     return pays.map((p) => {
       const tax = computeTax(p);
@@ -147,14 +148,20 @@ function buildRows(
         f.severity === "high" ? "Hold and investigate" : f.severity === "medium" ? "Verify documents" : "Manager review",
       approval_status: "Open",
     }));
-  return araps.map((r) => ({
-    type: r.type,
-    party: r.party_name,
-    due_date: r.due_date,
-    aging_bucket: agingBand(r),
-    amount: r.amount,
-    status: r.status,
-  }));
+  const bands = ["Current", "1-30 Days", "31-60 Days", "61-90 Days", "90+ Days"];
+  return (["AR", "AP"] as const).flatMap((type) =>
+    bands.map((band) => {
+      const matches = araps.filter((r) => r.type === type && agingBand(r) === band);
+      return {
+        type,
+        aging_bucket: band,
+        invoice_count: matches.length,
+        outstanding_amount: matches
+          .filter((r) => r.status === "outstanding")
+          .reduce((sum, r) => sum + r.amount, 0),
+      };
+    }),
+  );
 }
 
 const PAGE_KEY: Record<ReportKey, "pnl" | "payroll" | "audit" | "reports"> = {
@@ -186,7 +193,6 @@ function ReportsPage() {
     const monthlyBurn = months.slice(-3).reduce((sum, m) => sum + Math.max(0, m.expense - m.revenue), 0) / 3;
     const overdue = araps.filter((r) => r.status === "outstanding" && agingBand(r) !== "Current");
     const overdueValue = overdue.reduce((sum, r) => sum + r.amount, 0);
-    const columns = Object.keys(reportRows[0] ?? {});
     const titles: Record<ReportKey, string> = {
       pnl: "Profit & Loss Statement",
       summary: "Executive Financial Summary",
@@ -198,7 +204,7 @@ function ReportsPage() {
       pnl: `Operating income ${inr(t.revenue)}, total expenses ${inr(t.expense)}, COGS ${inr(t.cogs)}, EBITDA ${inr(t.ebitda)}, corporate tax at 25% ${inr(t.tax)}, and net profit ${inr(t.netProfit)}. Operating expense variance against income is ${inr(t.opex - t.revenue)}.`,
       summary: `Management overview: revenue ${inr(t.revenue)}, expenses ${inr(t.expense)}, net profit ${inr(t.netProfit)}, closing modeled cash ${inr(finalCash)}, and recent monthly cash burn ${inr(monthlyBurn)}. Budget-versus-actual lines: ${reportRows.length}.`,
       payroll: `Salary register covers ${pays.length} employees. Gross pay ${inr(pays.reduce((s, p) => s + grossPay(p), 0))}, PF at 12% ${inr(pays.reduce((s, p) => s + computeTax(p).pf, 0))}, ESI ${inr(pays.reduce((s, p) => s + computeTax(p).esi, 0))}, slab-wise TDS including 4% cess ${inr(pays.reduce((s, p) => s + computeTax(p).monthlyTds, 0))}, and net take-home ${inr(pays.reduce((s, p) => s + computeTax(p).net, 0))}. Compliance certificate: figures are system-computed and require Finance Head approval before statutory filing.`,
-      audit: `Forensic review of ${txns.length} transactions identified ${reportRows.length} exceptions. Duplicate transactions: ${reportRows.filter((r) => r.rule === "Duplicate invoice").length}; high-value or round-sum warnings: ${reportRows.filter((r) => String(r.rule).includes("Round-figure")).length}; variance warnings: ${reportRows.filter((r) => r.rule === "Category variance").length}. Every exception remains open until approved by the audit owner.`,
+      audit: `Forensic review of ${txns.length} transactions identified ${reportRows.length} exceptions. Duplicate transactions: ${reportRows.filter((r) => r["rule"] === "Duplicate invoice").length}; high-value or round-sum warnings: ${reportRows.filter((r) => String(r["rule"]).includes("Round-figure")).length}; variance warnings: ${reportRows.filter((r) => r["rule"] === "Category variance").length}. Every exception remains open until approved by the audit owner.`,
       aging: `Receivables and payables reviewed: ${araps.length}. Overdue invoices: ${overdue.length}, total overdue exposure ${inr(overdueValue)}. Amount overdue beyond 90 days: ${inr(overdue.filter((r) => agingBand(r) === "90+ Days").reduce((s, r) => s + r.amount, 0))}. This concentration may pressure near-term cash flow and requires collection or payment prioritisation.`,
     };
     const kpisByReport: Record<ReportKey, { label: string; value: string; delta?: string }[]> = {
@@ -223,8 +229,8 @@ function ReportsPage() {
       audit: [
         { label: "Transactions", value: String(txns.length) },
         { label: "Exceptions", value: String(reportRows.length) },
-        { label: "High Risk", value: String(reportRows.filter((r) => r.severity === "high").length) },
-        { label: "Exposure", value: inr(reportRows.reduce((s, r) => s + Number(r.amount ?? 0), 0), true) },
+        { label: "High Risk", value: String(reportRows.filter((r) => r["severity"] === "high").length) },
+        { label: "Exposure", value: inr(reportRows.reduce((s, r) => s + Number(r["amount"] ?? 0), 0), true) },
       ],
       aging: [
         { label: "Open Invoices", value: String(araps.filter((r) => r.status === "outstanding").length) },
@@ -234,7 +240,7 @@ function ReportsPage() {
       ],
     };
 
-    const columns = Object.keys(rows[0] ?? {});
+    const columns = Object.keys(reportRows[0] ?? {});
     return {
       page: PAGE_KEY[key],
       reportName: titles[key],
@@ -253,6 +259,12 @@ function ReportsPage() {
         },
       ],
       facts: facts[key],
+      ...(key === "payroll"
+        ? {
+            complianceNote:
+              "Compliance Certificate: PF, ESI, slab-wise TDS and 4% cess computations are subject to Finance Head verification before statutory filing.",
+          }
+        : {}),
       chartEl: printRef.current,
     };
   };

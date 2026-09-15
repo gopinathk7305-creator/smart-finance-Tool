@@ -30,6 +30,8 @@ export interface ReportSpec {
   tables: ReportTable[];
   /** plain-text facts handed to the AI narrative */
   facts: string;
+  /** optional formal note repeated in the document footer */
+  complianceNote?: string;
   /** chart container captured into the visual snapshot */
   chartEl?: HTMLElement | null;
 }
@@ -318,7 +320,10 @@ export async function generateReportPdf(spec: ReportSpec, narrative: ReportNarra
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(7.5);
     pdf.setTextColor(...SLATE);
-    T("Confidential - For internal management use only. Not for external circulation.", M, H - 40);
+    const footerNote = spec.complianceNote
+      ? (pdf.splitTextToSize(pdfSafe(spec.complianceNote), W - M * 2) as string[])[0]
+      : "Confidential - For internal management use only. Not for external circulation.";
+    T(footerNote, M, H - 40);
     T(ref, M, H - 28);
     T(`Page ${p} of ${pages}`, W - M, H - 28, { align: "right" });
   }
