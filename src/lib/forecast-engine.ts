@@ -139,7 +139,18 @@ export function runForecast(
   const lastRev = avg((s) => s.revenue) || 1;
   const lastExp = avg((s) => s.expense) || 1;
 
-  const basePayroll = pays.length ? pays.reduce((s, p) => s + grossPay(p), 0) : lastExp * 0.45;
+  // Monthly people cost taken from the user's own payroll categories in the ledger.
+  const payrollNames = new Set(payrollCategories.map((c) => c.toLowerCase()));
+  const ledgerPayroll =
+    txns
+      .filter((t) => t.type === "expense" && payrollNames.has(t.category.toLowerCase()))
+      .reduce((s, t) => s + t.amount, 0) / sample.length;
+
+  const basePayroll = ledgerPayroll
+    ? ledgerPayroll
+    : pays.length
+      ? pays.reduce((s, p) => s + grossPay(p), 0)
+      : lastExp * 0.45;
   const baseOpex = Math.max(0, lastExp - basePayroll);
   const hirePayroll = (inputs.hires * inputs.avgSalary * STATUTORY_LOAD) / 12;
 
