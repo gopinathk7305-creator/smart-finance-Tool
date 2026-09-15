@@ -479,6 +479,77 @@ function ForecastPage() {
                     suffix="%"
                     onChange={(v) => set("gstRate", v)}
                   />
+
+                  <div className="space-y-2 rounded-md border border-border p-3">
+                    <Label className="text-xs font-semibold">Revenue currency</Label>
+                    <Select value={fx.code} onValueChange={fx.setCode}>
+                      <SelectTrigger className="bg-background" aria-label="Revenue currency">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CURRENCIES.map((c) => (
+                          <SelectItem key={c.code} value={c.code}>
+                            {c.code} — {c.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Label htmlFor="new-revenue" className="text-xs">
+                      New contracted revenue per month ({fx.currency.symbol.trim() || fx.code})
+                    </Label>
+                    <Input
+                      id="new-revenue"
+                      className="bg-background"
+                      placeholder="25000"
+                      value={newRevenueEntered ? String(newRevenueEntered) : ""}
+                      onChange={(e) =>
+                        setNewRevenueEntered(Number(e.target.value.replace(/[^0-9.]/g, "")) || 0)
+                      }
+                    />
+
+                    {fx.code !== "INR" && (
+                      <>
+                        <Label htmlFor="fx-rate" className="text-xs">
+                          1 {fx.code} in rupees
+                        </Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="fx-rate"
+                            className="bg-background"
+                            value={rateDraft || String(fx.rate)}
+                            onChange={(e) => setRateDraft(e.target.value.replace(/[^0-9.]/g, ""))}
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={fx.saving}
+                            onClick={() => {
+                              const value = Number(rateDraft);
+                              if (!value) {
+                                toast.error("Enter a conversion rate greater than zero.");
+                                return;
+                              }
+                              void fx
+                                .setRate(value)
+                                .then(() => {
+                                  setRateDraft("");
+                                  toast.success(`Rate saved — 1 ${fx.code} = ₹${value.toFixed(2)}`);
+                                })
+                                .catch((e: unknown) =>
+                                  toast.error(
+                                    e instanceof Error ? e.message : "Could not save the rate.",
+                                  ),
+                                );
+                            }}
+                          >
+                            Save
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                    <p className="text-[11px] text-muted-foreground">{fx.note}</p>
+                  </div>
                 </AccordionContent>
               </AccordionItem>
 
@@ -562,6 +633,13 @@ function ForecastPage() {
 
         <div className="space-y-4 xl:col-span-3">
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiCard
+              label="Plan vs Forecast Gap"
+              value={`${budgetGap >= 0 ? "+" : "−"}${inr(Math.abs(budgetGap), true)}`}
+              hint={plannedTotal ? `plan ${inr(plannedTotal, true)}` : "no budget entered yet"}
+              icon={Gauge}
+              tone={plannedTotal === 0 ? "neutral" : budgetGap > 0 ? "danger" : "success"}
+            />
             <KpiCard
               label="Projected 12M Revenue"
               value={inr(result.scenRevenueTotal, true)}
