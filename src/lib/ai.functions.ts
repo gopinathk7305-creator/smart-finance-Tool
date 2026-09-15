@@ -135,6 +135,13 @@ export interface ForecastAiInput {
     dso: number;
   };
   months: ForecastMonth[];
+  /** planned budget and actual spend so the answer can name plan gaps */
+  budget?: {
+    plannedAnnual: number;
+    actualToDate: number;
+    forecastSpend: number;
+    lines: { category: string; planned: number; actual: number }[];
+  };
   /** when set, focus the explanation on this single month */
   focusMonth?: string;
 }
@@ -144,15 +151,22 @@ export const explainForecast = createServerFn({ method: "POST" })
   .inputValidator((input: ForecastAiInput) => input)
   .handler(async ({ data }) => {
     const d = data.drivers;
+    const budgetLine = data.budget
+      ? `Budget context: planned annual spend ${data.budget.plannedAnnual}, actual spend to date ${data.budget.actualToDate}, forecast twelve-month operating plus payroll spend ${data.budget.forecastSpend}. Per-category plan vs actual: ${data.budget.lines
+          .map((l) => `${l.category} planned ${l.planned} actual ${l.actual}`)
+          .join("; ")}. Say clearly where the entity is over or under plan and where the forecast breaches the budget.`
+      : "No budget has been entered yet; do not invent plan figures.";
     const text = await callGateway(
       "You are a CFO-level Indian corporate financial planning analyst. Explain forecast movements in short, concrete plain text (no markdown symbols). Amounts are Indian rupees; quote them in Lakhs (L) or Crores (Cr) using the Indian number system. Months follow the Indian financial year, April to March. Costs already include employer PF 12% and ESI 3.25%, and profit is post-tax at 25% corporate tax plus 7% surcharge and 4% cess, with advance tax paid in Jun, Sep, Dec and Mar. Use only the numbers supplied and never invent new figures.",
       data.focusMonth
         ? `Scenario drivers: revenue growth ${d.revenueGrowth}%, churn ${d.churn}%, price/inflation ${d.priceFactor}%, opex adjustment ${d.opexAdj}%, ${d.hires} new hires at ${d.avgSalary} each per year, CAPEX ${d.capex}, DSO ${d.dso} days.
 Monthly data (JSON, revenue/cost/profit are scenario values, base* are baseline): ${JSON.stringify(data.months)}
+${budgetLine}
 Explain ONLY the month "${data.focusMonth}": why its revenue, cost and profit differ from the baseline and from the previous month, naming which drivers caused it and by roughly how much. Under 90 words.`
         : `Scenario drivers: revenue growth ${d.revenueGrowth}%, churn ${d.churn}%, price/inflation ${d.priceFactor}%, opex adjustment ${d.opexAdj}%, ${d.hires} new hires at ${d.avgSalary} each per year, CAPEX ${d.capex}, DSO ${d.dso} days.
 Monthly data (JSON, revenue/cost/profit are scenario values, base* are baseline): ${JSON.stringify(data.months)}
-Give: 1) two lines on how revenue, cost and profit move across the twelve months, 2) three bullets naming the drivers behind the biggest monthly changes with the months and amounts, 3) one line on the main risk month. Under 170 words.`,
+${budgetLine}
+Give: 1) two lines on how revenue, cost and profit move across the twelve months, 2) three bullets naming the drivers behind the biggest monthly changes with the months and amounts, 3) one line naming the biggest budget-vs-actual gap and the main risk month. Under 190 words.`,
     );
     return { text };
   });

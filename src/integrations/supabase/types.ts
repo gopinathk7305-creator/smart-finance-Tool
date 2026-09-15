@@ -100,7 +100,9 @@ export type Database = {
           created_at: string
           detail: string
           finding_date: string | null
+          fingerprint: string
           id: string
+          org_id: string | null
           origin: string
           party: string
           rule: string
@@ -113,7 +115,9 @@ export type Database = {
           created_at?: string
           detail?: string
           finding_date?: string | null
+          fingerprint?: string
           id?: string
+          org_id?: string | null
           origin?: string
           party?: string
           rule: string
@@ -126,7 +130,9 @@ export type Database = {
           created_at?: string
           detail?: string
           finding_date?: string | null
+          fingerprint?: string
           id?: string
+          org_id?: string | null
           origin?: string
           party?: string
           rule?: string
@@ -134,7 +140,15 @@ export type Database = {
           status?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "audit_findings_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       budget_targets: {
         Row: {
@@ -180,6 +194,59 @@ export type Database = {
           },
         ]
       }
+      compliance_filings: {
+        Row: {
+          ack_number: string
+          amount: number
+          created_at: string
+          due_date: string | null
+          filed_date: string | null
+          filing_key: string
+          filing_type: string
+          id: string
+          org_id: string | null
+          period: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          ack_number?: string
+          amount?: number
+          created_at?: string
+          due_date?: string | null
+          filed_date?: string | null
+          filing_key?: string
+          filing_type?: string
+          id?: string
+          org_id?: string | null
+          period?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          ack_number?: string
+          amount?: number
+          created_at?: string
+          due_date?: string | null
+          filed_date?: string | null
+          filing_key?: string
+          filing_type?: string
+          id?: string
+          org_id?: string | null
+          period?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_filings_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expense_categories: {
         Row: {
           created_at: string
@@ -211,6 +278,88 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "expense_categories_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fx_rates: {
+        Row: {
+          created_at: string
+          currency: string
+          id: string
+          org_id: string | null
+          rate_to_inr: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          id?: string
+          org_id?: string | null
+          rate_to_inr?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          id?: string
+          org_id?: string | null
+          rate_to_inr?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fx_rates_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      org_settings: {
+        Row: {
+          base_currency: string
+          created_at: string
+          depreciation_annual: number
+          id: string
+          org_id: string | null
+          surcharge_band: string
+          tax_regime: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          base_currency?: string
+          created_at?: string
+          depreciation_annual?: number
+          id?: string
+          org_id?: string | null
+          surcharge_band?: string
+          tax_regime?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          base_currency?: string
+          created_at?: string
+          depreciation_annual?: number
+          id?: string
+          org_id?: string | null
+          surcharge_band?: string
+          tax_regime?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_settings_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"

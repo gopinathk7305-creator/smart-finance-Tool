@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { AlertOctagon, CheckCircle2, Copy, ShieldAlert, Sparkles } from "lucide-react";
-import { useMemo, useState } from "react";
+import { AlertOctagon, CheckCircle2, Copy, History, ShieldAlert, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { AiReportButton } from "@/components/finance/AiReportButton";
@@ -31,6 +31,12 @@ import {
   type AuditStatus,
 } from "@/lib/enterprise-data";
 import { scanLedgerWithAi } from "@/lib/ai.functions";
+import {
+  FINDING_STATUS_LABEL,
+  useAuditHistory,
+  type FindingInput,
+  type FindingStatus,
+} from "@/lib/audit-history";
 import { useDataset } from "@/lib/dataset";
 import { downloadCSV, inr } from "@/lib/finance-data";
 
@@ -62,6 +68,10 @@ const STATUS_LABEL: Record<AuditStatus, string> = {
 
 function AuditPage() {
   const { txns, live } = useDataset();
+  const hist = useAuditHistory();
+  const [histRule, setHistRule] = useState("all");
+  const [histStatus, setHistStatus] = useState("all");
+  const persisted = useRef(false);
   const ruleFindings = useMemo(() => auditFindings(live ? txns : undefined), [txns, live]);
   const [aiFindings, setAiFindings] = useState<AuditFinding[]>([]);
   const [scanning, setScanning] = useState(false);
@@ -69,6 +79,36 @@ function AuditPage() {
   const [ruleFilter, setRuleFilter] = useState("all");
 
   const findings = useMemo(() => [...aiFindings, ...ruleFindings], [aiFindings, ruleFindings]);
+
+  const asInput = (f: AuditFinding, origin: string): FindingInput => ({
+    rule: f.rule,
+    severity: f.severity,
+    party: f.party,
+    date: f.date,
+    amount: f.amount,
+    detail: f.detail,
+    origin,
+  });
+
+  // Rule-engine exceptions are written to the organization's audit history once
+  // per visit, so flagged rows survive later uploads and page reloads.
+  useEffect(() => {
+    if (!hist.live || hist.loading || persisted.current || !live || ruleFindings.length === 0) return;
+    persisted.current = true;
+    void hist
+      .persist(ruleFindings.map((f) => asInput(f, "rules")))
+      .then((count) => {
+        if (count) toast.success(`${count} new exception(s) added to audit history`);
+      })
+      .catch(() => undefined);
+  }, [hist, live, ruleFindings]);
+
+  const historyRules = Array.from(new Set(hist.history.map((h) => h.rule)));
+  const visibleHistory = hist.history.filter(
+    (h) =>
+      (histRule === "all" || h.rule === histRule) &&
+      (histStatus === "all" || h.status === histStatus),
+  );
 
   const runAiScan = async () => {
     setScanning(true);
@@ -96,6 +136,7 @@ function AuditPage() {
         detail: f.detail,
       }));
       setAiFindings(mapped);
+      if (hist.live) await hist.persist(mapped.map((f) => asInput(f, "ai")));
       toast.success(
         mapped.length ? `AI scan flagged ${mapped.length} items` : "AI scan found no new anomalies",
       );
@@ -266,6 +307,113 @@ function AuditPage() {
                     </TableRow>
                   );
                 })}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mt-4 border-border shadow-card">
+        <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 space-y-0">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <History className="size-4 text-brand" /> Persisted Audit History
+            </CardTitle>
+            <CardDescription>
+              {hist.live
+                ? `${visibleHistory.length} of ${hist.history.length} stored exceptions for this organization`
+                : "Sign in to keep exceptions between uploads"}
+            </CardDescription>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Select value={histRule} onValueChange={setHistRule}>
+              <SelectTrigger className="w-56 bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All rules</SelectItem>
+                {historyRules.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {r}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={histStatus} onValueChange={setHistStatus}>
+              <SelectTrigger className="w-40 bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="open">Open</SelectItem>
+                <SelectItem value="reviewed">Reviewed</SelectItem>
+                <SelectItem value="closed">Closed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Logged</TableHead>
+                  <TableHead>Rule</TableHead>
+                  <TableHead>Severity</TableHead>
+                  <TableHead>Party / Category</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead>Source</TableHead>
+                  <TableHead className="text-right">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {visibleHistory.map((h) => (
+                  <TableRow key={h.id}>
+                    <TableCell className="tabular whitespace-nowrap text-xs text-muted-foreground">
+                      {h.created_at.slice(0, 10)}
+                    </TableCell>
+                    <TableCell>{h.rule}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={h.severity === "high" ? "destructive" : "secondary"}
+                        className="capitalize"
+                      >
+                        {h.severity}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{h.party}</TableCell>
+                    <TableCell className="tabular whitespace-nowrap">{h.date}</TableCell>
+                    <TableCell className="tabular text-right">{inr(h.amount)}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground capitalize">{h.origin}</TableCell>
+                    <TableCell className="text-right">
+                      <Select
+                        value={h.status}
+                        onValueChange={(v) => void hist.setStatus(h.id, v as FindingStatus)}
+                      >
+                        <SelectTrigger className="ml-auto w-32 bg-background">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(["open", "reviewed", "closed"] as FindingStatus[]).map((s) => (
+                            <SelectItem key={s} value={s}>
+                              {FINDING_STATUS_LABEL[s]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {visibleHistory.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
+                      {hist.live
+                        ? "No stored exceptions yet — upload a ledger or run an AI scan."
+                        : "Audit history is available once you sign in."}
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </div>

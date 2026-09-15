@@ -17,11 +17,19 @@ import { AppShell } from "@/components/finance/AppShell";
 import { KpiCard } from "@/components/finance/KpiCard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { actualsByCategory, inr, monthlySummary, totals } from "@/lib/finance-data";
 import { gstSummary } from "@/lib/enterprise-data";
 import { useCategories } from "@/lib/categories";
 import { useDataset } from "@/lib/dataset";
+import { corporateTax, type CorporateRate, type SurchargeBand } from "@/lib/tax";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/pnl")({
@@ -31,12 +39,12 @@ export const Route = createFileRoute("/pnl")({
       {
         name: "description",
         content:
-          "Interactive profit and loss statement with gross profit, EBITDA, net margin and monthly margin trends.",
+          "Interactive profit and loss waterfall with gross profit, EBITDA, EBIT and a step-by-step Indian corporate tax computation.",
       },
       { property: "og:title", content: "Financial Analysis & P&L — Finance IQ" },
       {
         property: "og:description",
-        content: "Revenue to net profit walk-down with dynamic margin toggles.",
+        content: "Revenue to net profit walk-down with surcharge, cess and Sec 115BAA options.",
       },
     ],
   }),
@@ -45,12 +53,18 @@ export const Route = createFileRoute("/pnl")({
 
 function PnlPage() {
   const [showPct, setShowPct] = useState(true);
+  const [rate, setRate] = useState<CorporateRate>(0.25);
+  const [band, setBand] = useState<SurchargeBand>("auto");
   const { txns } = useDataset();
   const { categories, cogsNames, live: liveCats } = useCategories();
   const t = totals(txns, cogsNames);
   const cats = actualsByCategory(txns);
   const series = monthlySummary(txns);
   const gst = gstSummary(t.revenue, t.expense);
+
+  // Taxable profit: EBITDA less depreciation & amortisation and finance cost.
+  const ebit = t.ebitda - t.depreciation - t.interest;
+  const tx = corporateTax(ebit, rate, band);
 
   // Expense lines below gross profit follow the user's own category definitions,
   // plus any ledger category they have not defined yet.
@@ -63,7 +77,7 @@ function PnlPage() {
     .filter((r) => r.value > 0);
 
   const rows: { label: string; value: number; kind?: "sub" | "total" | "grand" }[] = [
-    { label: "Gross Revenue", value: t.revenue, kind: "total" },
+    { label: "Gross Revenue (excl. GST)", value: t.revenue, kind: "total" },
     {
       label: cogsNames.length ? `Cost of Goods Sold (${cogsNames.join(", ")})` : "Cost of Goods Sold",
       value: -t.cogs,
@@ -72,10 +86,11 @@ function PnlPage() {
     { label: "Gross Profit", value: t.grossProfit, kind: "total" },
     ...opexLines.map((o) => ({ label: o.label, value: -o.value, kind: "sub" as const })),
     { label: "EBITDA", value: t.ebitda, kind: "total" },
-    { label: "Depreciation", value: -t.depreciation, kind: "sub" },
-    { label: "Interest", value: -t.interest, kind: "sub" },
-    { label: "Tax @ 25%", value: -t.tax, kind: "sub" },
-    { label: "Net Profit", value: t.netProfit, kind: "grand" },
+    { label: "Depreciation & Amortisation", value: -t.depreciation, kind: "sub" },
+    { label: "Finance cost / interest", value: -t.interest, kind: "sub" },
+    { label: "EBIT (taxable profit)", value: ebit, kind: "total" },
+    { label: `Corporate tax @ ${(rate * 100).toFixed(0)}% + surcharge + cess`, value: -tx.total, kind: "sub" },
+    { label: "Net Profit After Tax", value: tx.netProfit, kind: "grand" },
   ];
 
   const marginSeries = series.map((m) => ({
@@ -83,6 +98,19 @@ function PnlPage() {
     grossMargin: ((m.revenue - m.revenue * 0.22) / m.revenue) * 100,
     netMargin: (m.profit / m.revenue) * 100,
   }));
+
+  const taxRows: [string, string][] = [
+    ["EBITDA", inr(t.ebitda)],
+    ["Less: depreciation & amortisation", `(${inr(t.depreciation)})`],
+    ["Less: finance cost", `(${inr(t.interest)})`],
+    ["EBIT (taxable profit)", inr(ebit)],
+    [`Base corporate tax @ ${(rate * 100).toFixed(0)}%`, inr(tx.base)],
+    [`Surcharge @ ${tx.surchargePct}%`, inr(tx.surcharge)],
+    ["Health & education cess @ 4%", inr(tx.cess)],
+    ["Total tax payable", inr(tx.total)],
+    ["Effective tax rate", `${tx.effectiveRate.toFixed(2)}%`],
+    ["Net profit after tax", inr(tx.netProfit)],
+  ];
 
   const buildReport = () => ({
     page: "pnl" as const,
@@ -95,8 +123,8 @@ function PnlPage() {
         delta: `${((t.grossProfit / t.revenue) * 100).toFixed(1)}% margin`,
       },
       { label: "EBITDA", value: inr(t.ebitda, true), delta: `${((t.ebitda / t.revenue) * 100).toFixed(1)}% of revenue` },
-      { label: "Net Profit (Post-Tax)", value: inr(t.netProfit, true), delta: "After tax & interest" },
-      { label: "Net Margin", value: `${((t.netProfit / t.revenue) * 100).toFixed(1)}%`, delta: "FY 2026-27" },
+      { label: "Net Profit (Post-Tax)", value: inr(tx.netProfit, true), delta: `Effective tax ${tx.effectiveRate.toFixed(2)}%` },
+      { label: "Net Margin", value: `${((tx.netProfit / t.revenue) * 100).toFixed(1)}%`, delta: "FY 2026-27" },
     ],
     tables: [
       {
@@ -110,16 +138,19 @@ function PnlPage() {
         ]),
       },
       {
-        title: "GST & Corporate Tax Position",
+        title: "Corporate Tax Computation (step by step)",
+        columns: ["Particulars", "Amount"],
+        numericFrom: 1,
+        rows: taxRows.map(([a, b]) => [a, b]),
+      },
+      {
+        title: "GST Position",
         columns: ["Particulars", "Amount"],
         numericFrom: 1,
         rows: [
           ["Output GST on sales (18%)", inr(gst.outputGst)],
           ["Input tax credit on purchases", `(${inr(gst.inputCredit)})`],
           ["Net GST payable", inr(gst.payable)],
-          ["Earnings before tax", inr(t.ebitda - t.depreciation - t.interest)],
-          ["Corporate tax @ 25%", `(${inr(t.tax)})`],
-          ["Net profit after tax", inr(t.netProfit)],
         ],
       },
       {
@@ -133,29 +164,29 @@ function PnlPage() {
         ]),
       },
     ],
-    facts: `Revenue ${inr(t.revenue)}, COGS ${inr(t.cogs)}, gross profit ${inr(t.grossProfit)}, opex ${inr(t.opex)}, EBITDA ${inr(t.ebitda)}, depreciation ${inr(t.depreciation)}, interest ${inr(t.interest)}, corporate tax ${inr(t.tax)}, net profit ${inr(t.netProfit)}. Output GST ${inr(gst.outputGst)}, input credit ${inr(gst.inputCredit)}, net GST payable ${inr(gst.payable)}.`,
+    facts: `Revenue ${inr(t.revenue)}, COGS ${inr(t.cogs)}, gross profit ${inr(t.grossProfit)}, opex ${inr(t.opex)}, EBITDA ${inr(t.ebitda)}, depreciation ${inr(t.depreciation)}, finance cost ${inr(t.interest)}, EBIT ${inr(ebit)}. Corporate tax base ${inr(tx.base)} at ${(rate * 100).toFixed(0)}%, surcharge ${tx.surchargePct}% ${inr(tx.surcharge)}, cess 4% ${inr(tx.cess)}, total tax ${inr(tx.total)} at an effective rate of ${tx.effectiveRate.toFixed(2)}%, net profit after tax ${inr(tx.netProfit)}. Output GST ${inr(gst.outputGst)}, input credit ${inr(gst.inputCredit)}, net GST payable ${inr(gst.payable)}.`,
     chartEl: null,
   });
 
   return (
-    <AppShell title="Financial Analysis & P&L" subtitle="FY2026 statement of profit and loss">
+    <AppShell title="Financial Analysis & P&L" subtitle="FY 2026-27 statement of profit and loss">
       <div className="mb-4 flex justify-end">
         <AiReportButton build={buildReport} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard label="Gross Profit" value={inr(t.grossProfit, true)} icon={TrendingUp} tone="success" hint={`${((t.grossProfit / t.revenue) * 100).toFixed(1)}% margin`} />
         <KpiCard label="EBITDA" value={inr(t.ebitda, true)} icon={Activity} hint={`${((t.ebitda / t.revenue) * 100).toFixed(1)}% of revenue`} />
-        <KpiCard label="Net Profit" value={inr(t.netProfit, true)} icon={PiggyBank} tone={t.netProfit > 0 ? "success" : "danger"} hint="After tax & interest" />
-        <KpiCard label="Net Margin" value={`${((t.netProfit / t.revenue) * 100).toFixed(1)}%`} icon={Percent} tone="neutral" hint="FY2026" />
+        <KpiCard label="Net Profit After Tax" value={inr(tx.netProfit, true)} icon={PiggyBank} tone={tx.netProfit > 0 ? "success" : "danger"} hint={`Effective tax ${tx.effectiveRate.toFixed(2)}%`} />
+        <KpiCard label="Net Margin" value={`${((tx.netProfit / t.revenue) * 100).toFixed(1)}%`} icon={Percent} tone="neutral" hint="FY 2026-27" />
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-5">
         <Card className="border-border shadow-card lg:col-span-3">
           <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
             <div>
-              <CardTitle className="text-base">Profit & Loss Statement</CardTitle>
+              <CardTitle className="text-base">Profit & Loss Waterfall</CardTitle>
               <CardDescription>
-                Consolidated, fiscal year 2026 ·{" "}
+                Revenue to net profit ·{" "}
                 {liveCats ? "your expense categories" : "starter expense categories"}
               </CardDescription>
             </div>
@@ -242,30 +273,52 @@ function PnlPage() {
         </Card>
 
         <Card className="border-border shadow-card">
-          <CardHeader>
-            <CardTitle className="text-base">Corporate Tax Computation</CardTitle>
-            <CardDescription>Statutory rate 25% on earnings before tax</CardDescription>
+          <CardHeader className="space-y-3">
+            <div>
+              <CardTitle className="text-base">Corporate Tax Computation</CardTitle>
+              <CardDescription>
+                Base rate, surcharge and 4% health &amp; education cess on taxable profit
+              </CardDescription>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Select value={String(rate)} onValueChange={(v) => setRate(Number(v) as CorporateRate)}>
+                <SelectTrigger className="w-[230px] bg-background" aria-label="Corporate tax rate">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0.25">25% standard domestic rate</SelectItem>
+                  <SelectItem value="0.22">22% concessional (Sec 115BAA)</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={band} onValueChange={(v) => setBand(v as SurchargeBand)}>
+                <SelectTrigger className="w-[190px] bg-background" aria-label="Surcharge band">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Surcharge: automatic</SelectItem>
+                  <SelectItem value="none">No surcharge</SelectItem>
+                  <SelectItem value="7">7% (profit above ₹1 Cr)</SelectItem>
+                  <SelectItem value="12">12% (profit above ₹10 Cr)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent className="space-y-1">
-            <div className="flex justify-between rounded-md px-3 py-2 text-sm">
-              <span className="text-muted-foreground">EBITDA</span>
-              <span className="tabular font-medium">{inr(t.ebitda)}</span>
-            </div>
-            <div className="flex justify-between rounded-md px-3 py-2 text-sm">
-              <span className="text-muted-foreground">Less: depreciation & interest</span>
-              <span className="tabular font-medium">({inr(t.depreciation + t.interest)})</span>
-            </div>
+            {taxRows.slice(0, 7).map(([label, value]) => (
+              <div key={label} className="flex justify-between rounded-md px-3 py-2 text-sm">
+                <span className="text-muted-foreground">{label}</span>
+                <span className="tabular font-medium">{value}</span>
+              </div>
+            ))}
             <div className="flex justify-between rounded-md bg-secondary px-3 py-2 text-sm font-semibold">
-              <span>Earnings before tax (EBT)</span>
-              <span className="tabular">{inr(t.ebitda - t.depreciation - t.interest)}</span>
-            </div>
-            <div className="flex justify-between rounded-md px-3 py-2 text-sm">
-              <span className="text-muted-foreground">Corporate tax @ 25%</span>
-              <span className="tabular font-medium text-danger">({inr(t.tax)})</span>
+              <span>Total tax payable</span>
+              <span className="tabular">
+                {inr(tx.total)} · {tx.effectiveRate.toFixed(2)}% effective
+              </span>
             </div>
             <div className="mt-2 flex justify-between rounded-md bg-primary px-3 py-2 text-sm font-bold text-primary-foreground">
               <span>Net profit after tax</span>
-              <span className="tabular">{inr(t.netProfit)}</span>
+              <span className="tabular">{inr(tx.netProfit)}</span>
             </div>
           </CardContent>
         </Card>

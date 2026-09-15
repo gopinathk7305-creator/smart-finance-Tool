@@ -11,6 +11,7 @@ import {
   PanelLeft,
   Building2,
   ShieldAlert,
+  ShieldCheck,
   Target,
   TrendingUp,
   UploadCloud,
@@ -52,6 +53,7 @@ const NAV = [
   { to: "/pnl", label: "Financial Analysis", icon: TrendingUp },
   { to: "/cashflow", label: "Cash Flow & AR/AP", icon: Wallet },
   { to: "/audit", label: "Internal Audit", icon: ShieldAlert },
+  { to: "/compliance", label: "Compliance & Filings", icon: ShieldCheck },
   { to: "/forecast", label: "Forecasting", icon: LineChart },
   { to: "/reports", label: "Reports & PDF", icon: FileText },
 ] as const;

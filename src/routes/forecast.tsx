@@ -13,7 +13,7 @@ import {
   TrendingUp,
   Wallet,
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -71,10 +71,12 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/lib/auth";
+import { useBudget } from "@/lib/budget";
 import { useCategories } from "@/lib/categories";
+import { CURRENCIES, useFx } from "@/lib/fx";
 import { useDataset } from "@/lib/dataset";
 
-import { downloadCSV, inr } from "@/lib/finance-data";
+import { actualsByCategory, downloadCSV, inr } from "@/lib/finance-data";
 
 import {
   BASE_SCENARIO,
@@ -128,6 +130,9 @@ function ForecastPage() {
   const { session } = useAuth();
   const { payrollNames } = useCategories();
 
+  const fx = useFx();
+  const [newRevenueEntered, setNewRevenueEntered] = useState(0);
+  const [rateDraft, setRateDraft] = useState("");
   const [inputs, setInputs] = useState<ScenarioInputs>(BASE_SCENARIO);
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("profit");
   const [band, setBand] = useState(true);
@@ -164,6 +169,16 @@ function ForecastPage() {
             baseCost: r.baseExpense,
             baseProfit: r.baseProfit,
           })),
+          ...(plannedTotal
+            ? {
+                budget: {
+                  plannedAnnual: plannedTotal,
+                  actualToDate,
+                  forecastSpend: result.spendTotal,
+                  lines: budgetLines,
+                },
+              }
+            : {}),
           ...(focusMonth ? { focusMonth } : {}),
         },
       });
@@ -184,11 +199,32 @@ function ForecastPage() {
   const set = <K extends keyof ScenarioInputs>(key: K, value: ScenarioInputs[K]) =>
     setInputs((prev) => ({ ...prev, [key]: value }));
 
+  // Revenue typed in the selected currency is converted to rupees for the model.
+  useEffect(() => {
+    setInputs((prev) => ({
+      ...prev,
+      newRevenue: Math.round(newRevenueEntered * fx.rate),
+      currency: fx.code,
+      fxRate: fx.rate,
+    }));
+  }, [newRevenueEntered, fx.rate, fx.code]);
+
   const result = useMemo(
     () => runForecast(inputs, txns, pays, payrollNames),
     [inputs, txns, pays, payrollNames],
   );
   const { rows } = result;
+
+  const budget = useBudget(inputs.fy);
+  const actuals = useMemo(() => actualsByCategory(txns), [txns]);
+  const plannedTotal = budget.plannedTotal;
+  const budgetGap = result.spendTotal - plannedTotal;
+  const budgetLines = budget.rows.map((b) => ({
+    category: b.category,
+    planned: b.budgeted_amount,
+    actual: actuals.get(b.category) ?? 0,
+  }));
+  const actualToDate = budgetLines.reduce((s, l) => s + l.actual, 0);
 
   const revDelta = pctChange(result.scenRevenueTotal, result.baseRevenueTotal);
   const profitDelta = pctChange(result.scenProfitTotal, result.baseProfitTotal);
@@ -270,6 +306,18 @@ function ForecastPage() {
         ]),
       },
       {
+        title: "Plan vs Forecast",
+        columns: ["Particulars", "Amount"],
+        numericFrom: 1,
+        rows: [
+          ["Planned budget for the year", inr(plannedTotal)],
+          ["Actual spend to date", inr(actualToDate)],
+          ["Forecast 12-month operating + payroll spend", inr(result.spendTotal)],
+          ["Gap vs plan", `${budgetGap > 0 ? "+" : "-"}${inr(Math.abs(budgetGap))}`],
+          ["Currency basis", fx.note],
+        ],
+      },
+      {
         title: "Scenario Drivers",
         columns: ["Driver", "Setting"],
         rows: [
@@ -281,12 +329,17 @@ function ForecastPage() {
           ["New hires", `${inputs.hires} at ${inr(inputs.avgSalary)} p.a. CTC (incl. PF 12% + ESI 3.25%)`],
           ["CAPEX", inr(inputs.capex)],
           ["DSO", `${inputs.dso} days`],
+          [
+            "New contracted revenue",
+            `${fx.currency.symbol}${newRevenueEntered.toLocaleString("en-IN")} per month${fx.code === "INR" ? "" : ` = ${inr(inputs.newRevenue)}`}`,
+          ],
+          ["Reporting currency basis", fx.note],
         ],
       },
     ],
     facts: `Baseline 12M revenue ${inr(result.baseRevenueTotal)} vs scenario ${inr(result.scenRevenueTotal)} (${revDelta.toFixed(1)}%). Baseline net profit ${inr(result.baseProfitTotal)} vs scenario ${inr(result.scenProfitTotal)} (${profitDelta.toFixed(1)}%). Cash runway ${result.runway.toFixed(1)} months. Drivers: revenue growth ${inputs.revenueGrowth}%, churn ${inputs.churn}%, opex ${inputs.opexAdj}%, ${inputs.hires} hires at ${inr(inputs.avgSalary)} CTC, CAPEX ${inr(inputs.capex)}, DSO ${inputs.dso} days, GST ${inputs.gstRate}%. Monthly detail: ${rows
       .map((r) => `${r.month} rev ${inr(r.scenRevenue, true)} profit ${inr(r.scenProfit, true)} cash ${inr(r.scenCash, true)} runway ${r.runway.toFixed(1)}m`)
-      .join("; ")}. Data source: ${live ? "uploaded ledger" : "demo dataset"}.`,
+      .join("; ")}. Planned budget ${inr(plannedTotal)}, actual spend to date ${inr(actualToDate)}, forecast operating plus payroll spend ${inr(result.spendTotal)}, gap ${inr(budgetGap)}. ${fx.note} Data source: ${live ? "uploaded ledger" : "demo dataset"}.`,
     chartEl: chartRef.current,
   });
 
@@ -426,6 +479,77 @@ function ForecastPage() {
                     suffix="%"
                     onChange={(v) => set("gstRate", v)}
                   />
+
+                  <div className="space-y-2 rounded-md border border-border p-3">
+                    <Label className="text-xs font-semibold">Revenue currency</Label>
+                    <Select value={fx.code} onValueChange={fx.setCode}>
+                      <SelectTrigger className="bg-background" aria-label="Revenue currency">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CURRENCIES.map((c) => (
+                          <SelectItem key={c.code} value={c.code}>
+                            {c.code} — {c.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Label htmlFor="new-revenue" className="text-xs">
+                      New contracted revenue per month ({fx.currency.symbol.trim() || fx.code})
+                    </Label>
+                    <Input
+                      id="new-revenue"
+                      className="bg-background"
+                      placeholder="25000"
+                      value={newRevenueEntered ? String(newRevenueEntered) : ""}
+                      onChange={(e) =>
+                        setNewRevenueEntered(Number(e.target.value.replace(/[^0-9.]/g, "")) || 0)
+                      }
+                    />
+
+                    {fx.code !== "INR" && (
+                      <>
+                        <Label htmlFor="fx-rate" className="text-xs">
+                          1 {fx.code} in rupees
+                        </Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="fx-rate"
+                            className="bg-background"
+                            value={rateDraft || String(fx.rate)}
+                            onChange={(e) => setRateDraft(e.target.value.replace(/[^0-9.]/g, ""))}
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={fx.saving}
+                            onClick={() => {
+                              const value = Number(rateDraft);
+                              if (!value) {
+                                toast.error("Enter a conversion rate greater than zero.");
+                                return;
+                              }
+                              void fx
+                                .setRate(value)
+                                .then(() => {
+                                  setRateDraft("");
+                                  toast.success(`Rate saved — 1 ${fx.code} = ₹${value.toFixed(2)}`);
+                                })
+                                .catch((e: unknown) =>
+                                  toast.error(
+                                    e instanceof Error ? e.message : "Could not save the rate.",
+                                  ),
+                                );
+                            }}
+                          >
+                            Save
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                    <p className="text-[11px] text-muted-foreground">{fx.note}</p>
+                  </div>
                 </AccordionContent>
               </AccordionItem>
 
@@ -509,6 +633,13 @@ function ForecastPage() {
 
         <div className="space-y-4 xl:col-span-3">
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiCard
+              label="Plan vs Forecast Gap"
+              value={`${budgetGap >= 0 ? "+" : "−"}${inr(Math.abs(budgetGap), true)}`}
+              hint={plannedTotal ? `plan ${inr(plannedTotal, true)}` : "no budget entered yet"}
+              icon={Gauge}
+              tone={plannedTotal === 0 ? "neutral" : budgetGap > 0 ? "danger" : "success"}
+            />
             <KpiCard
               label="Projected 12M Revenue"
               value={inr(result.scenRevenueTotal, true)}

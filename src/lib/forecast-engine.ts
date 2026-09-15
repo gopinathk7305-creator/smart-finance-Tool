@@ -44,6 +44,12 @@ export interface ScenarioInputs {
   capex: number;
   dso: number;
   fy: FinancialYear;
+  /** extra contracted revenue per month, already converted to rupees */
+  newRevenue: number;
+  /** currency the new revenue was entered in (reporting only) */
+  currency: string;
+  /** conversion rate used, 1 unit of `currency` in rupees */
+  fxRate: number;
 }
 
 export const BASE_SCENARIO: ScenarioInputs = {
@@ -57,6 +63,9 @@ export const BASE_SCENARIO: ScenarioInputs = {
   capex: 0,
   dso: 30,
   fy: "FY 2026-27",
+  newRevenue: 0,
+  currency: "INR",
+  fxRate: 1,
 };
 
 export const PRESETS: Record<string, Partial<ScenarioInputs>> = {
@@ -97,6 +106,8 @@ export interface ForecastRow {
 
 export interface ForecastResult {
   rows: ForecastRow[];
+  /** total 12-month operating + payroll spend, for budget comparison */
+  spendTotal: number;
   baseRevenueTotal: number;
   scenRevenueTotal: number;
   baseProfitTotal: number;
@@ -174,7 +185,7 @@ export function runForecast(
     const month = FY_MONTHS[i]!;
 
     const baseRevenue = lastRev * Math.pow(1 + gBase, n);
-    const scenRevenue = lastRev * Math.pow(1 + gScen, n);
+    const scenRevenue = lastRev * Math.pow(1 + gScen, n) + inputs.newRevenue;
     const gstOutput = scenRevenue * (inputs.gstRate / 100);
 
     const opex = baseOpex * Math.pow(1 + eScen, n);
@@ -235,6 +246,7 @@ export function runForecast(
 
   return {
     rows,
+    spendTotal: sum((r) => r.opex + r.payroll),
     baseRevenueTotal: sum((r) => r.baseRevenue),
     scenRevenueTotal,
     baseProfitTotal: sum((r) => r.baseProfit),
