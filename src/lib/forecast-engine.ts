@@ -112,11 +112,19 @@ export interface ForecastResult {
   cashImpact: number;
 }
 
-/** Deterministic 12-month Indian-FY scenario model driven by the selected entity's ledger. */
+/**
+ * Deterministic 12-month Indian-FY scenario model driven by the selected entity's ledger.
+ *
+ * @param payrollCategories user-defined expense categories that count as people cost.
+ *   When the ledger carries spend in those categories it defines the payroll baseline,
+ *   so the split between payroll and other operating expenses follows the user's own
+ *   category setup instead of a fixed assumption.
+ */
 export function runForecast(
   inputs: ScenarioInputs,
   txns: Transaction[],
   pays: PayrollRecord[],
+  payrollCategories: string[] = ["Payroll"],
 ): ForecastResult {
   const series = monthlySummary(txns);
   const last = series[series.length - 1]!;

@@ -3,6 +3,7 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Bell,
   Calculator,
+  Tags,
   ChevronLeft,
   FileText,
   LayoutDashboard,
@@ -45,6 +46,7 @@ const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/users", label: "Users & Activity", icon: Users },
   { to: "/upload", label: "Data Upload", icon: UploadCloud },
+  { to: "/categories", label: "Expense Categories", icon: Tags },
   { to: "/payroll", label: "Payroll & Tax", icon: Calculator },
   { to: "/budget", label: "Budget vs Actual", icon: Target },
   { to: "/pnl", label: "Financial Analysis", icon: TrendingUp },
