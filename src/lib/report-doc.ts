@@ -223,14 +223,27 @@ export async function generateReportPdf(spec: ReportSpec, narrative: ReportNarra
       const tableW = W - M * 2;
       const numericFrom = table.numericFrom ?? cols;
       const labelCols = Math.max(numericFrom, 1);
-      const numCols = cols - labelCols;
-      // give label columns more room, numeric columns a consistent width
-      const numW = numCols > 0 ? Math.min(96, (tableW * 0.62) / numCols) : 0;
-      const labelW = (tableW - numW * numCols) / labelCols;
-      const xAt = (i: number) => (i < labelCols ? M + i * labelW : M + labelCols * labelW + (i - labelCols) * numW);
-      const wAt = (i: number) => (i < labelCols ? labelW : numW);
       const rowH = 19;
       const PAD = 8;
+      const BODY_FS = 8.5;
+
+      // measure the widest content in each column so numbers never get clipped
+      const need = table.columns.map((c, i) => {
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(8);
+        let w = pdf.getTextWidth(pdfSafe(c));
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(BODY_FS);
+        for (const r of table.rows) w = Math.max(w, pdf.getTextWidth(pdfSafe(r[i])));
+        return w + PAD * 2;
+      });
+      const needed = need.reduce((a, b) => a + b, 0);
+      const widths =
+        needed <= tableW
+          ? need.map((w, i) => (i < labelCols ? w + (tableW - needed) / labelCols : w))
+          : need.map((w) => (w / needed) * tableW);
+      const xAt = (i: number) => M + widths.slice(0, i).reduce((a, b) => a + b, 0);
+      const wAt = (i: number) => widths[i] ?? 0;
 
       const drawHead = () => {
         pdf.setFillColor(...NAVY);
