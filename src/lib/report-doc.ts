@@ -242,13 +242,14 @@ export async function generateReportPdf(spec: ReportSpec, narrative: ReportNarra
       const needed = need.reduce((a, b) => a + b, 0);
       const minimums = table.columns.map((_, i) => (i < labelCols ? 42 : 54));
       const minimumTotal = minimums.reduce((a, b) => a + b, 0);
+      const extraNeeds = need.map((w, i) => Math.max(0, w - (minimums[i] ?? 42)));
+      const extraNeedTotal = Math.max(1, extraNeeds.reduce((a, b) => a + b, 0));
       const widths = needed <= tableW
         ? need.map((w, i) => (i < labelCols ? w + (tableW - needed) / labelCols : w))
         : need.map((w, i) => {
             const distributable = Math.max(0, tableW - minimumTotal);
-            const weightTotal = Math.max(1, needed - minimumTotal);
             const minimum = minimums[i] ?? 42;
-            return minimum + (Math.max(0, w - minimum) / weightTotal) * distributable;
+            return minimum + ((extraNeeds[i] ?? 0) / extraNeedTotal) * distributable;
           });
       const xAt = (i: number) => M + widths.slice(0, i).reduce((a, b) => a + b, 0);
       const wAt = (i: number) => widths[i] ?? 0;
