@@ -4,6 +4,7 @@ import { useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { ALL, demoDatasetFor, useOrg } from "@/lib/orgs";
+import { useActiveDataset } from "@/lib/active-dataset";
 import {
   type ArApRecord,
   type BudgetTarget,
