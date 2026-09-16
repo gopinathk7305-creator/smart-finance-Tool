@@ -378,7 +378,13 @@ export interface StreamProgress {
   etaSeconds: number | null;
 }
 
-/** Header normalisation — runs on the main thread, never inside the worker config. */
+const yieldToBrowser = () =>
+  new Promise<void>((resolve) => {
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => resolve());
+    else setTimeout(resolve, 0);
+  });
+
+/** Header normalisation runs after each local file chunk is read. */
 const normaliseHeader = (h: string) => h.trim().toLowerCase().replace(/\s+/g, "_");
 
 /** Rewrites each parsed row's keys to normalised headers (worker results arrive raw). */
@@ -393,57 +399,96 @@ function normaliseRows(rows: Record<string, unknown>[]): Record<string, string>[
 }
 
 /**
- * Streams a CSV in 5,000-row chunks inside a Web Worker so the UI thread never
- * blocks on 50,000+ row files. Excel files fall back to the buffered reader.
- *
- * NOTE: PapaParse posts the options object to the worker and only strips
- * step/chunk/complete/error — inline helpers like `transformHeader` would fail
- * with "function could not be cloned". So the worker config stays free of any
- * function values and headers are sanitised in the chunk/complete callbacks
- * after the worker finishes parsing.
+ * Reads local files without a Web Worker. PapaParse uses FileReader slices for
+ * CSV input; each callback is split into small row blocks and explicitly yields
+ * so React can paint progress. Excel worksheets are mapped in bounded ranges.
  */
 export async function streamTabular(
   file: File,
   onProgress: (p: StreamProgress) => void,
-  chunkSize = 2000,
+  chunkSize = 1000,
 ): Promise<Record<string, string>[]> {
   if (!/\.csv$/i.test(file.name)) {
-    const rows = await readTabular(file);
-    onProgress({ phase: "parsing", rows: rows.length, bytesDone: file.size, bytesTotal: file.size, etaSeconds: 0 });
-    return rows;
+    if (!/\.xlsx?$/i.test(file.name)) throw new Error("Unsupported file — upload .csv, .xls or .xlsx");
+    const XLSX = await import("xlsx");
+    const started = Date.now();
+    const buffer = await file.arrayBuffer();
+    await yieldToBrowser();
+    const wb = XLSX.read(buffer, { type: "array", cellDates: true });
+    const sheet = wb.Sheets[wb.SheetNames[0] ?? ""];
+    if (!sheet || !sheet["!ref"]) return [];
+    const range = XLSX.utils.decode_range(sheet["!ref"]);
+    const headerRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+      header: 1,
+      range: { s: { r: range.s.r, c: range.s.c }, e: { r: range.s.r, c: range.e.c } },
+      blankrows: false,
+      defval: "",
+    });
+    const headers = (headerRows[0] ?? []).map((h) => normaliseHeader(String(h ?? "")));
+    const all: Record<string, string>[] = [];
+    const dataStart = range.s.r + 1;
+    const totalRows = Math.max(0, range.e.r - range.s.r);
+    for (let start = dataStart; start <= range.e.r; start += chunkSize) {
+      const end = Math.min(range.e.r, start + chunkSize - 1);
+      const values = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+        header: 1,
+        range: { s: { r: start, c: range.s.c }, e: { r: end, c: range.e.c } },
+        blankrows: false,
+        defval: "",
+        raw: false,
+      });
+      for (const valuesRow of values) {
+        const row: Record<string, string> = {};
+        headers.forEach((header, index) => {
+          if (header) row[header] = String(valuesRow[index] ?? "");
+        });
+        if (Object.values(row).some((value) => value !== "")) all.push(row);
+      }
+      const elapsed = (Date.now() - started) / 1000;
+      const done = Math.min(totalRows, end - range.s.r);
+      const ratio = totalRows > 0 ? done / totalRows : 1;
+      onProgress({
+        phase: "parsing",
+        rows: all.length,
+        bytesDone: Math.round(file.size * ratio),
+        bytesTotal: file.size,
+        etaSeconds: ratio > 0 ? Math.max(0, elapsed / ratio - elapsed) : null,
+      });
+      await yieldToBrowser();
+    }
+    return all;
   }
 
   const Papa = (await import("papaparse")).default;
   const started = Date.now();
   const all: Record<string, string>[] = [];
-  let lastTick = 0;
 
   return new Promise((resolve, reject) => {
     Papa.parse<Record<string, string>>(file, {
       header: true,
       skipEmptyLines: true,
-      worker: true,
-      // Bytes per worker chunk — roughly `chunkSize` rows of a typical ledger row.
-      chunkSize: Math.max(256 * 1024, chunkSize * 150),
-      chunk: (results) => {
-        // Headers are normalised exactly once, here — never again on completion.
-        for (const row of normaliseRows(results.data)) {
-          if (row && Object.keys(row).length) all.push(row);
-        }
-        const bytesDone = results.meta.cursor || 0;
-        const now = Date.now();
-        // Throttled so React re-renders at most ~7x/second instead of per chunk.
-        if (now - lastTick < 150) return;
-        lastTick = now;
-        const elapsed = (now - started) / 1000;
-        const ratio = file.size > 0 ? bytesDone / file.size : 1;
-        onProgress({
-          phase: "parsing",
-          rows: all.length,
-          bytesDone,
-          bytesTotal: file.size,
-          etaSeconds: ratio > 0.02 && elapsed > 0.4 ? Math.max(0, elapsed / ratio - elapsed) : null,
-        });
+      worker: false,
+      chunkSize: 256 * 1024,
+      chunk: (results, parser) => {
+        parser.pause();
+        void (async () => {
+          for (let offset = 0; offset < results.data.length; offset += chunkSize) {
+            const block = normaliseRows(results.data.slice(offset, offset + chunkSize));
+            for (const row of block) if (Object.keys(row).length) all.push(row);
+            const bytesDone = results.meta.cursor || 0;
+            const elapsed = (Date.now() - started) / 1000;
+            const ratio = file.size > 0 ? bytesDone / file.size : 1;
+            onProgress({
+              phase: "parsing",
+              rows: all.length,
+              bytesDone,
+              bytesTotal: file.size,
+              etaSeconds: ratio > 0.02 ? Math.max(0, elapsed / ratio - elapsed) : null,
+            });
+            await yieldToBrowser();
+          }
+          parser.resume();
+        })().catch(reject);
       },
       complete: () => {
         onProgress({
@@ -458,4 +503,26 @@ export async function streamTabular(
       error: (err: Error) => reject(err),
     });
   });
+}
+
+export async function runEtlChunked(
+  key: DatasetKey,
+  raw: Record<string, string>[],
+  userId: string,
+  fileName: string,
+  autoFix: boolean,
+  onProgress?: (done: number, total: number) => void,
+  chunkSize = 1000,
+): Promise<EtlResult> {
+  const result: EtlResult = { fileName, rows: [], issues: [], preview: [], total: raw.length, clean: 0 };
+  for (let start = 0; start < raw.length; start += chunkSize) {
+    const part = runEtl(key, raw.slice(start, start + chunkSize), userId, fileName, autoFix);
+    result.rows.push(...part.rows);
+    result.issues.push(...part.issues.map((issue) => ({ ...issue, row: issue.row + start })));
+    if (result.preview.length < 10) result.preview.push(...part.preview.slice(0, 10 - result.preview.length));
+    result.clean += part.clean;
+    onProgress?.(Math.min(raw.length, start + chunkSize), raw.length);
+    await yieldToBrowser();
+  }
+  return result;
 }
