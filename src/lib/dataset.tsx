@@ -100,7 +100,7 @@ export function useDataset(): Dataset {
   }, [user, refresh]);
 
   const fallback = user ? localFallbacks.get(user.id) : undefined;
-  const combined = data
+  const combinedRaw = data
     ? {
         t: mergeRows(data.t, fallback?.t),
         p: mergeRows(data.p, fallback?.p),
