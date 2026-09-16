@@ -53,6 +53,7 @@ export type Database = {
           invoice_date: string | null
           org_id: string | null
           party_name: string
+          raw_data: Json
           source_file: string
           status: string
           type: string
@@ -66,6 +67,7 @@ export type Database = {
           invoice_date?: string | null
           org_id?: string | null
           party_name?: string
+          raw_data?: Json
           source_file?: string
           status?: string
           type?: string
@@ -79,6 +81,7 @@ export type Database = {
           invoice_date?: string | null
           org_id?: string | null
           party_name?: string
+          raw_data?: Json
           source_file?: string
           status?: string
           type?: string
@@ -159,6 +162,7 @@ export type Database = {
           fiscal_year: string
           id: string
           org_id: string | null
+          raw_data: Json
           source_file: string
           user_id: string
         }
@@ -170,6 +174,7 @@ export type Database = {
           fiscal_year?: string
           id?: string
           org_id?: string | null
+          raw_data?: Json
           source_file?: string
           user_id: string
         }
@@ -181,6 +186,7 @@ export type Database = {
           fiscal_year?: string
           id?: string
           org_id?: string | null
+          raw_data?: Json
           source_file?: string
           user_id?: string
         }
@@ -401,6 +407,7 @@ export type Database = {
           name: string
           org_id: string | null
           pf_deduction: number
+          raw_data: Json
           source_file: string
           tds_deduction: number
           user_id: string
@@ -417,6 +424,7 @@ export type Database = {
           name?: string
           org_id?: string | null
           pf_deduction?: number
+          raw_data?: Json
           source_file?: string
           tds_deduction?: number
           user_id: string
@@ -433,6 +441,7 @@ export type Database = {
           name?: string
           org_id?: string | null
           pf_deduction?: number
+          raw_data?: Json
           source_file?: string
           tds_deduction?: number
           user_id?: string
@@ -484,6 +493,7 @@ export type Database = {
           created_at: string
           id: string
           org_id: string | null
+          raw_data: Json
           source_file: string
           status: string
           subcategory: string
@@ -498,6 +508,7 @@ export type Database = {
           created_at?: string
           id?: string
           org_id?: string | null
+          raw_data?: Json
           source_file?: string
           status?: string
           subcategory?: string
@@ -512,6 +523,7 @@ export type Database = {
           created_at?: string
           id?: string
           org_id?: string | null
+          raw_data?: Json
           source_file?: string
           status?: string
           subcategory?: string
