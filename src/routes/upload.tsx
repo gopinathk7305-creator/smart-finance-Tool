@@ -385,8 +385,10 @@ function UploadPage() {
       return;
     }
     await supabase.from("uploaded_datasets").delete().eq("id", ds.id);
+    if (activeId === ds.id) setActiveId(null);
     refresh();
     void stored.refetch();
+    refreshDatasets();
     toast.success(`${ds.file_name} purged from cloud storage`);
   };
 
