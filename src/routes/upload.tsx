@@ -12,7 +12,7 @@ import {
   UploadCloud,
   XCircle,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/finance/AppShell";
@@ -846,9 +846,9 @@ function UploadPage() {
           <DialogHeader>
             <DialogTitle>{viewer?.file_name}</DialogTitle>
             <DialogDescription>
-              {viewerRows.isLoading
-                ? "Loading rows from cloud storage…"
-                : `${filteredRows.length.toLocaleString("en-IN")} of ${(viewerRows.data ?? []).length.toLocaleString("en-IN")} stored rows`}
+              {rowsError
+                ? `Could not load rows: ${rowsError}`
+                : `${filteredRows.length.toLocaleString("en-IN")} of ${viewerBase.length.toLocaleString("en-IN")} stored rows${loadingRows ? " · still loading more…" : ""}`}
             </DialogDescription>
           </DialogHeader>
 
@@ -943,8 +943,8 @@ function UploadPage() {
 
           {viewerCols.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border py-12 text-center text-sm text-muted-foreground">
-              {viewerRows.isLoading
-                ? "Loading…"
+              {loadingRows
+                ? "Loading first rows…"
                 : allViewerCols.length
                   ? "Every column is hidden. Use the columns filter to show some."
                   : "No rows stored for this dataset."}
