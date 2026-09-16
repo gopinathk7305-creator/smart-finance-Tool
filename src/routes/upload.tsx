@@ -98,6 +98,67 @@ interface StoredDataset {
   created_at: string;
 }
 
+const DATE_COL = /(date|_at|period|month)/i;
+
+interface RowHealth {
+  empty: number;
+  badDates: number;
+  untrimmed: number;
+  total: number;
+}
+
+/** Counts empty cells, unparseable dates and padded strings across every column. */
+function auditRows(
+  rows: Record<string, unknown>[],
+  cols: string[],
+  numeric: Set<string>,
+): RowHealth {
+  let empty = 0;
+  let badDates = 0;
+  let untrimmed = 0;
+  rows.forEach((r) => {
+    cols.forEach((c) => {
+      const v = r[c];
+      if (v === null || v === undefined || v === "") {
+        empty += 1;
+        return;
+      }
+      if (typeof v === "string") {
+        if (v !== v.trim()) untrimmed += 1;
+        if (DATE_COL.test(c) && Number.isNaN(new Date(v.trim()).getTime())) badDates += 1;
+      }
+    });
+  });
+  void numeric;
+  return { empty, badDates, untrimmed, total: rows.length * Math.max(1, cols.length) };
+}
+
+/** Trims text, blanks unparseable dates and fills empty numeric cells with 0. */
+function autoFixRows(
+  rows: Record<string, unknown>[],
+  cols: string[],
+  numeric: Set<string>,
+): Record<string, unknown>[] {
+  return rows.map((r) => {
+    const out: Record<string, unknown> = { ...r };
+    cols.forEach((c) => {
+      const v = out[c];
+      if (typeof v === "string") {
+        const t = v.trim();
+        if (DATE_COL.test(c) && t && Number.isNaN(new Date(t).getTime())) {
+          out[c] = "";
+          return;
+        }
+        out[c] = t;
+      }
+      if (out[c] === null || out[c] === undefined || out[c] === "") {
+        if (numeric.has(c)) out[c] = 0;
+      }
+    });
+    return out;
+  });
+}
+
 function UploadPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
