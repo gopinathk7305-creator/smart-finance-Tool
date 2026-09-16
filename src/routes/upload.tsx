@@ -795,6 +795,14 @@ function UploadPage() {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
+            {viewer &&
+              (activeId === viewer.id ? (
+                <Badge className="bg-success-soft text-success">Active / Loaded</Badge>
+              ) : (
+                <Button size="sm" variant="outline" onClick={() => activate(viewer.id)}>
+                  <Database className="size-4" /> Activate this dataset
+                </Button>
+              ))}
             <Badge variant="secondary" className="ml-auto tabular">
               Showing {filteredRows.length.toLocaleString("en-IN")} rows ·{" "}
               {viewerCols.length} of {allViewerCols.length} columns
