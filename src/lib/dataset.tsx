@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -40,6 +40,36 @@ async function fetchDataset() {
   };
 }
 
+type CloudDataset = Awaited<ReturnType<typeof fetchDataset>>;
+type DatasetBucket = keyof CloudDataset;
+const localFallbacks = new Map<string, Partial<CloudDataset>>();
+
+const mergeRows = <T extends { id?: string }>(cloud: T[], local: T[] = []) => {
+  const ids = new Set(cloud.map((row) => row.id).filter(Boolean));
+  return [...cloud, ...local.filter((row) => !row.id || !ids.has(row.id))];
+};
+
+export function cacheLocalDatasetRows(
+  queryClient: QueryClient,
+  userId: string,
+  bucket: DatasetBucket,
+  rows: Record<string, unknown>[],
+) {
+  const current = localFallbacks.get(userId) ?? {};
+  localFallbacks.set(userId, { ...current, [bucket]: rows });
+  queryClient.setQueryData<CloudDataset>(["dataset", userId], (cloud) => {
+    const base = cloud ?? { t: [], p: [], b: [], a: [] };
+    return { ...base, [bucket]: mergeRows(base[bucket] as never[], rows as never[]) } as CloudDataset;
+  });
+}
+
+export function clearLocalDatasetRows(userId: string, bucket: DatasetBucket) {
+  const current = localFallbacks.get(userId);
+  if (!current) return;
+  delete current[bucket];
+  if (!Object.keys(current).length) localFallbacks.delete(userId);
+}
+
 export function useDataset(): Dataset {
   const { user } = useAuth();
   const { orgId, vendor } = useOrg();
@@ -69,9 +99,20 @@ export function useDataset(): Dataset {
     };
   }, [user, refresh]);
 
-  const rowCount = data ? data.t.length + data.p.length + data.b.length + data.a.length : 0;
+  const fallback = user ? localFallbacks.get(user.id) : undefined;
+  const combined = data
+    ? {
+        t: mergeRows(data.t, fallback?.t),
+        p: mergeRows(data.p, fallback?.p),
+        b: mergeRows(data.b, fallback?.b),
+        a: mergeRows(data.a, fallback?.a),
+      }
+    : fallback
+      ? { t: fallback.t ?? [], p: fallback.p ?? [], b: fallback.b ?? [], a: fallback.a ?? [] }
+      : undefined;
+  const rowCount = combined ? combined.t.length + combined.p.length + combined.b.length + combined.a.length : 0;
 
-  if (!data || rowCount === 0) {
+  if (!combined || rowCount === 0) {
     const demo = demoDatasetFor(orgId);
     const vendors = uniqueVendors(demo.txns, demo.araps);
     return {
@@ -89,7 +130,7 @@ export function useDataset(): Dataset {
   const inOrg = <T extends { org_id?: string | null }>(rows: T[]) =>
     orgId === ALL ? rows : rows.filter((r) => r.org_id === orgId);
 
-  const txns: Transaction[] = inOrg(data.t).map((r) => ({
+  const txns: Transaction[] = inOrg(combined.t).map((r) => ({
     id: r.id,
     date: r.txn_date,
     category: r.category,
@@ -100,7 +141,7 @@ export function useDataset(): Dataset {
     status: r.status === "pending" ? "pending" : "paid",
   }));
 
-  const pays: PayrollRecord[] = inOrg(data.p).map((r) => ({
+  const pays: PayrollRecord[] = inOrg(combined.p).map((r) => ({
     id: r.id,
     month_year: r.month_year,
     employee_id: r.employee_id,
@@ -113,7 +154,7 @@ export function useDataset(): Dataset {
     tds_deduction: Number(r.tds_deduction),
   }));
 
-  const buds: BudgetTarget[] = inOrg(data.b).map((r) => ({
+  const buds: BudgetTarget[] = inOrg(combined.b).map((r) => ({
     id: r.id,
     fiscal_year: r.fiscal_year,
     category: r.category,
@@ -121,7 +162,7 @@ export function useDataset(): Dataset {
     budgeted_amount: Number(r.budgeted_amount),
   }));
 
-  const araps: ArApRecord[] = inOrg(data.a).map((r) => ({
+  const araps: ArApRecord[] = inOrg(combined.a).map((r) => ({
     id: r.id,
     type: r.type === "AP" ? "AP" : "AR",
     party_name: r.party_name,
