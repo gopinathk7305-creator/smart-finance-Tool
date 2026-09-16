@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -40,14 +40,15 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { logActivity, useAuth } from "@/lib/auth";
 import { ALL, useOrg } from "@/lib/orgs";
-import { useDataset } from "@/lib/dataset";
+import { cacheLocalDatasetRows, clearLocalDatasetRows, useDataset } from "@/lib/dataset";
 import { useInsights } from "@/lib/insights";
 import { VirtualTable } from "@/components/finance/VirtualTable";
-import { type EtlResult, issueTone, runEtl, streamTabular } from "@/lib/etl";
+import { type EtlResult, issueTone, runEtlChunked, streamTabular } from "@/lib/etl";
 import { detectSchema, type Detection } from "@/lib/schema-detect";
 
-const BATCH_SIZE = 2000;
+const BATCH_SIZE = 1000;
 const MAX_CONCURRENT = 3;
+const CLOUD_TIMEOUT_MS = 5000;
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
 export const Route = createFileRoute("/upload")({
@@ -88,6 +89,7 @@ interface StoredDataset {
 
 function UploadPage() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { refresh, live } = useDataset();
   const { orgId, liveOrgs, orgName } = useOrg();
@@ -158,13 +160,31 @@ function UploadPage() {
 
   /* ------------------------------------------------ ingestion */
 
-  const runPipeline = (
+  const runPipeline = async (
     det: Detection,
     raw: Record<string, string>[],
     fileName: string,
     autoFixMode: boolean,
   ) => {
-    const result = runEtl(det.key, raw, user!.id, fileName, autoFixMode);
+    if (!user) throw new Error("Sign in to process this file.");
+    const started = Date.now();
+    const result = await runEtlChunked(
+      det.key,
+      raw,
+      user.id,
+      fileName,
+      autoFixMode,
+      (done, total) => {
+        const ratio = done / Math.max(1, total);
+        const elapsed = (Date.now() - started) / 1000;
+        setProgress({
+          label: `Cleaning data… ${done.toLocaleString("en-IN")} of ${total.toLocaleString("en-IN")} rows`,
+          pct: ratio * 100,
+          eta: ratio > 0 ? `~${Math.ceil(Math.max(0, elapsed / ratio - elapsed))}s remaining` : "",
+        });
+      },
+      BATCH_SIZE,
+    );
     const rows = scopeOrgId ? result.rows.map((r) => ({ ...r, org_id: scopeOrgId })) : result.rows;
     const withOrg = { ...result, rows };
     setParsed(withOrg);
@@ -212,14 +232,15 @@ function UploadPage() {
     setDetection(det);
     setRawCache(raw);
     setFixed(false);
-    runPipeline(det, raw, file.name, false);
+    await runPipeline(det, raw, file.name, false);
     setProgress(null);
     setMappedOpen(true);
   };
 
-  const autoFix = () => {
+  const autoFix = async () => {
     if (!rawCache || !parsed || !detection) return;
-    const result = runPipeline(detection, rawCache, parsed.fileName, true);
+    const result = await runPipeline(detection, rawCache, parsed.fileName, true);
+    setProgress(null);
     setFixed(true);
     toast.success(`Auto-fix applied — ${result.clean} of ${result.total} rows ready to sync`);
   };
@@ -227,15 +248,17 @@ function UploadPage() {
   const commit = async () => {
     if (!parsed || !detection || !parsed.rows.length || !user) return;
     setCommitting(true);
+    const rowsWithIds = parsed.rows.map((row) => ({ ...row, id: String(row["id"] ?? crypto.randomUUID()) }));
     const batches: Record<string, unknown>[][] = [];
-    for (let i = 0; i < parsed.rows.length; i += BATCH_SIZE)
-      batches.push(parsed.rows.slice(i, i + BATCH_SIZE));
+    for (let i = 0; i < rowsWithIds.length; i += BATCH_SIZE)
+      batches.push(rowsWithIds.slice(i, i + BATCH_SIZE));
 
     const started = Date.now();
     const total = batches.length;
     let completed = 0;
     let lastTick = 0;
     let failure: string | null = null;
+    let timedOut = false;
 
     const tick = (force = false) => {
       const now = Date.now();
@@ -251,36 +274,54 @@ function UploadPage() {
     };
     tick(true);
 
-    // Up to MAX_CONCURRENT bulk inserts in flight; each batch is a single payload.
+    const bucket = detection.key === "transactions" ? "t" : detection.key === "payroll" ? "p" : detection.key === "budget" ? "b" : "a";
+
+    // Up to three 1,000-row upserts run together. A five-second race keeps the UI usable.
     let cursor = 0;
     const worker = async () => {
       while (cursor < total && !failure) {
         const index = cursor;
         cursor += 1;
         const batch = batches[index]!;
-        const { error } = await supabase.from(detection.table).insert(batch as never);
-        batches[index] = [];
-        if (error) {
-          failure = error.message;
+        try {
+          const request = supabase.from(detection.table).upsert(batch as never, { onConflict: "id" });
+          const result = await Promise.race([
+            request,
+            new Promise<never>((_, reject) =>
+              window.setTimeout(() => reject(new Error("Cloud sync exceeded 5 seconds")), CLOUD_TIMEOUT_MS),
+            ),
+          ]);
+          batches[index] = [];
+          if (result.error) throw result.error;
+          completed += 1;
+          tick();
+        } catch (error) {
+          timedOut = error instanceof Error && error.message.includes("exceeded 5 seconds");
+          failure = error instanceof Error ? error.message : "Cloud sync failed";
           return;
         }
-        completed += 1;
-        tick();
       }
     };
     await Promise.all(Array.from({ length: Math.min(MAX_CONCURRENT, total) }, worker));
 
     if (failure) {
+      cacheLocalDatasetRows(queryClient, user.id, bucket, rowsWithIds);
       setCommitting(false);
       setProgress(null);
-      toast.error(failure);
+      setMappedOpen(false);
+      toast.warning(
+        timedOut
+          ? "Cloud sync is slow. Your data is available locally across every module now."
+          : `Cloud sync failed (${failure}). Your data is available locally across every module.`,
+      );
+      window.setTimeout(() => openInsights(parsed.fileName), 300);
       return;
     }
     completed = total;
     tick(true);
 
 
-    await supabase.from("uploaded_datasets").insert({
+    const { error: metadataError } = await supabase.from("uploaded_datasets").insert({
       user_id: user.id,
       org_id: scopeOrgId,
       file_name: parsed.fileName,
@@ -291,7 +332,9 @@ function UploadPage() {
       modules: detection.modules,
       status: "synced",
     } as never);
+    if (metadataError) toast.warning(`Rows synced, but dataset history could not be saved: ${metadataError.message}`);
 
+    clearLocalDatasetRows(user.id, bucket);
     setCommitting(false);
     setProgress(null);
     await logActivity(`Synced ${parsed.rows.length} clean ${detection.label} rows to cloud`, "Data Upload");
@@ -642,7 +685,7 @@ function UploadPage() {
           )}
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={autoFix} disabled={!parsed || fixed || errors.length === 0}>
+             <Button variant="outline" onClick={() => void autoFix()} disabled={!parsed || fixed || errors.length === 0}>
               <Sparkles className="size-4" /> Auto-fix errors
             </Button>
             <Button variant="outline" onClick={() => void navigate({ to: "/" })}>
