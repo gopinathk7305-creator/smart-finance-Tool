@@ -156,6 +156,45 @@ export function AppShell({
 
           <div className="ml-auto flex items-center gap-2">
             <Select
+              value={preset}
+              onValueChange={(v) => setPreset(v as RangePreset)}
+            >
+              <SelectTrigger className="w-[150px] bg-background font-medium sm:w-[190px]">
+                <CalendarRange className="size-4 text-primary" />
+                <SelectValue placeholder="Date range" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All time</SelectItem>
+                <SelectItem value="fy-current">{fyLabel(fy)}</SelectItem>
+                <SelectItem value="fy-previous">{fyLabel(fy - 1)}</SelectItem>
+                <SelectItem value="ytd">YTD {fyLabel(fy)}</SelectItem>
+                <SelectItem value="q1">Q1 (Apr–Jun)</SelectItem>
+                <SelectItem value="q2">Q2 (Jul–Sep)</SelectItem>
+                <SelectItem value="q3">Q3 (Oct–Dec)</SelectItem>
+                <SelectItem value="q4">Q4 (Jan–Mar)</SelectItem>
+                <SelectItem value="custom">Custom date range</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {preset === "custom" && (
+              <div className="hidden items-center gap-1 lg:flex">
+                <Input
+                  type="date"
+                  value={custom.start}
+                  onChange={(e) => setCustom({ ...custom, start: e.target.value })}
+                  className="h-9 w-[140px]"
+                />
+                <span className="text-xs text-muted-foreground">to</span>
+                <Input
+                  type="date"
+                  value={custom.end}
+                  onChange={(e) => setCustom({ ...custom, end: e.target.value })}
+                  className="h-9 w-[140px]"
+                />
+              </div>
+            )}
+
+            <Select
               value={activeId ?? ALL}
               onValueChange={(v) => {
                 const id = v === ALL ? null : v;
