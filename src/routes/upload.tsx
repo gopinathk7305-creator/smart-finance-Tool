@@ -588,6 +588,19 @@ function UploadPage() {
                         <Badge className="bg-success-soft text-success">{ds.status}</Badge>
                       </TableCell>
                       <TableCell className="space-x-1 text-right">
+                        {activeId === ds.id ? (
+                          <Button
+                            size="sm"
+                            className="bg-success text-success-foreground hover:bg-success/90"
+                            onClick={() => activate(null)}
+                          >
+                            <CheckCircle2 className="size-4" /> Active / Loaded
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="outline" onClick={() => activate(ds.id)}>
+                            <Database className="size-4" /> Switch to this
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
