@@ -378,9 +378,29 @@ export interface StreamProgress {
   etaSeconds: number | null;
 }
 
+/** Header normalisation — runs on the main thread, never inside the worker config. */
+const normaliseHeader = (h: string) => h.trim().toLowerCase().replace(/\s+/g, "_");
+
+/** Rewrites each parsed row's keys to normalised headers (worker results arrive raw). */
+function normaliseRows(rows: Record<string, unknown>[]): Record<string, string>[] {
+  return rows.map((row) => {
+    const out: Record<string, string> = {};
+    Object.entries(row).forEach(([k, v]) => {
+      out[normaliseHeader(String(k))] = v == null ? "" : String(v);
+    });
+    return out;
+  });
+}
+
 /**
  * Streams a CSV in 5,000-row chunks inside a Web Worker so the UI thread never
  * blocks on 50,000+ row files. Excel files fall back to the buffered reader.
+ *
+ * NOTE: PapaParse posts the options object to the worker and only strips
+ * step/chunk/complete/error — inline helpers like `transformHeader` would fail
+ * with "function could not be cloned". So the worker config stays free of any
+ * function values and headers are sanitised in the chunk/complete callbacks
+ * after the worker finishes parsing.
  */
 export async function streamTabular(
   file: File,
@@ -403,9 +423,8 @@ export async function streamTabular(
       skipEmptyLines: true,
       worker: true,
       chunkSize: chunkSize * 120,
-      transformHeader: (h) => h.trim().toLowerCase().replace(/\s+/g, "_"),
-      chunk: (results, parser) => {
-        for (const row of results.data) {
+      chunk: (results) => {
+        for (const row of normaliseRows(results.data)) {
           if (row && Object.keys(row).length) all.push(row);
         }
         const bytesDone = results.meta.cursor || 0;
@@ -418,9 +437,8 @@ export async function streamTabular(
           bytesTotal: file.size,
           etaSeconds: ratio > 0.02 && elapsed > 0.4 ? Math.max(0, elapsed / ratio - elapsed) : null,
         });
-        void parser;
       },
-      complete: () => resolve(all),
+      complete: () => resolve(normaliseRows(all)),
       error: (err: Error) => reject(err),
     });
   });
