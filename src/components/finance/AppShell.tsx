@@ -26,6 +26,9 @@ import { useActiveDataset } from "@/lib/active-dataset";
 
 import { AiInsightsDock } from "@/components/finance/AiInsightsDock";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { fiscalYearStart, fyLabel, useWorkspace, type RangePreset } from "@/lib/workspace";
+import { useDataset } from "@/lib/dataset";
 import {
   Select,
   SelectContent,
