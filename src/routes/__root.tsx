@@ -137,6 +137,7 @@ function RootComponent() {
             <Outlet />
             <Toaster position="top-right" richColors />
           </InsightsProvider>
+          </ActiveDatasetProvider>
         </OrgProvider>
       </AuthProvider>
     </QueryClientProvider>
