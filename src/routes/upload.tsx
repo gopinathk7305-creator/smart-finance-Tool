@@ -200,29 +200,54 @@ function UploadPage() {
     },
   });
 
-  const viewerRows = useQuery({
-    queryKey: ["dataset-rows", viewer?.id ?? "none"],
-    enabled: !!viewer && !!user,
-    queryFn: async () => {
-      const rows = await fetchAllRows<Record<string, unknown>>((from, to) => {
-        let q = supabase
-          .from(viewer!.table_name)
-          .select("*")
-          .eq("user_id", user!.id)
-          .eq("source_file", viewer!.file_name)
-          .range(from, to);
-        if (scopeOrgId) q = q.eq("org_id", scopeOrgId);
-        return q as unknown as PromiseLike<{
-          data: Record<string, unknown>[] | null;
-          error: { message: string } | null;
-        }>;
-      });
-      // Original upload columns live in raw_data; merge them back so all 39+ render.
-      return rows.map(withRawColumns);
-    },
-  });
+  // Rows stream in page by page so the grid shows data immediately even for
+  // 50,000-row files instead of waiting for every page.
+  const [loadedRows, setLoadedRows] = useState<Record<string, unknown>[]>([]);
+  const [loadingRows, setLoadingRows] = useState(false);
+  const [rowsError, setRowsError] = useState<string | null>(null);
 
-  const viewerBase = fixedRows ?? viewerRows.data ?? [];
+  useEffect(() => {
+    if (!viewer || !user) {
+      setLoadedRows([]);
+      setLoadingRows(false);
+      setRowsError(null);
+      return;
+    }
+    let cancelled = false;
+    const PAGE = 2000;
+    setLoadedRows([]);
+    setRowsError(null);
+    setLoadingRows(true);
+
+    void (async () => {
+      try {
+        for (let from = 0; from < 200_000; from += PAGE) {
+          const { data, error } = await supabase
+            .from(viewer.table_name)
+            .select("*")
+            .eq("user_id", user.id)
+            .eq("source_file", viewer.file_name)
+            .range(from, from + PAGE - 1);
+          if (cancelled) return;
+          if (error) throw new Error(error.message);
+          const batch = (data ?? []) as unknown as Record<string, unknown>[];
+          // Original upload columns live in raw_data; merge them back so all 39+ render.
+          setLoadedRows((prev) => [...prev, ...batch.map(withRawColumns)]);
+          if (batch.length < PAGE) break;
+        }
+      } catch (e) {
+        if (!cancelled) setRowsError(e instanceof Error ? e.message : "Could not load rows");
+      } finally {
+        if (!cancelled) setLoadingRows(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [viewer, user]);
+
+  const viewerBase = fixedRows ?? loadedRows;
   const allViewerCols = useMemo(() => collectColumns(viewerBase), [viewerBase]);
   const viewerNumeric = useMemo(
     () => numericColumns(viewerBase, allViewerCols),
