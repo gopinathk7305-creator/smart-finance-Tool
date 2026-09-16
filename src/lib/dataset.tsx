@@ -4,6 +4,7 @@ import { useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { ALL, demoDatasetFor, useOrg } from "@/lib/orgs";
+import { useActiveDataset } from "@/lib/active-dataset";
 import {
   type ArApRecord,
   type BudgetTarget,
@@ -73,6 +74,7 @@ export function clearLocalDatasetRows(userId: string, bucket: DatasetBucket) {
 export function useDataset(): Dataset {
   const { user } = useAuth();
   const { orgId, vendor } = useOrg();
+  const { activeFile } = useActiveDataset();
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -100,7 +102,7 @@ export function useDataset(): Dataset {
   }, [user, refresh]);
 
   const fallback = user ? localFallbacks.get(user.id) : undefined;
-  const combined = data
+  const combinedRaw = data
     ? {
         t: mergeRows(data.t, fallback?.t),
         p: mergeRows(data.p, fallback?.p),
@@ -110,6 +112,20 @@ export function useDataset(): Dataset {
     : fallback
       ? { t: fallback.t ?? [], p: fallback.p ?? [], b: fallback.b ?? [], a: fallback.a ?? [] }
       : undefined;
+  const onlyActive = <T,>(rows: T[]) =>
+    activeFile
+      ? rows.filter((r) => (r as { source_file?: string | null }).source_file === activeFile)
+      : rows;
+
+  const combined = combinedRaw
+    ? {
+        t: onlyActive(combinedRaw.t),
+        p: onlyActive(combinedRaw.p),
+        b: onlyActive(combinedRaw.b),
+        a: onlyActive(combinedRaw.a),
+      }
+    : undefined;
+
   const rowCount = combined ? combined.t.length + combined.p.length + combined.b.length + combined.a.length : 0;
 
   if (!combined || rowCount === 0) {

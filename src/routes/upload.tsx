@@ -50,6 +50,7 @@ import { logActivity, useAuth } from "@/lib/auth";
 import { ALL, useOrg } from "@/lib/orgs";
 import { cacheLocalDatasetRows, clearLocalDatasetRows, useDataset } from "@/lib/dataset";
 import { useInsights } from "@/lib/insights";
+import { useActiveDataset } from "@/lib/active-dataset";
 import { VirtualTable } from "@/components/finance/VirtualTable";
 import { collectColumns, DataGrid, labelFor, numericColumns } from "@/components/finance/DataGrid";
 import { type EtlResult, issueTone, runEtlChunked, streamTabular } from "@/lib/etl";
@@ -103,6 +104,7 @@ function UploadPage() {
   const { refresh, live } = useDataset();
   const { orgId, liveOrgs, orgName } = useOrg();
   const { openInsights } = useInsights();
+  const { activeId, setActiveId, datasets, refreshDatasets } = useActiveDataset();
   const scopeOrgId = liveOrgs && orgId !== ALL ? orgId : null;
 
   const [dragging, setDragging] = useState(false);
@@ -353,9 +355,21 @@ function UploadPage() {
     await logActivity(`Synced ${parsed.rows.length} clean ${detection.label} rows to cloud`, "Data Upload");
     refresh();
     void stored.refetch();
+    refreshDatasets();
     setMappedOpen(false);
     toast.success(`${parsed.rows.length} rows synced — every module refreshed`);
     window.setTimeout(() => openInsights(parsed.fileName), 900);
+  };
+
+  const activate = (id: string | null) => {
+    setActiveId(id);
+    refresh();
+    const name = datasets.find((d) => d.id === id)?.file_name ?? (stored.data ?? []).find((d) => d.id === id)?.file_name;
+    toast.success(
+      id
+        ? `Switched active workspace dataset to ${name ?? "selected dataset"}`
+        : "Every module is using all stored datasets again",
+    );
   };
 
   const purge = async (ds: StoredDataset) => {
@@ -372,8 +386,10 @@ function UploadPage() {
       return;
     }
     await supabase.from("uploaded_datasets").delete().eq("id", ds.id);
+    if (activeId === ds.id) setActiveId(null);
     refresh();
     void stored.refetch();
+    refreshDatasets();
     toast.success(`${ds.file_name} purged from cloud storage`);
   };
 
@@ -588,6 +604,19 @@ function UploadPage() {
                         <Badge className="bg-success-soft text-success">{ds.status}</Badge>
                       </TableCell>
                       <TableCell className="space-x-1 text-right">
+                        {activeId === ds.id ? (
+                          <Button
+                            size="sm"
+                            className="bg-success text-success-foreground hover:bg-success/90"
+                            onClick={() => activate(null)}
+                          >
+                            <CheckCircle2 className="size-4" /> Active / Loaded
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="outline" onClick={() => activate(ds.id)}>
+                            <Database className="size-4" /> Switch to this
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
@@ -766,6 +795,14 @@ function UploadPage() {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
+            {viewer &&
+              (activeId === viewer.id ? (
+                <Badge className="bg-success-soft text-success">Active / Loaded</Badge>
+              ) : (
+                <Button size="sm" variant="outline" onClick={() => activate(viewer.id)}>
+                  <Database className="size-4" /> Activate this dataset
+                </Button>
+              ))}
             <Badge variant="secondary" className="ml-auto tabular">
               Showing {filteredRows.length.toLocaleString("en-IN")} rows ·{" "}
               {viewerCols.length} of {allViewerCols.length} columns

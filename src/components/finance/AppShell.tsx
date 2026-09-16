@@ -18,8 +18,11 @@ import {
   Users,
   Wallet,
   CircleDollarSign,
+  FolderOpen,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
+import { toast } from "sonner";
+import { useActiveDataset } from "@/lib/active-dataset";
 
 import { AiInsightsDock } from "@/components/finance/AiInsightsDock";
 import { Button } from "@/components/ui/button";
@@ -75,6 +78,7 @@ export function AppShell({
   const queryClient = useQueryClient();
   const { orgs, orgId, setOrgId, vendor, setVendor } = useOrg();
   const { vendors } = useDataset();
+  const { datasets, activeId, setActiveId } = useActiveDataset();
 
   useEffect(() => {
     if (!loading && !user && !demoMode) void navigate({ to: "/login", replace: true });
@@ -155,6 +159,35 @@ export function AppShell({
           </div>
 
           <div className="ml-auto flex items-center gap-2">
+            {datasets.length > 0 && (
+              <Select
+                value={activeId ?? ALL}
+                onValueChange={(v) => {
+                  const id = v === ALL ? null : v;
+                  setActiveId(id);
+                  const name = datasets.find((d) => d.id === id)?.file_name;
+                  toast.success(
+                    id
+                      ? `Switched active workspace dataset to ${name}`
+                      : "Using every stored dataset",
+                  );
+                }}
+              >
+                <SelectTrigger className="hidden w-[230px] bg-background xl:flex">
+                  <FolderOpen className="size-4 text-muted-foreground" />
+                  <SelectValue placeholder="Active dataset" />
+                </SelectTrigger>
+                <SelectContent className="max-h-72">
+                  <SelectItem value={ALL}>All datasets combined</SelectItem>
+                  {datasets.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.file_name} ({d.row_count.toLocaleString("en-IN")} rows)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
             <Select value={orgId} onValueChange={setOrgId}>
               <SelectTrigger className="w-[190px] bg-background">
                 <Building2 className="size-4 text-muted-foreground" />

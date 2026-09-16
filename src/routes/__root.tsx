@@ -15,6 +15,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AuthProvider } from "@/lib/auth";
 import { OrgProvider } from "@/lib/orgs";
 import { InsightsProvider } from "@/lib/insights";
+import { ActiveDatasetProvider } from "@/lib/active-dataset";
 
 function NotFoundComponent() {
   return (
@@ -131,11 +132,13 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <OrgProvider>
+          <ActiveDatasetProvider>
           <InsightsProvider>
             {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
             <Outlet />
             <Toaster position="top-right" richColors />
           </InsightsProvider>
+          </ActiveDatasetProvider>
         </OrgProvider>
       </AuthProvider>
     </QueryClientProvider>
