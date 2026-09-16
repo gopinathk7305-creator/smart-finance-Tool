@@ -49,10 +49,12 @@ export function ActiveDatasetProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [activeId, setActiveIdState] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     const saved = window.localStorage.getItem(ACTIVE_KEY);
     if (saved) setActiveIdState(saved);
+    setHydrated(true);
   }, []);
 
   const { data, isLoading } = useQuery({
