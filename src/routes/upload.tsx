@@ -103,6 +103,7 @@ function UploadPage() {
   const { refresh, live } = useDataset();
   const { orgId, liveOrgs, orgName } = useOrg();
   const { openInsights } = useInsights();
+  const { activeId, setActiveId, datasets, refreshDatasets } = useActiveDataset();
   const scopeOrgId = liveOrgs && orgId !== ALL ? orgId : null;
 
   const [dragging, setDragging] = useState(false);
