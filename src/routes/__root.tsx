@@ -134,6 +134,7 @@ function RootComponent() {
       <AuthProvider>
         <OrgProvider>
           <ActiveDatasetProvider>
+          <WorkspaceProvider>
           <InsightsProvider>
             {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
             <Outlet />
