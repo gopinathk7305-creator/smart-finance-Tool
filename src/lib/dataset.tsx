@@ -73,6 +73,7 @@ export function clearLocalDatasetRows(userId: string, bucket: DatasetBucket) {
 export function useDataset(): Dataset {
   const { user } = useAuth();
   const { orgId, vendor } = useOrg();
+  const { activeFile } = useActiveDataset();
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
