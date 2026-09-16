@@ -405,7 +405,7 @@ function normaliseRows(rows: Record<string, unknown>[]): Record<string, string>[
 export async function streamTabular(
   file: File,
   onProgress: (p: StreamProgress) => void,
-  chunkSize = 5000,
+  chunkSize = 2000,
 ): Promise<Record<string, string>[]> {
   if (!/\.csv$/i.test(file.name)) {
     const rows = await readTabular(file);
@@ -416,19 +416,26 @@ export async function streamTabular(
   const Papa = (await import("papaparse")).default;
   const started = Date.now();
   const all: Record<string, string>[] = [];
+  let lastTick = 0;
 
   return new Promise((resolve, reject) => {
     Papa.parse<Record<string, string>>(file, {
       header: true,
       skipEmptyLines: true,
       worker: true,
-      chunkSize: chunkSize * 120,
+      // Bytes per worker chunk — roughly `chunkSize` rows of a typical ledger row.
+      chunkSize: Math.max(256 * 1024, chunkSize * 150),
       chunk: (results) => {
+        // Headers are normalised exactly once, here — never again on completion.
         for (const row of normaliseRows(results.data)) {
           if (row && Object.keys(row).length) all.push(row);
         }
         const bytesDone = results.meta.cursor || 0;
-        const elapsed = (Date.now() - started) / 1000;
+        const now = Date.now();
+        // Throttled so React re-renders at most ~7x/second instead of per chunk.
+        if (now - lastTick < 150) return;
+        lastTick = now;
+        const elapsed = (now - started) / 1000;
         const ratio = file.size > 0 ? bytesDone / file.size : 1;
         onProgress({
           phase: "parsing",
@@ -438,7 +445,16 @@ export async function streamTabular(
           etaSeconds: ratio > 0.02 && elapsed > 0.4 ? Math.max(0, elapsed / ratio - elapsed) : null,
         });
       },
-      complete: () => resolve(normaliseRows(all)),
+      complete: () => {
+        onProgress({
+          phase: "parsing",
+          rows: all.length,
+          bytesDone: file.size,
+          bytesTotal: file.size,
+          etaSeconds: 0,
+        });
+        resolve(all);
+      },
       error: (err: Error) => reject(err),
     });
   });
