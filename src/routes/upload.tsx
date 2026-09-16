@@ -724,39 +724,68 @@ function UploadPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <Input
-            placeholder="Search any value in this dataset…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="max-w-sm"
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              placeholder="Search any value in this dataset…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="max-w-sm"
+            />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Eye className="size-4" /> Columns filter
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="max-h-80 w-60 overflow-y-auto">
+                <DropdownMenuItem onSelect={() => setHiddenViewerCols(new Set())}>
+                  Select all
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => setHiddenViewerCols(new Set(allViewerCols.slice(8)))}
+                >
+                  Reset default
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {allViewerCols.map((c) => (
+                  <DropdownMenuCheckboxItem
+                    key={c}
+                    checked={!hiddenViewerCols.has(c)}
+                    onCheckedChange={(on) =>
+                      setHiddenViewerCols((prev) => {
+                        const next = new Set(prev);
+                        if (on) next.delete(c);
+                        else next.add(c);
+                        return next;
+                      })
+                    }
+                    onSelect={(e) => e.preventDefault()}
+                  >
+                    {labelFor(c)}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Badge variant="secondary" className="ml-auto tabular">
+              Showing {filteredRows.length.toLocaleString("en-IN")} rows ·{" "}
+              {viewerCols.length} of {allViewerCols.length} columns
+            </Badge>
+          </div>
 
           {viewerCols.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border py-12 text-center text-sm text-muted-foreground">
-              {viewerRows.isLoading ? "Loading…" : "No rows stored for this dataset."}
+              {viewerRows.isLoading
+                ? "Loading…"
+                : allViewerCols.length
+                  ? "Every column is hidden. Use the columns filter to show some."
+                  : "No rows stored for this dataset."}
             </div>
           ) : (
-            <VirtualTable
+            <DataGrid
               rows={filteredRows}
-              height={480}
-              head={
-                <>
-                  {viewerCols.map((c) => (
-                    <th key={c} className="p-2 capitalize">
-                      {c.replace(/_/g, " ")}
-                    </th>
-                  ))}
-                </>
-              }
-              row={(r) => (
-                <>
-                  {viewerCols.map((c) => (
-                    <td key={c} className="tabular truncate p-2">
-                      {String(r[c] ?? "—")}
-                    </td>
-                  ))}
-                </>
-              )}
+              columns={viewerCols}
+              numeric={viewerNumeric}
+              maxHeight={Math.round(typeof window === "undefined" ? 520 : window.innerHeight * 0.6)}
             />
           )}
         </DialogContent>
