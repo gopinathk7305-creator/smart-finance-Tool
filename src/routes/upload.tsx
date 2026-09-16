@@ -115,6 +115,7 @@ function UploadPage() {
   const [progress, setProgress] = useState<{ label: string; pct: number; eta: string } | null>(null);
   const [viewer, setViewer] = useState<StoredDataset | null>(null);
   const [search, setSearch] = useState("");
+  const [hiddenViewerCols, setHiddenViewerCols] = useState<Set<string>>(new Set());
 
   /* ------------------------------------------------ stored datasets */
 
