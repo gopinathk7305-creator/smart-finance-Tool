@@ -695,6 +695,7 @@ function UploadPage() {
                           variant="outline"
                           onClick={() => {
                             setSearch("");
+                            setFixedRows(null);
                             setViewer(ds);
                           }}
                         >
@@ -880,6 +881,39 @@ function UploadPage() {
               Showing all {filteredRows.length.toLocaleString("en-IN")} rows ·{" "}
               {viewerCols.length} of {allViewerCols.length} columns loaded
             </Badge>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-muted/30 p-3">
+            <span className="text-sm font-semibold">Data health &amp; error audit</span>
+            <Badge
+              variant={health.empty ? "destructive" : "secondary"}
+              className="tabular"
+            >
+              {health.empty.toLocaleString("en-IN")} empty values
+            </Badge>
+            <Badge
+              variant={health.badDates ? "destructive" : "secondary"}
+              className="tabular"
+            >
+              {health.badDates.toLocaleString("en-IN")} invalid dates
+            </Badge>
+            <Badge
+              variant={health.untrimmed ? "destructive" : "secondary"}
+              className="tabular"
+            >
+              {health.untrimmed.toLocaleString("en-IN")} format errors
+            </Badge>
+            <Button
+              size="sm"
+              className="ml-auto"
+              disabled={!health.empty && !health.badDates && !health.untrimmed}
+              onClick={() => {
+                setFixedRows(autoFixRows(viewerBase, allViewerCols, viewerNumeric));
+                toast.success("Dataset errors auto-fixed in this view");
+              }}
+            >
+              ⚡ Auto-fix all dataset errors
+            </Button>
           </div>
 
           {viewerCols.length === 0 ? (
