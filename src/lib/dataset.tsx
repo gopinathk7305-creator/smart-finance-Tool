@@ -24,6 +24,8 @@ export interface Dataset {
   /** true when the numbers come from the user's own uploaded data */
   live: boolean;
   loading: boolean;
+  /** true when rows exist for the dataset but none fall inside the selected date range */
+  outOfRange: boolean;
   refresh: () => void;
 }
 
