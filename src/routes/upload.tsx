@@ -151,21 +151,24 @@ function UploadPage() {
     },
   });
 
-  const hiddenCols = new Set(["id", "user_id", "org_id", "created_at", "source_file"]);
-  const viewerCols = useMemo(() => {
-    const first = viewerRows.data?.[0];
-    return first ? Object.keys(first).filter((k) => !hiddenCols.has(k)) : [];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewerRows.data]);
+  const allViewerCols = useMemo(() => collectColumns(viewerRows.data ?? []), [viewerRows.data]);
+  const viewerNumeric = useMemo(
+    () => numericColumns(viewerRows.data ?? [], allViewerCols),
+    [viewerRows.data, allViewerCols],
+  );
+  const viewerCols = useMemo(
+    () => (hiddenViewerCols.size ? allViewerCols.filter((c) => !hiddenViewerCols.has(c)) : allViewerCols),
+    [allViewerCols, hiddenViewerCols],
+  );
 
   const filteredRows = useMemo(() => {
     const rows = viewerRows.data ?? [];
     const term = search.trim().toLowerCase();
     if (!term) return rows;
     return rows.filter((r) =>
-      viewerCols.some((c) => String(r[c] ?? "").toLowerCase().includes(term)),
+      allViewerCols.some((c) => String(r[c] ?? "").toLowerCase().includes(term)),
     );
-  }, [viewerRows.data, search, viewerCols]);
+  }, [viewerRows.data, search, allViewerCols]);
 
   /* ------------------------------------------------ ingestion */
 
