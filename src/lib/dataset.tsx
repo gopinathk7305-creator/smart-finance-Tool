@@ -203,14 +203,23 @@ export function useDataset(): Dataset {
     status: r.status === "settled" ? "settled" : "outstanding",
   }));
 
+  // Global date-range filter: every module reads this dataset, so scoping here
+  // syncs all pages to the header selection at once.
+  const txnsInRange = txns.filter((r) => inRange(r.date, range));
+  const arapsInRange = araps.filter((r) => inRange(r.invoice_date || r.due_date, range));
+  const paysInRange = pays.filter((r) => inRange(r.month_year, range));
+
   return {
-    txns: byVendor(txns, vendor, (r) => r.vendor_client),
-    pays,
+    txns: byVendor(txnsInRange, vendor, (r) => r.vendor_client),
+    pays: paysInRange,
     buds,
-    araps: byVendor(araps, vendor, (r) => r.party_name),
+    araps: byVendor(arapsInRange, vendor, (r) => r.party_name),
     vendors: uniqueVendors(txns, araps),
     live: true,
     loading: false,
+    outOfRange:
+      txns.length + araps.length + pays.length > 0 &&
+      txnsInRange.length + arapsInRange.length + paysInRange.length === 0,
     refresh,
   };
 }
