@@ -85,6 +85,7 @@ export function useDataset(): Dataset {
   const { user } = useAuth();
   const { orgId, vendor } = useOrg();
   const { activeFile } = useActiveDataset();
+  const { range } = useWorkspace();
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
