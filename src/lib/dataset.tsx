@@ -2,6 +2,8 @@ import { type QueryClient, useQuery, useQueryClient } from "@tanstack/react-quer
 import { useCallback, useEffect } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import { fetchAllRows } from "@/lib/fetch-all";
 import { useAuth } from "@/lib/auth";
 import { ALL, demoDatasetFor, useOrg } from "@/lib/orgs";
 import { useActiveDataset } from "@/lib/active-dataset";
@@ -25,17 +27,23 @@ export interface Dataset {
   refresh: () => void;
 }
 
+type Row<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"];
+
 async function fetchDataset() {
   // Every table is paged past the 1,000-row response cap.
   const [t, p, b, a] = await Promise.all([
-    fetchAllRows((from, to) =>
+    fetchAllRows<Row<"transactions">>((from, to) =>
       supabase.from("transactions").select("*").order("txn_date").range(from, to),
     ),
-    fetchAllRows((from, to) =>
+    fetchAllRows<Row<"payroll_records">>((from, to) =>
       supabase.from("payroll_records").select("*").order("employee_id").range(from, to),
     ),
-    fetchAllRows((from, to) => supabase.from("budget_targets").select("*").range(from, to)),
-    fetchAllRows((from, to) => supabase.from("arap_records").select("*").range(from, to)),
+    fetchAllRows<Row<"budget_targets">>((from, to) =>
+      supabase.from("budget_targets").select("*").range(from, to),
+    ),
+    fetchAllRows<Row<"arap_records">>((from, to) =>
+      supabase.from("arap_records").select("*").range(from, to),
+    ),
   ]);
 
   return { t, p, b, a };
