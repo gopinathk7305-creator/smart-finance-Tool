@@ -230,25 +230,55 @@ function UploadPage() {
     const batches: Record<string, unknown>[][] = [];
     for (let i = 0; i < parsed.rows.length; i += BATCH_SIZE)
       batches.push(parsed.rows.slice(i, i + BATCH_SIZE));
+
     const started = Date.now();
-    for (let b = 0; b < batches.length; b += 1) {
-      const done = b / batches.length;
-      const elapsed = (Date.now() - started) / 1000;
+    const total = batches.length;
+    let completed = 0;
+    let lastTick = 0;
+    let failure: string | null = null;
+
+    const tick = (force = false) => {
+      const now = Date.now();
+      if (!force && now - lastTick < 200) return;
+      lastTick = now;
+      const done = completed / total;
+      const elapsed = (now - started) / 1000;
       setProgress({
-        label: `Batch inserting into cloud database… (Batch ${b + 1} of ${batches.length})`,
+        label: `Batch inserting into cloud database… (Batch ${Math.min(completed + 1, total)} of ${total})`,
         pct: done * 100,
-        eta: done > 0 ? `~${Math.ceil(elapsed / done - elapsed)}s remaining` : "",
+        eta: done > 0.02 ? `~${Math.ceil(elapsed / done - elapsed)}s remaining` : "",
       });
-      const { error } = await supabase.from(detection.table).insert(batches[b]! as never);
-      if (error) {
-        setCommitting(false);
-        setProgress(null);
-        toast.error(error.message);
-        return;
+    };
+    tick(true);
+
+    // Up to MAX_CONCURRENT bulk inserts in flight; each batch is a single payload.
+    let cursor = 0;
+    const worker = async () => {
+      while (cursor < total && !failure) {
+        const index = cursor;
+        cursor += 1;
+        const batch = batches[index]!;
+        const { error } = await supabase.from(detection.table).insert(batch as never);
+        batches[index] = [];
+        if (error) {
+          failure = error.message;
+          return;
+        }
+        completed += 1;
+        tick();
       }
-      batches[b] = [];
-      await new Promise((r) => window.setTimeout(r, 0));
+    };
+    await Promise.all(Array.from({ length: Math.min(MAX_CONCURRENT, total) }, worker));
+
+    if (failure) {
+      setCommitting(false);
+      setProgress(null);
+      toast.error(failure);
+      return;
     }
+    completed = total;
+    tick(true);
+
 
     await supabase.from("uploaded_datasets").insert({
       user_id: user.id,
