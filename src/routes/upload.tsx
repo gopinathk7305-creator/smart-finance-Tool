@@ -28,6 +28,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
 import {
   Table,
@@ -43,6 +51,7 @@ import { ALL, useOrg } from "@/lib/orgs";
 import { cacheLocalDatasetRows, clearLocalDatasetRows, useDataset } from "@/lib/dataset";
 import { useInsights } from "@/lib/insights";
 import { VirtualTable } from "@/components/finance/VirtualTable";
+import { collectColumns, DataGrid, labelFor, numericColumns } from "@/components/finance/DataGrid";
 import { type EtlResult, issueTone, runEtlChunked, streamTabular } from "@/lib/etl";
 import { detectSchema, type Detection } from "@/lib/schema-detect";
 
@@ -106,6 +115,7 @@ function UploadPage() {
   const [progress, setProgress] = useState<{ label: string; pct: number; eta: string } | null>(null);
   const [viewer, setViewer] = useState<StoredDataset | null>(null);
   const [search, setSearch] = useState("");
+  const [hiddenViewerCols, setHiddenViewerCols] = useState<Set<string>>(new Set());
 
   /* ------------------------------------------------ stored datasets */
 
@@ -142,21 +152,24 @@ function UploadPage() {
     },
   });
 
-  const hiddenCols = new Set(["id", "user_id", "org_id", "created_at", "source_file"]);
-  const viewerCols = useMemo(() => {
-    const first = viewerRows.data?.[0];
-    return first ? Object.keys(first).filter((k) => !hiddenCols.has(k)) : [];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewerRows.data]);
+  const allViewerCols = useMemo(() => collectColumns(viewerRows.data ?? []), [viewerRows.data]);
+  const viewerNumeric = useMemo(
+    () => numericColumns(viewerRows.data ?? [], allViewerCols),
+    [viewerRows.data, allViewerCols],
+  );
+  const viewerCols = useMemo(
+    () => (hiddenViewerCols.size ? allViewerCols.filter((c) => !hiddenViewerCols.has(c)) : allViewerCols),
+    [allViewerCols, hiddenViewerCols],
+  );
 
   const filteredRows = useMemo(() => {
     const rows = viewerRows.data ?? [];
     const term = search.trim().toLowerCase();
     if (!term) return rows;
     return rows.filter((r) =>
-      viewerCols.some((c) => String(r[c] ?? "").toLowerCase().includes(term)),
+      allViewerCols.some((c) => String(r[c] ?? "").toLowerCase().includes(term)),
     );
-  }, [viewerRows.data, search, viewerCols]);
+  }, [viewerRows.data, search, allViewerCols]);
 
   /* ------------------------------------------------ ingestion */
 
@@ -711,39 +724,68 @@ function UploadPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <Input
-            placeholder="Search any value in this dataset…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="max-w-sm"
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              placeholder="Search any value in this dataset…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="max-w-sm"
+            />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Eye className="size-4" /> Columns filter
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="max-h-80 w-60 overflow-y-auto">
+                <DropdownMenuItem onSelect={() => setHiddenViewerCols(new Set())}>
+                  Select all
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => setHiddenViewerCols(new Set(allViewerCols.slice(8)))}
+                >
+                  Reset default
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {allViewerCols.map((c) => (
+                  <DropdownMenuCheckboxItem
+                    key={c}
+                    checked={!hiddenViewerCols.has(c)}
+                    onCheckedChange={(on) =>
+                      setHiddenViewerCols((prev) => {
+                        const next = new Set(prev);
+                        if (on) next.delete(c);
+                        else next.add(c);
+                        return next;
+                      })
+                    }
+                    onSelect={(e) => e.preventDefault()}
+                  >
+                    {labelFor(c)}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Badge variant="secondary" className="ml-auto tabular">
+              Showing {filteredRows.length.toLocaleString("en-IN")} rows ·{" "}
+              {viewerCols.length} of {allViewerCols.length} columns
+            </Badge>
+          </div>
 
           {viewerCols.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border py-12 text-center text-sm text-muted-foreground">
-              {viewerRows.isLoading ? "Loading…" : "No rows stored for this dataset."}
+              {viewerRows.isLoading
+                ? "Loading…"
+                : allViewerCols.length
+                  ? "Every column is hidden. Use the columns filter to show some."
+                  : "No rows stored for this dataset."}
             </div>
           ) : (
-            <VirtualTable
+            <DataGrid
               rows={filteredRows}
-              height={480}
-              head={
-                <>
-                  {viewerCols.map((c) => (
-                    <th key={c} className="p-2 capitalize">
-                      {c.replace(/_/g, " ")}
-                    </th>
-                  ))}
-                </>
-              }
-              row={(r) => (
-                <>
-                  {viewerCols.map((c) => (
-                    <td key={c} className="tabular truncate p-2">
-                      {String(r[c] ?? "—")}
-                    </td>
-                  ))}
-                </>
-              )}
+              columns={viewerCols}
+              numeric={viewerNumeric}
+              maxHeight={Math.round(typeof window === "undefined" ? 520 : window.innerHeight * 0.6)}
             />
           )}
         </DialogContent>
