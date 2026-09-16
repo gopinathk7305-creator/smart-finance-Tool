@@ -18,8 +18,11 @@ import {
   Users,
   Wallet,
   CircleDollarSign,
+  FolderOpen,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
+import { toast } from "sonner";
+import { useActiveDataset } from "@/lib/active-dataset";
 
 import { AiInsightsDock } from "@/components/finance/AiInsightsDock";
 import { Button } from "@/components/ui/button";
