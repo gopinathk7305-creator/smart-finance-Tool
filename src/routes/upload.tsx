@@ -119,6 +119,7 @@ function UploadPage() {
   const [viewer, setViewer] = useState<StoredDataset | null>(null);
   const [search, setSearch] = useState("");
   const [hiddenViewerCols, setHiddenViewerCols] = useState<Set<string>>(new Set());
+  const [fixedRows, setFixedRows] = useState<Record<string, unknown>[] | null>(null);
 
   /* ------------------------------------------------ stored datasets */
 
@@ -160,24 +161,29 @@ function UploadPage() {
     },
   });
 
-  const allViewerCols = useMemo(() => collectColumns(viewerRows.data ?? []), [viewerRows.data]);
+  const viewerBase = fixedRows ?? viewerRows.data ?? [];
+  const allViewerCols = useMemo(() => collectColumns(viewerBase), [viewerBase]);
   const viewerNumeric = useMemo(
-    () => numericColumns(viewerRows.data ?? [], allViewerCols),
-    [viewerRows.data, allViewerCols],
+    () => numericColumns(viewerBase, allViewerCols),
+    [viewerBase, allViewerCols],
   );
   const viewerCols = useMemo(
     () => (hiddenViewerCols.size ? allViewerCols.filter((c) => !hiddenViewerCols.has(c)) : allViewerCols),
     [allViewerCols, hiddenViewerCols],
   );
 
+  const health = useMemo(
+    () => auditRows(viewerBase, allViewerCols, viewerNumeric),
+    [viewerBase, allViewerCols, viewerNumeric],
+  );
+
   const filteredRows = useMemo(() => {
-    const rows = viewerRows.data ?? [];
     const term = search.trim().toLowerCase();
-    if (!term) return rows;
-    return rows.filter((r) =>
+    if (!term) return viewerBase;
+    return viewerBase.filter((r) =>
       allViewerCols.some((c) => String(r[c] ?? "").toLowerCase().includes(term)),
     );
-  }, [viewerRows.data, search, allViewerCols]);
+  }, [viewerBase, search, allViewerCols]);
 
   /* ------------------------------------------------ ingestion */
 
