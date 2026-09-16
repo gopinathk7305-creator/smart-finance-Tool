@@ -46,7 +46,8 @@ import { VirtualTable } from "@/components/finance/VirtualTable";
 import { type EtlResult, issueTone, runEtl, streamTabular } from "@/lib/etl";
 import { detectSchema, type Detection } from "@/lib/schema-detect";
 
-const BATCH_SIZE = 5000;
+const BATCH_SIZE = 2000;
+const MAX_CONCURRENT = 3;
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
 export const Route = createFileRoute("/upload")({
