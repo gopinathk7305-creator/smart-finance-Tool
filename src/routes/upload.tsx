@@ -50,6 +50,7 @@ import { logActivity, useAuth } from "@/lib/auth";
 import { ALL, useOrg } from "@/lib/orgs";
 import { cacheLocalDatasetRows, clearLocalDatasetRows, useDataset } from "@/lib/dataset";
 import { useInsights } from "@/lib/insights";
+import { useActiveDataset } from "@/lib/active-dataset";
 import { VirtualTable } from "@/components/finance/VirtualTable";
 import { collectColumns, DataGrid, labelFor, numericColumns } from "@/components/finance/DataGrid";
 import { type EtlResult, issueTone, runEtlChunked, streamTabular } from "@/lib/etl";
