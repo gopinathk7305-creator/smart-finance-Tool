@@ -26,19 +26,19 @@ export interface Dataset {
 }
 
 async function fetchDataset() {
+  // Every table is paged past the 1,000-row response cap.
   const [t, p, b, a] = await Promise.all([
-    supabase.from("transactions").select("*").order("txn_date"),
-    supabase.from("payroll_records").select("*").order("employee_id"),
-    supabase.from("budget_targets").select("*"),
-    supabase.from("arap_records").select("*"),
+    fetchAllRows((from, to) =>
+      supabase.from("transactions").select("*").order("txn_date").range(from, to),
+    ),
+    fetchAllRows((from, to) =>
+      supabase.from("payroll_records").select("*").order("employee_id").range(from, to),
+    ),
+    fetchAllRows((from, to) => supabase.from("budget_targets").select("*").range(from, to)),
+    fetchAllRows((from, to) => supabase.from("arap_records").select("*").range(from, to)),
   ]);
 
-  return {
-    t: t.data ?? [],
-    p: p.data ?? [],
-    b: b.data ?? [],
-    a: a.data ?? [],
-  };
+  return { t, p, b, a };
 }
 
 type CloudDataset = Awaited<ReturnType<typeof fetchDataset>>;
