@@ -55,6 +55,7 @@ import { VirtualTable } from "@/components/finance/VirtualTable";
 import { collectColumns, DataGrid, labelFor, numericColumns } from "@/components/finance/DataGrid";
 import { type EtlResult, issueTone, runEtlChunked, streamTabular } from "@/lib/etl";
 import { detectSchema, type Detection } from "@/lib/schema-detect";
+import { fetchAllRows, withRawColumns } from "@/lib/fetch-all";
 
 const BATCH_SIZE = 1000;
 const MAX_CONCURRENT = 3;
@@ -809,8 +810,8 @@ function UploadPage() {
                 </Button>
               ))}
             <Badge variant="secondary" className="ml-auto tabular">
-              Showing {filteredRows.length.toLocaleString("en-IN")} rows ·{" "}
-              {viewerCols.length} of {allViewerCols.length} columns
+              Showing all {filteredRows.length.toLocaleString("en-IN")} rows ·{" "}
+              {viewerCols.length} of {allViewerCols.length} columns loaded
             </Badge>
           </div>
 
