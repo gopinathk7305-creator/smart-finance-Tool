@@ -16,6 +16,7 @@ import { AuthProvider } from "@/lib/auth";
 import { OrgProvider } from "@/lib/orgs";
 import { InsightsProvider } from "@/lib/insights";
 import { ActiveDatasetProvider } from "@/lib/active-dataset";
+import { WorkspaceProvider } from "@/lib/workspace";
 
 function NotFoundComponent() {
   return (
@@ -133,11 +134,13 @@ function RootComponent() {
       <AuthProvider>
         <OrgProvider>
           <ActiveDatasetProvider>
+          <WorkspaceProvider>
           <InsightsProvider>
             {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
             <Outlet />
             <Toaster position="top-right" richColors />
           </InsightsProvider>
+          </WorkspaceProvider>
           </ActiveDatasetProvider>
         </OrgProvider>
       </AuthProvider>

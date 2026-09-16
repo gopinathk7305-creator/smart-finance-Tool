@@ -49,10 +49,12 @@ export function ActiveDatasetProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [activeId, setActiveIdState] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     const saved = window.localStorage.getItem(ACTIVE_KEY);
     if (saved) setActiveIdState(saved);
+    setHydrated(true);
   }, []);
 
   const { data, isLoading } = useQuery({
@@ -71,10 +73,18 @@ export function ActiveDatasetProvider({ children }: { children: ReactNode }) {
   const datasets = data ?? [];
 
   const setActiveId = useCallback((id: string | null) => {
-    if (id) window.localStorage.setItem(ACTIVE_KEY, id);
-    else window.localStorage.removeItem(ACTIVE_KEY);
+    // "" records an explicit "all datasets" choice so it survives reloads.
+    window.localStorage.setItem(ACTIVE_KEY, id ?? "");
     setActiveIdState(id);
   }, []);
+
+  // Default: the most recently uploaded dataset drives the workspace.
+  useEffect(() => {
+    if (!hydrated || activeId || datasets.length === 0) return;
+    if (window.localStorage.getItem(ACTIVE_KEY) === "") return;
+    setActiveIdState(datasets[0]!.id);
+    window.localStorage.setItem(ACTIVE_KEY, datasets[0]!.id);
+  }, [hydrated, activeId, datasets]);
 
   const refreshDatasets = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ["dataset-registry"] });

@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Bell,
+  CalendarRange,
   Calculator,
   Tags,
   ChevronLeft,
@@ -25,6 +26,9 @@ import { useActiveDataset } from "@/lib/active-dataset";
 
 import { AiInsightsDock } from "@/components/finance/AiInsightsDock";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { fiscalYearStart, fyLabel, useWorkspace, type RangePreset } from "@/lib/workspace";
+import { useDataset } from "@/lib/dataset";
 import {
   Select,
   SelectContent,
@@ -74,7 +78,10 @@ export function AppShell({
   const { user, demoMode, signOut, loading } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { datasets, activeId, setActiveId } = useActiveDataset();
+  const { datasets, activeId, setActiveId, active } = useActiveDataset();
+  const { preset, custom, range, setPreset, setCustom, resetRange } = useWorkspace();
+  const { outOfRange } = useDataset();
+  const fy = fiscalYearStart();
 
   useEffect(() => {
     if (!loading && !user && !demoMode) void navigate({ to: "/login", replace: true });
@@ -155,6 +162,45 @@ export function AppShell({
           </div>
 
           <div className="ml-auto flex items-center gap-2">
+            <Select
+              value={preset}
+              onValueChange={(v) => setPreset(v as RangePreset)}
+            >
+              <SelectTrigger className="w-[150px] bg-background font-medium sm:w-[190px]">
+                <CalendarRange className="size-4 text-primary" />
+                <SelectValue placeholder="Date range" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All time</SelectItem>
+                <SelectItem value="fy-current">{fyLabel(fy)}</SelectItem>
+                <SelectItem value="fy-previous">{fyLabel(fy - 1)}</SelectItem>
+                <SelectItem value="ytd">YTD {fyLabel(fy)}</SelectItem>
+                <SelectItem value="q1">Q1 (Apr–Jun)</SelectItem>
+                <SelectItem value="q2">Q2 (Jul–Sep)</SelectItem>
+                <SelectItem value="q3">Q3 (Oct–Dec)</SelectItem>
+                <SelectItem value="q4">Q4 (Jan–Mar)</SelectItem>
+                <SelectItem value="custom">Custom date range</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {preset === "custom" && (
+              <div className="hidden items-center gap-1 lg:flex">
+                <Input
+                  type="date"
+                  value={custom.start}
+                  onChange={(e) => setCustom({ ...custom, start: e.target.value })}
+                  className="h-9 w-[140px]"
+                />
+                <span className="text-xs text-muted-foreground">to</span>
+                <Input
+                  type="date"
+                  value={custom.end}
+                  onChange={(e) => setCustom({ ...custom, end: e.target.value })}
+                  className="h-9 w-[140px]"
+                />
+              </div>
+            )}
+
             <Select
               value={activeId ?? ALL}
               onValueChange={(v) => {
@@ -251,6 +297,18 @@ export function AppShell({
         </header>
 
         <main data-page-capture className="flex-1 p-4 md:p-6">
+          {outOfRange && (
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-warning/40 bg-warning-soft px-4 py-3">
+              <CalendarRange className="size-4 text-warning" />
+              <p className="text-sm font-medium text-foreground">
+                No records found for {range.label}
+                {active ? ` in ${active.file_name}` : ""}.
+              </p>
+              <Button size="sm" variant="outline" className="ml-auto" onClick={resetRange}>
+                Reset date filter
+              </Button>
+            </div>
+          )}
           {children}
         </main>
         <AiInsightsDock />

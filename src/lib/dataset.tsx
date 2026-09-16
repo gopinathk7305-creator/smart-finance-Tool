@@ -7,6 +7,7 @@ import { fetchAllRows } from "@/lib/fetch-all";
 import { useAuth } from "@/lib/auth";
 import { ALL, demoDatasetFor, useOrg } from "@/lib/orgs";
 import { useActiveDataset } from "@/lib/active-dataset";
+import { inRange, useWorkspace } from "@/lib/workspace";
 import {
   type ArApRecord,
   type BudgetTarget,
@@ -24,6 +25,8 @@ export interface Dataset {
   /** true when the numbers come from the user's own uploaded data */
   live: boolean;
   loading: boolean;
+  /** true when rows exist for the dataset but none fall inside the selected date range */
+  outOfRange: boolean;
   refresh: () => void;
 }
 
@@ -83,6 +86,7 @@ export function useDataset(): Dataset {
   const { user } = useAuth();
   const { orgId, vendor } = useOrg();
   const { activeFile } = useActiveDataset();
+  const { range } = useWorkspace();
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -139,14 +143,17 @@ export function useDataset(): Dataset {
   if (!combined || rowCount === 0) {
     const demo = demoDatasetFor(orgId);
     const vendors = uniqueVendors(demo.txns, demo.araps);
+    const demoTxns = demo.txns.filter((r) => inRange(r.date, range));
+    const demoAraps = demo.araps.filter((r) => inRange(r.invoice_date, range));
     return {
-      txns: byVendor(demo.txns, vendor, (r) => r.vendor_client),
-      pays: demo.pays,
+      txns: byVendor(demoTxns, vendor, (r) => r.vendor_client),
+      pays: demo.pays.filter((r) => inRange(r.month_year, range)),
       buds: demo.buds,
-      araps: byVendor(demo.araps, vendor, (r) => r.party_name),
+      araps: byVendor(demoAraps, vendor, (r) => r.party_name),
       vendors,
       live: false,
       loading: !!user && isLoading,
+      outOfRange: demo.txns.length > 0 && demoTxns.length === 0,
       refresh,
     };
   }
@@ -196,14 +203,23 @@ export function useDataset(): Dataset {
     status: r.status === "settled" ? "settled" : "outstanding",
   }));
 
+  // Global date-range filter: every module reads this dataset, so scoping here
+  // syncs all pages to the header selection at once.
+  const txnsInRange = txns.filter((r) => inRange(r.date, range));
+  const arapsInRange = araps.filter((r) => inRange(r.invoice_date || r.due_date, range));
+  const paysInRange = pays.filter((r) => inRange(r.month_year, range));
+
   return {
-    txns: byVendor(txns, vendor, (r) => r.vendor_client),
-    pays,
+    txns: byVendor(txnsInRange, vendor, (r) => r.vendor_client),
+    pays: paysInRange,
     buds,
-    araps: byVendor(araps, vendor, (r) => r.party_name),
+    araps: byVendor(arapsInRange, vendor, (r) => r.party_name),
     vendors: uniqueVendors(txns, araps),
     live: true,
     loading: false,
+    outOfRange:
+      txns.length + araps.length + pays.length > 0 &&
+      txnsInRange.length + arapsInRange.length + paysInRange.length === 0,
     refresh,
   };
 }
