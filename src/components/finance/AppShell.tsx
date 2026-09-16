@@ -78,6 +78,7 @@ export function AppShell({
   const queryClient = useQueryClient();
   const { orgs, orgId, setOrgId, vendor, setVendor } = useOrg();
   const { vendors } = useDataset();
+  const { datasets, activeId, setActiveId } = useActiveDataset();
 
   useEffect(() => {
     if (!loading && !user && !demoMode) void navigate({ to: "/login", replace: true });
