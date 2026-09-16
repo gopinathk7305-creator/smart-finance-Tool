@@ -297,6 +297,18 @@ export function AppShell({
         </header>
 
         <main data-page-capture className="flex-1 p-4 md:p-6">
+          {outOfRange && (
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-warning/40 bg-warning-soft px-4 py-3">
+              <CalendarRange className="size-4 text-warning" />
+              <p className="text-sm font-medium text-foreground">
+                No records found for {range.label}
+                {active ? ` in ${active.file_name}` : ""}.
+              </p>
+              <Button size="sm" variant="outline" className="ml-auto" onClick={resetRange}>
+                Reset date filter
+              </Button>
+            </div>
+          )}
           {children}
         </main>
         <AiInsightsDock />
