@@ -7,6 +7,7 @@ import { fetchAllRows } from "@/lib/fetch-all";
 import { useAuth } from "@/lib/auth";
 import { ALL, demoDatasetFor, useOrg } from "@/lib/orgs";
 import { useActiveDataset } from "@/lib/active-dataset";
+import { inRange, useWorkspace } from "@/lib/workspace";
 import {
   type ArApRecord,
   type BudgetTarget,
