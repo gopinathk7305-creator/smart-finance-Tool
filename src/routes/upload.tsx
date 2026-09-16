@@ -355,6 +355,7 @@ function UploadPage() {
     await logActivity(`Synced ${parsed.rows.length} clean ${detection.label} rows to cloud`, "Data Upload");
     refresh();
     void stored.refetch();
+    refreshDatasets();
     setMappedOpen(false);
     toast.success(`${parsed.rows.length} rows synced — every module refreshed`);
     window.setTimeout(() => openInsights(parsed.fileName), 900);
