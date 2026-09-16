@@ -183,17 +183,6 @@ export function AppShell({
             </Select>
 
 
-            <Select defaultValue="ytd">
-              <SelectTrigger className="w-[132px] bg-background">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="month">This Month</SelectItem>
-                <SelectItem value="q4">Q4 2026</SelectItem>
-                <SelectItem value="ytd">YTD 2026</SelectItem>
-                <SelectItem value="custom">Custom</SelectItem>
-              </SelectContent>
-            </Select>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
