@@ -140,6 +140,7 @@ function RootComponent() {
             <Outlet />
             <Toaster position="top-right" richColors />
           </InsightsProvider>
+          </WorkspaceProvider>
           </ActiveDatasetProvider>
         </OrgProvider>
       </AuthProvider>
