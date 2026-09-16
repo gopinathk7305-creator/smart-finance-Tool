@@ -530,6 +530,48 @@ export type Database = {
           },
         ]
       }
+      uploaded_datasets: {
+        Row: {
+          column_names: string[]
+          created_at: string
+          dataset_key: string
+          file_name: string
+          id: string
+          modules: string[]
+          org_id: string | null
+          row_count: number
+          status: string
+          table_name: string
+          user_id: string
+        }
+        Insert: {
+          column_names?: string[]
+          created_at?: string
+          dataset_key: string
+          file_name: string
+          id?: string
+          modules?: string[]
+          org_id?: string | null
+          row_count?: number
+          status?: string
+          table_name: string
+          user_id: string
+        }
+        Update: {
+          column_names?: string[]
+          created_at?: string
+          dataset_key?: string
+          file_name?: string
+          id?: string
+          modules?: string[]
+          org_id?: string | null
+          row_count?: number
+          status?: string
+          table_name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string

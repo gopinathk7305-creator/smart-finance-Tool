@@ -1,17 +1,18 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
   CheckCircle2,
   CloudUpload,
   Database,
-  History,
+  Eye,
+  FolderOpen,
   Sparkles,
   Trash2,
   UploadCloud,
   XCircle,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/finance/AppShell";
@@ -26,6 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import {
   Table,
@@ -35,31 +37,32 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { logActivity, useAuth } from "@/lib/auth";
 import { ALL, useOrg } from "@/lib/orgs";
 import { useDataset } from "@/lib/dataset";
 import { useInsights } from "@/lib/insights";
 import { VirtualTable } from "@/components/finance/VirtualTable";
-import { type DatasetKey, type EtlResult, issueTone, runEtl, streamTabular } from "@/lib/etl";
+import { type EtlResult, issueTone, runEtl, streamTabular } from "@/lib/etl";
+import { detectSchema, type Detection } from "@/lib/schema-detect";
 
 const BATCH_SIZE = 5000;
+const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
 export const Route = createFileRoute("/upload")({
   head: () => ({
     meta: [
-      { title: "Cloud Data Ingestion & ETL — Finance IQ" },
+      { title: "Universal Data Ingestion — Finance IQ" },
       {
         name: "description",
         content:
-          "Upload CSV or Excel files, auto-clean and type-cast every field, review the data health report and sync clean rows to the cloud database.",
+          "Drop any financial CSV or Excel file. Finance IQ detects the schema, maps it to the right modules, cleans every field and syncs it to your cloud database.",
       },
-      { property: "og:title", content: "Cloud Data Ingestion & ETL — Finance IQ" },
+      { property: "og:title", content: "Universal Data Ingestion — Finance IQ" },
       {
         property: "og:description",
         content:
-          "Automated cleaning, error detection and cloud sync that instantly refreshes every dashboard.",
+          "One-click ingestion with automatic schema detection, data health checks, cloud storage and a stored dataset viewer.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -68,91 +71,111 @@ export const Route = createFileRoute("/upload")({
   component: UploadPage,
 });
 
-const DATASETS = [
-  {
-    key: "transactions",
-    table: "transactions",
-    label: "Financial Transactions",
-    columns: ["date", "category", "type", "amount", "vendor_client", "status"],
-  },
-  {
-    key: "payroll",
-    table: "payroll_records",
-    label: "Payroll Records",
-    columns: ["month_year", "employee_id", "name", "department", "basic_pay", "allowances", "deductions"],
-  },
-  {
-    key: "budget",
-    table: "budget_targets",
-    label: "Budget Targets",
-    columns: ["fiscal_year", "category", "department", "budgeted_amount"],
-  },
-  {
-    key: "arap",
-    table: "arap_records",
-    label: "Receivables / Payables",
-    columns: ["type", "party_name", "invoice_date", "due_date", "amount", "status"],
-  },
-] as const;
+type TableName = Detection["table"];
 
-type TableName = (typeof DATASETS)[number]["table"];
+interface StoredDataset {
+  id: string;
+  file_name: string;
+  table_name: TableName;
+  dataset_key: string;
+  row_count: number;
+  modules: string[];
+  column_names: string[];
+  status: string;
+  created_at: string;
+}
 
 function UploadPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { refresh, live } = useDataset();
   const { orgId, liveOrgs, orgName } = useOrg();
   const { openInsights } = useInsights();
   const scopeOrgId = liveOrgs && orgId !== ALL ? orgId : null;
-  const [active, setActive] = useState<DatasetKey>("transactions");
+
   const [dragging, setDragging] = useState(false);
-  const [parsed, setParsed] = useState<Partial<Record<DatasetKey, EtlResult>>>({});
-  const [rawCache, setRawCache] = useState<Partial<Record<DatasetKey, Record<string, string>[]>>>({});
-  const [auditOpen, setAuditOpen] = useState(false);
+  const [detection, setDetection] = useState<Detection | null>(null);
+  const [parsed, setParsed] = useState<EtlResult | null>(null);
+  const [rawCache, setRawCache] = useState<Record<string, string>[] | null>(null);
+  const [mappedOpen, setMappedOpen] = useState(false);
   const [committing, setCommitting] = useState(false);
   const [fixed, setFixed] = useState(false);
   const [progress, setProgress] = useState<{ label: string; pct: number; eta: string } | null>(null);
+  const [viewer, setViewer] = useState<StoredDataset | null>(null);
+  const [search, setSearch] = useState("");
 
-  const history = useQuery({
-    queryKey: ["upload-history", user?.id ?? "anon", scopeOrgId ?? "all"],
+  /* ------------------------------------------------ stored datasets */
+
+  const stored = useQuery({
+    queryKey: ["stored-datasets", user?.id ?? "anon", scopeOrgId ?? "all"],
     enabled: !!user,
     queryFn: async () => {
-      const out: { file: string; table: TableName; label: string; rows: number; last: string }[] = [];
-      for (const ds of DATASETS) {
-        let q = supabase.from(ds.table).select("source_file, created_at").eq("user_id", user!.id);
-        if (scopeOrgId) q = q.eq("org_id", scopeOrgId);
-        const { data } = await q;
-        const groups = new Map<string, { rows: number; last: string }>();
-        (data ?? []).forEach((r) => {
-          const row = r as { source_file?: string; created_at?: string };
-          const file = row.source_file || "Manual entry";
-          const created = String(row.created_at ?? "");
-          const g = groups.get(file) ?? { rows: 0, last: created };
-          g.rows += 1;
-          if (created > g.last) g.last = created;
-          groups.set(file, g);
-        });
-        groups.forEach((g, file) =>
-          out.push({ file, table: ds.table, label: ds.label, rows: g.rows, last: g.last }),
-        );
-      }
-      return out.sort((a, b) => b.last.localeCompare(a.last));
+      let q = supabase
+        .from("uploaded_datasets")
+        .select("*")
+        .eq("user_id", user!.id)
+        .order("created_at", { ascending: false });
+      if (scopeOrgId) q = q.eq("org_id", scopeOrgId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as unknown as StoredDataset[];
     },
   });
 
-  const parse = (key: DatasetKey, raw: Record<string, string>[], fileName: string, autoFixMode: boolean) => {
-    const result = runEtl(key, raw, user!.id, fileName, autoFixMode);
+  const viewerRows = useQuery({
+    queryKey: ["dataset-rows", viewer?.id ?? "none"],
+    enabled: !!viewer && !!user,
+    queryFn: async () => {
+      let q = supabase
+        .from(viewer!.table_name)
+        .select("*")
+        .eq("user_id", user!.id)
+        .eq("source_file", viewer!.file_name)
+        .limit(20000);
+      if (scopeOrgId) q = q.eq("org_id", scopeOrgId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as Record<string, unknown>[];
+    },
+  });
+
+  const hiddenCols = new Set(["id", "user_id", "org_id", "created_at", "source_file"]);
+  const viewerCols = useMemo(() => {
+    const first = viewerRows.data?.[0];
+    return first ? Object.keys(first).filter((k) => !hiddenCols.has(k)) : [];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewerRows.data]);
+
+  const filteredRows = useMemo(() => {
+    const rows = viewerRows.data ?? [];
+    const term = search.trim().toLowerCase();
+    if (!term) return rows;
+    return rows.filter((r) =>
+      viewerCols.some((c) => String(r[c] ?? "").toLowerCase().includes(term)),
+    );
+  }, [viewerRows.data, search, viewerCols]);
+
+  /* ------------------------------------------------ ingestion */
+
+  const runPipeline = (
+    det: Detection,
+    raw: Record<string, string>[],
+    fileName: string,
+    autoFixMode: boolean,
+  ) => {
+    const result = runEtl(det.key, raw, user!.id, fileName, autoFixMode);
     const rows = scopeOrgId ? result.rows.map((r) => ({ ...r, org_id: scopeOrgId })) : result.rows;
-    setParsed((s) => ({ ...s, [key]: { ...result, rows } }));
-    return result;
+    const withOrg = { ...result, rows };
+    setParsed(withOrg);
+    return withOrg;
   };
 
-  const handleFile = async (key: DatasetKey, file: File) => {
+  const handleFile = async (file: File) => {
     if (!user) {
       toast.error("Sign in to upload your own data.");
       return;
     }
     let raw: Record<string, string>[];
-    setActive(key);
     setProgress({ label: `Parsing ${file.name}…`, pct: 2, eta: "" });
     try {
       raw = await streamTabular(
@@ -177,32 +200,35 @@ function UploadPage() {
       toast.error("That file has no data rows.");
       return;
     }
-    setProgress({ label: `Cleaning ${raw.length.toLocaleString("en-IN")} rows…`, pct: 100, eta: "" });
+
+    const det = detectSchema(Object.keys(raw[0]!));
+    setProgress({
+      label: `Detected ${det.label} — cleaning ${raw.length.toLocaleString("en-IN")} rows…`,
+      pct: 100,
+      eta: "",
+    });
     await new Promise((r) => window.setTimeout(r, 30));
-    setRawCache((s) => ({ ...s, [key]: raw }));
+    setDetection(det);
+    setRawCache(raw);
     setFixed(false);
-    const result = parse(key, raw, file.name, false);
+    runPipeline(det, raw, file.name, false);
     setProgress(null);
-    setAuditOpen(true);
-    toast.success(`${file.name} cleaned — ${result.clean} of ${result.total} rows validated`);
+    setMappedOpen(true);
   };
 
   const autoFix = () => {
-    const raw = rawCache[active];
-    const p = parsed[active];
-    if (!raw || !p) return;
-    const result = parse(active, raw, p.fileName, true);
+    if (!rawCache || !parsed || !detection) return;
+    const result = runPipeline(detection, rawCache, parsed.fileName, true);
     setFixed(true);
     toast.success(`Auto-fix applied — ${result.clean} of ${result.total} rows ready to sync`);
   };
 
-  const commit = async (key: DatasetKey) => {
-    const p = parsed[key];
-    const ds = DATASETS.find((d) => d.key === key)!;
-    if (!p || !p.rows.length) return;
+  const commit = async () => {
+    if (!parsed || !detection || !parsed.rows.length || !user) return;
     setCommitting(true);
     const batches: Record<string, unknown>[][] = [];
-    for (let i = 0; i < p.rows.length; i += BATCH_SIZE) batches.push(p.rows.slice(i, i + BATCH_SIZE));
+    for (let i = 0; i < parsed.rows.length; i += BATCH_SIZE)
+      batches.push(parsed.rows.slice(i, i + BATCH_SIZE));
     const started = Date.now();
     for (let b = 0; b < batches.length; b += 1) {
       const done = b / batches.length;
@@ -212,74 +238,110 @@ function UploadPage() {
         pct: done * 100,
         eta: done > 0 ? `~${Math.ceil(elapsed / done - elapsed)}s remaining` : "",
       });
-      const { error } = await supabase.from(ds.table).insert(batches[b]! as never);
+      const { error } = await supabase.from(detection.table).insert(batches[b]! as never);
       if (error) {
         setCommitting(false);
         setProgress(null);
         toast.error(error.message);
         return;
       }
-      // let the UI paint between batches and release the chunk from memory
       batches[b] = [];
       await new Promise((r) => window.setTimeout(r, 0));
     }
+
+    await supabase.from("uploaded_datasets").insert({
+      user_id: user.id,
+      org_id: scopeOrgId,
+      file_name: parsed.fileName,
+      dataset_key: detection.key,
+      table_name: detection.table,
+      row_count: parsed.rows.length,
+      column_names: detection.columns,
+      modules: detection.modules,
+      status: "synced",
+    } as never);
+
     setCommitting(false);
     setProgress(null);
-    await logActivity(`Synced ${p.rows.length} clean ${ds.label} rows to cloud`, "Data Upload");
+    await logActivity(`Synced ${parsed.rows.length} clean ${detection.label} rows to cloud`, "Data Upload");
     refresh();
-    void history.refetch();
-    setAuditOpen(false);
-    toast.success(`${p.rows.length} rows synced — every page refreshed`);
-    // Automated AI insight pop-up, once the fresh rows have landed in state.
-    window.setTimeout(() => openInsights(p.fileName), 900);
+    void stored.refetch();
+    setMappedOpen(false);
+    toast.success(`${parsed.rows.length} rows synced — every module refreshed`);
+    window.setTimeout(() => openInsights(parsed.fileName), 900);
   };
 
-  const deleteDataset = async (table: TableName, file: string) => {
+  const purge = async (ds: StoredDataset) => {
     if (!user) return;
     let q = supabase
-      .from(table)
+      .from(ds.table_name)
       .delete()
       .eq("user_id", user.id)
-      .eq("source_file", file === "Manual entry" ? "" : file);
+      .eq("source_file", ds.file_name);
     if (scopeOrgId) q = q.eq("org_id", scopeOrgId);
     const { error } = await q;
     if (error) {
       toast.error(error.message);
       return;
     }
+    await supabase.from("uploaded_datasets").delete().eq("id", ds.id);
     refresh();
-    void history.refetch();
-    toast.success(`${file} removed from cloud storage`);
+    void stored.refetch();
+    toast.success(`${ds.file_name} purged from cloud storage`);
   };
 
-  const clearTable = async (key: DatasetKey) => {
-    if (!user) return;
-    const ds = DATASETS.find((d) => d.key === key)!;
-    const base = supabase.from(ds.table).delete().eq("user_id", user.id);
-    const { error } = await (scopeOrgId ? base.eq("org_id", scopeOrgId) : base);
-    if (error) {
-      toast.error(error.message);
-      return;
+  /* ------------------------------------------------ derived */
+
+  const errors = parsed?.issues.filter((i) => i.severity === "error") ?? [];
+  const warnings = parsed?.issues.filter((i) => i.severity === "warning") ?? [];
+  const fixes = parsed?.issues.filter((i) => i.severity === "fixed") ?? [];
+
+  const highlights = useMemo(() => {
+    if (!parsed || !detection) return [] as string[];
+    const rows = parsed.rows as Record<string, unknown>[];
+    const num = (r: Record<string, unknown>, k: string) => Number(r[k] ?? 0) || 0;
+    const out: string[] = [];
+
+    if (detection.key === "transactions") {
+      const income = rows.filter((r) => r["type"] === "income").reduce((s, r) => s + num(r, "amount"), 0);
+      const expense = rows.filter((r) => r["type"] !== "income").reduce((s, r) => s + num(r, "amount"), 0);
+      const byCat = new Map<string, number>();
+      rows.forEach((r) => {
+        if (r["type"] === "income") return;
+        const c = String(r["category"] ?? "Unassigned");
+        byCat.set(c, (byCat.get(c) ?? 0) + num(r, "amount"));
+      });
+      const top = [...byCat.entries()].sort((a, b) => b[1] - a[1])[0];
+      out.push(`Revenue recognised ${inr(income)} against ${inr(expense)} of spend — net position ${inr(income - expense)}.`);
+      if (top) out.push(`Highest expense head is ${top[0]} at ${inr(top[1])}.`);
+    } else if (detection.key === "payroll") {
+      const gross = rows.reduce((s, r) => s + num(r, "basic_pay") + num(r, "allowances"), 0);
+      const tds = rows.reduce((s, r) => s + num(r, "tds_deduction"), 0);
+      const pf = rows.reduce((s, r) => s + num(r, "pf_deduction"), 0);
+      out.push(`${rows.length} payroll rows totalling ${inr(gross)} gross pay.`);
+      out.push(`Statutory exposure: PF ${inr(pf)} and TDS ${inr(tds)} now flow into Payroll, Tax and Compliance.`);
+    } else if (detection.key === "budget") {
+      const plan = rows.reduce((s, r) => s + num(r, "budgeted_amount"), 0);
+      out.push(`Plan of ${inr(plan)} loaded across ${rows.length} category lines for Budget vs Actual.`);
+    } else {
+      const ar = rows.filter((r) => r["type"] === "AR").reduce((s, r) => s + num(r, "amount"), 0);
+      const ap = rows.filter((r) => r["type"] === "AP").reduce((s, r) => s + num(r, "amount"), 0);
+      out.push(`Receivables ${inr(ar)} and payables ${inr(ap)} will fill the cash-flow aging buckets.`);
     }
-    setParsed((s) => ({ ...s, [key]: undefined }));
-    refresh();
-    void history.refetch();
-    toast.success(`${ds.label} cleared`);
-  };
 
-  const p = parsed[active];
-  const errors = p?.issues.filter((i) => i.severity === "error") ?? [];
-  const warnings = p?.issues.filter((i) => i.severity === "warning") ?? [];
-  const fixes = p?.issues.filter((i) => i.severity === "fixed") ?? [];
+    if (warnings.length) out.push(`${warnings.length} anomaly flag(s) raised — duplicates, unpaid items or invalid tax IDs.`);
+    if (errors.length && !fixed) out.push(`${errors.length} row(s) blocked and will be skipped unless auto-fixed.`);
+    return out;
+  }, [parsed, detection, warnings.length, errors.length, fixed]);
 
   return (
     <AppShell
-      title="Cloud Data Ingestion & ETL"
+      title="Universal Data Ingestion"
       subtitle={
         user
           ? live
-            ? `${orgName} — clean cloud data is powering every page`
-            : `${orgName} — upload a CSV or Excel file to replace the sample numbers`
+            ? `${orgName} — clean cloud data is powering every module`
+            : `${orgName} — drop any financial file and it maps itself`
           : "Demo mode — sign in to upload real files"
       }
     >
@@ -297,169 +359,109 @@ function UploadPage() {
         </Card>
       )}
 
-      <Tabs value={active} onValueChange={(v) => setActive(v as DatasetKey)}>
-        <TabsList className="flex-wrap">
-          {DATASETS.map((d) => (
-            <TabsTrigger key={d.key} value={d.key}>
-              {d.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card className="border-border shadow-card lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-base">One-click upload — any financial file</CardTitle>
+            <CardDescription>
+              Transactions, budgets, payroll, vendors, assets or audit extracts. The schema is detected
+              automatically, so no module selection is needed.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <label
+              data-testid="universal-dropzone"
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragging(false);
+                const f = e.dataTransfer.files[0];
+                if (f) void handleFile(f);
+              }}
+              className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-12 text-center transition-colors ${
+                dragging ? "border-brand bg-brand-soft" : "border-border bg-background hover:border-brand"
+              }`}
+            >
+              <input
+                type="file"
+                accept=".csv,.xls,.xlsx,text/csv"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void handleFile(f);
+                  e.target.value = "";
+                }}
+              />
+              <UploadCloud className="size-9 text-brand" />
+              <p className="text-sm font-medium">Drag &amp; drop your .csv or .xlsx here</p>
+              <p className="text-xs text-muted-foreground">
+                Headers are matched, fields are cleaned and type-cast, and nothing saves until you confirm
+              </p>
+            </label>
 
-        {DATASETS.map((d) => {
-          const dp = parsed[d.key];
-          const blocked = dp?.issues.filter((i) => i.severity === "error").length ?? 0;
-          return (
-            <TabsContent key={d.key} value={d.key} className="mt-4 space-y-4">
-              <div className="grid gap-4 lg:grid-cols-3">
-                <Card className="border-border shadow-card lg:col-span-2">
-                  <CardHeader>
-                    <CardTitle className="text-base">Upload {d.label}</CardTitle>
-                    <CardDescription>
-                      CSV or Excel · Required columns: {d.columns.join(", ")}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <label
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        setDragging(true);
-                      }}
-                      onDragLeave={() => setDragging(false)}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        setDragging(false);
-                        const f = e.dataTransfer.files[0];
-                        if (f) void handleFile(d.key, f);
-                      }}
-                      className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-10 text-center transition-colors ${
-                        dragging
-                          ? "border-brand bg-brand-soft"
-                          : "border-border bg-background hover:border-brand"
-                      }`}
-                    >
-                      <input
-                        type="file"
-                        accept=".csv,.xls,.xlsx,text/csv"
-                        className="hidden"
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f) void handleFile(d.key, f);
-                          e.target.value = "";
-                        }}
-                      />
-                      <UploadCloud className="size-8 text-brand" />
-                      <p className="text-sm font-medium">Drag &amp; drop your .csv or .xlsx here</p>
-                      <p className="text-xs text-muted-foreground">
-                        Data is cleaned, type-cast and validated before anything is saved
-                      </p>
-                    </label>
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <Button
-                        disabled={!dp || dp.rows.length === 0 || !user}
-                        onClick={() => {
-                          setActive(d.key);
-                          setAuditOpen(true);
-                        }}
-                      >
-                        <Database className="size-4" />
-                        Review &amp; sync {dp?.rows.length ?? 0} rows
-                      </Button>
-                      <Button variant="outline" disabled={!user} onClick={() => void clearTable(d.key)}>
-                        <Trash2 className="size-4" /> Clear stored {d.label.toLowerCase()}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-border shadow-card">
-                  <CardHeader>
-                    <CardTitle className="text-base">Data health</CardTitle>
-                    <CardDescription>Automated cleaning pipeline</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {!dp ? (
-                      <p className="text-sm text-muted-foreground">
-                        Upload a file to run the cleaning pipeline.
-                      </p>
-                    ) : (
-                      <>
-                        <div className="grid grid-cols-3 gap-2 text-center">
-                          <Stat label="Total rows" value={dp.total} />
-                          <Stat label="Clean" value={dp.clean} tone="success" />
-                          <Stat label="Errors" value={blocked} tone="danger" />
-                        </div>
-                        <Progress value={(dp.clean / Math.max(1, dp.total)) * 100} className="h-2" />
-                        <ul className="space-y-2 text-xs">
-                          <Check ok label={`File read: ${dp.fileName}`} />
-                          <Check ok label="Whitespace & special characters trimmed" />
-                          <Check ok label="Dates, amounts, GSTIN/PAN type-cast" />
-                          <Check
-                            ok={blocked === 0}
-                            label={blocked === 0 ? "No blocking errors" : `${blocked} row(s) blocked`}
-                          />
-                        </ul>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
+            {parsed && detection && (
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <Button onClick={() => setMappedOpen(true)} disabled={!parsed.rows.length}>
+                  <Database className="size-4" /> Review &amp; sync {parsed.rows.length} rows
+                </Button>
+                <Badge variant="secondary">{detection.label}</Badge>
+                <span className="text-xs text-muted-foreground">{parsed.fileName}</span>
               </div>
+            )}
+          </CardContent>
+        </Card>
 
-              <Card className="border-border shadow-card">
-                <CardHeader>
-                  <CardTitle className="text-base">Cleaned preview</CardTitle>
-                  <CardDescription>First 10 rows after trimming and normalisation</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {!dp || dp.preview.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-border py-12 text-center text-sm text-muted-foreground">
-                      Nothing loaded yet.
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            {Object.keys(dp.preview[0]!).map((h) => (
-                              <TableHead key={h}>{h}</TableHead>
-                            ))}
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {dp.preview.map((r, i) => (
-                            <TableRow key={i}>
-                              {Object.values(r).map((val, j) => (
-                                <TableCell key={j} className="tabular whitespace-nowrap">
-                                  {String(val)}
-                                </TableCell>
-                              ))}
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          );
-        })}
-      </Tabs>
+        <Card className="border-border shadow-card">
+          <CardHeader>
+            <CardTitle className="text-base">Detection &amp; data health</CardTitle>
+            <CardDescription>Automatic schema mapper</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {!parsed || !detection ? (
+              <p className="text-sm text-muted-foreground">
+                Upload a file to run schema detection and the cleaning pipeline.
+              </p>
+            ) : (
+              <>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <Stat label="Total rows" value={parsed.total} />
+                  <Stat label="Clean" value={parsed.clean} tone="success" />
+                  <Stat label="Errors" value={errors.length} tone="danger" />
+                </div>
+                <Progress value={(parsed.clean / Math.max(1, parsed.total)) * 100} className="h-2" />
+                <ul className="space-y-2 text-xs">
+                  <Check ok label={`Detected as ${detection.label} (${detection.confidence}% match)`} />
+                  <Check ok label={`${detection.columns.length} columns mapped`} />
+                  <Check ok label="Whitespace, dates, amounts, GSTIN/PAN type-cast" />
+                  <Check
+                    ok={errors.length === 0}
+                    label={errors.length === 0 ? "No blocking errors" : `${errors.length} row(s) blocked`}
+                  />
+                </ul>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <Card className="mt-4 border-border shadow-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <History className="size-4 text-brand" /> Dataset history &amp; cloud storage
+            <FolderOpen className="size-4 text-brand" /> Manage cloud datasets
           </CardTitle>
           <CardDescription>
-            Every dataset stored for {orgName}. Delete a file to remove its rows everywhere.
+            Every dataset stored for {orgName}. Open one to inspect raw rows, or purge it to remove those rows
+            everywhere.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {!user ? (
             <p className="text-sm text-muted-foreground">Sign in to see your stored datasets.</p>
-          ) : (history.data ?? []).length === 0 ? (
+          ) : (stored.data ?? []).length === 0 ? (
             <div className="rounded-lg border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
               No datasets stored yet.
             </div>
@@ -468,30 +470,48 @@ function UploadPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Dataset file</TableHead>
-                    <TableHead>Module</TableHead>
+                    <TableHead>Dataset name</TableHead>
+                    <TableHead>Mapped modules</TableHead>
                     <TableHead className="text-right">Rows</TableHead>
-                    <TableHead>Last synced</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
+                    <TableHead>Upload date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(history.data ?? []).map((h) => (
-                    <TableRow key={`${h.table}-${h.file}`}>
-                      <TableCell className="font-medium">{h.file}</TableCell>
+                  {(stored.data ?? []).map((ds) => (
+                    <TableRow key={ds.id}>
+                      <TableCell className="font-medium">{ds.file_name}</TableCell>
                       <TableCell>
-                        <Badge variant="secondary">{h.label}</Badge>
+                        <div className="flex flex-wrap gap-1">
+                          {ds.modules.map((m) => (
+                            <Badge key={m} variant="secondary" className="text-[11px]">
+                              {m}
+                            </Badge>
+                          ))}
+                        </div>
                       </TableCell>
-                      <TableCell className="tabular text-right">{h.rows}</TableCell>
+                      <TableCell className="tabular text-right">
+                        {ds.row_count.toLocaleString("en-IN")}
+                      </TableCell>
                       <TableCell className="tabular whitespace-nowrap">
-                        {h.last ? new Date(h.last).toLocaleString("en-IN") : "—"}
+                        {new Date(ds.created_at).toLocaleString("en-IN")}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell>
+                        <Badge className="bg-success-soft text-success">{ds.status}</Badge>
+                      </TableCell>
+                      <TableCell className="space-x-1 text-right">
                         <Button
                           size="sm"
-                          variant="ghost"
-                          onClick={() => void deleteDataset(h.table, h.file)}
+                          variant="outline"
+                          onClick={() => {
+                            setSearch("");
+                            setViewer(ds);
+                          }}
                         >
+                          <Eye className="size-4" /> Open
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => void purge(ds)}>
                           <Trash2 className="size-4 text-danger" />
                         </Button>
                       </TableCell>
@@ -504,32 +524,59 @@ function UploadPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={auditOpen} onOpenChange={setAuditOpen}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
+      {/* ⚡ Dataset auto-detected modal */}
+      <Dialog open={mappedOpen} onOpenChange={setMappedOpen}>
+        <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Upload audit &amp; data health summary</DialogTitle>
+            <DialogTitle>⚡ Dataset auto-detected &amp; successfully processed</DialogTitle>
             <DialogDescription>
-              {p ? `${p.clean} / ${p.total} rows clean & validated from ${p.fileName}` : "No file loaded"}
+              {parsed
+                ? `${parsed.fileName} — ${parsed.total.toLocaleString("en-IN")} rows, ${
+                    detection?.columns.length ?? 0
+                  } columns detected`
+                : "No file loaded"}
             </DialogDescription>
           </DialogHeader>
 
-          {p && (
+          {parsed && detection && (
             <div className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                {detection.modules.map((m) => (
+                  <Badge key={m} className="bg-brand-soft text-brand">
+                    ✅ {m}
+                  </Badge>
+                ))}
+              </div>
+
               <div className="grid grid-cols-4 gap-2 text-center">
-                <Stat label="Total" value={p.total} />
-                <Stat label="Clean" value={p.clean} tone="success" />
+                <Stat label="Total" value={parsed.total} />
+                <Stat label="Clean" value={parsed.clean} tone="success" />
                 <Stat label="Errors" value={errors.length} tone="danger" />
                 <Stat label="Warnings" value={warnings.length} />
               </div>
 
-              {p.issues.length === 0 ? (
+              <div className="rounded-md border border-border bg-muted/40 p-3">
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Key highlights
+                </p>
+                <ul className="space-y-1 text-sm">
+                  {highlights.map((h) => (
+                    <li key={h} className="flex gap-2">
+                      <Sparkles className="mt-0.5 size-3.5 shrink-0 text-brand" />
+                      {h}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {parsed.issues.length === 0 ? (
                 <p className="rounded-md border border-border bg-success-soft p-3 text-sm text-success">
                   No issues detected — the dataset is ready to sync.
                 </p>
               ) : (
                 <VirtualTable
-                  rows={p.issues}
-                  height={288}
+                  rows={parsed.issues}
+                  height={240}
                   head={
                     <>
                       <th className="w-16 p-2">Row</th>
@@ -564,14 +611,67 @@ function UploadPage() {
           )}
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={autoFix} disabled={!p || fixed || errors.length === 0}>
+            <Button variant="outline" onClick={autoFix} disabled={!parsed || fixed || errors.length === 0}>
               <Sparkles className="size-4" /> Auto-fix errors
             </Button>
-            <Button disabled={!p || p.rows.length === 0 || committing} onClick={() => void commit(active)}>
+            <Button variant="outline" onClick={() => void navigate({ to: "/" })}>
+              Explore sync&rsquo;d dashboard
+            </Button>
+            <Button disabled={!parsed || parsed.rows.length === 0 || committing} onClick={() => void commit()}>
               <CloudUpload className="size-4" />
-              {committing ? "Syncing…" : `Confirm & sync ${p?.rows.length ?? 0} rows`}
+              {committing ? "Syncing…" : `Confirm & sync ${parsed?.rows.length ?? 0} rows`}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Stored dataset viewer */}
+      <Dialog open={!!viewer} onOpenChange={(o) => !o && setViewer(null)}>
+        <DialogContent className="max-w-[95vw] sm:max-w-[95vw]">
+          <DialogHeader>
+            <DialogTitle>{viewer?.file_name}</DialogTitle>
+            <DialogDescription>
+              {viewerRows.isLoading
+                ? "Loading rows from cloud storage…"
+                : `${filteredRows.length.toLocaleString("en-IN")} of ${(viewerRows.data ?? []).length.toLocaleString("en-IN")} stored rows`}
+            </DialogDescription>
+          </DialogHeader>
+
+          <Input
+            placeholder="Search any value in this dataset…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="max-w-sm"
+          />
+
+          {viewerCols.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border py-12 text-center text-sm text-muted-foreground">
+              {viewerRows.isLoading ? "Loading…" : "No rows stored for this dataset."}
+            </div>
+          ) : (
+            <VirtualTable
+              rows={filteredRows}
+              height={480}
+              head={
+                <>
+                  {viewerCols.map((c) => (
+                    <th key={c} className="p-2 capitalize">
+                      {c.replace(/_/g, " ")}
+                    </th>
+                  ))}
+                </>
+              }
+              row={(r) => (
+                <>
+                  {viewerCols.map((c) => (
+                    <td key={c} className="tabular truncate p-2">
+                      {String(r[c] ?? "—")}
+                    </td>
+                  ))}
+                </>
+              )}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </AppShell>
@@ -582,7 +682,7 @@ function Stat({ label, value, tone }: { label: string; value: number; tone?: "su
   const color = tone === "success" ? "text-success" : tone === "danger" ? "text-danger" : "text-foreground";
   return (
     <div className="rounded-md border border-border p-2">
-      <p className={`tabular text-lg font-bold ${color}`}>{value}</p>
+      <p className={`tabular text-lg font-bold ${color}`}>{value.toLocaleString("en-IN")}</p>
       <p className="text-[11px] text-muted-foreground">{label}</p>
     </div>
   );
