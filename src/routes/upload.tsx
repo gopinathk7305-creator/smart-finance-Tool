@@ -360,6 +360,17 @@ function UploadPage() {
     window.setTimeout(() => openInsights(parsed.fileName), 900);
   };
 
+  const activate = (id: string | null) => {
+    setActiveId(id);
+    refresh();
+    const name = datasets.find((d) => d.id === id)?.file_name ?? (stored.data ?? []).find((d) => d.id === id)?.file_name;
+    toast.success(
+      id
+        ? `Switched active workspace dataset to ${name ?? "selected dataset"}`
+        : "Every module is using all stored datasets again",
+    );
+  };
+
   const purge = async (ds: StoredDataset) => {
     if (!user) return;
     let q = supabase
