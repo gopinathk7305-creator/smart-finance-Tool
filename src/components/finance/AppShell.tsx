@@ -155,6 +155,35 @@ export function AppShell({
           </div>
 
           <div className="ml-auto flex items-center gap-2">
+            {datasets.length > 0 && (
+              <Select
+                value={activeId ?? ALL}
+                onValueChange={(v) => {
+                  const id = v === ALL ? null : v;
+                  setActiveId(id);
+                  const name = datasets.find((d) => d.id === id)?.file_name;
+                  toast.success(
+                    id
+                      ? `Switched active workspace dataset to ${name}`
+                      : "Using every stored dataset",
+                  );
+                }}
+              >
+                <SelectTrigger className="hidden w-[230px] bg-background xl:flex">
+                  <FolderOpen className="size-4 text-muted-foreground" />
+                  <SelectValue placeholder="Active dataset" />
+                </SelectTrigger>
+                <SelectContent className="max-h-72">
+                  <SelectItem value={ALL}>All datasets combined</SelectItem>
+                  {datasets.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.file_name} ({d.row_count.toLocaleString("en-IN")} rows)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
             <Select value={orgId} onValueChange={setOrgId}>
               <SelectTrigger className="w-[190px] bg-background">
                 <Building2 className="size-4 text-muted-foreground" />
