@@ -143,14 +143,17 @@ export function useDataset(): Dataset {
   if (!combined || rowCount === 0) {
     const demo = demoDatasetFor(orgId);
     const vendors = uniqueVendors(demo.txns, demo.araps);
+    const demoTxns = demo.txns.filter((r) => inRange(r.date, range));
+    const demoAraps = demo.araps.filter((r) => inRange(r.invoice_date, range));
     return {
-      txns: byVendor(demo.txns, vendor, (r) => r.vendor_client),
-      pays: demo.pays,
+      txns: byVendor(demoTxns, vendor, (r) => r.vendor_client),
+      pays: demo.pays.filter((r) => inRange(r.month_year, range)),
       buds: demo.buds,
-      araps: byVendor(demo.araps, vendor, (r) => r.party_name),
+      araps: byVendor(demoAraps, vendor, (r) => r.party_name),
       vendors,
       live: false,
       loading: !!user && isLoading,
+      outOfRange: demo.txns.length > 0 && demoTxns.length === 0,
       refresh,
     };
   }
