@@ -78,7 +78,10 @@ export function AppShell({
   const { user, demoMode, signOut, loading } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { datasets, activeId, setActiveId } = useActiveDataset();
+  const { datasets, activeId, setActiveId, active } = useActiveDataset();
+  const { preset, custom, range, setPreset, setCustom, resetRange } = useWorkspace();
+  const { outOfRange } = useDataset();
+  const fy = fiscalYearStart();
 
   useEffect(() => {
     if (!loading && !user && !demoMode) void navigate({ to: "/login", replace: true });
