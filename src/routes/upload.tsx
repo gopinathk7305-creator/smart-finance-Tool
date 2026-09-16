@@ -51,6 +51,7 @@ import { ALL, useOrg } from "@/lib/orgs";
 import { cacheLocalDatasetRows, clearLocalDatasetRows, useDataset } from "@/lib/dataset";
 import { useInsights } from "@/lib/insights";
 import { VirtualTable } from "@/components/finance/VirtualTable";
+import { collectColumns, DataGrid, numericColumns } from "@/components/finance/DataGrid";
 import { type EtlResult, issueTone, runEtlChunked, streamTabular } from "@/lib/etl";
 import { detectSchema, type Detection } from "@/lib/schema-detect";
 
