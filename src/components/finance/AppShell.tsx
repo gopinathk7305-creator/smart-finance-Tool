@@ -9,7 +9,6 @@ import {
   LayoutDashboard,
   LineChart,
   PanelLeft,
-  Building2,
   ShieldAlert,
   ShieldCheck,
   Target,
@@ -42,8 +41,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/lib/auth";
-import { useDataset } from "@/lib/dataset";
-import { ALL, useOrg } from "@/lib/orgs";
+import { ALL } from "@/lib/orgs";
 import { alerts } from "@/lib/finance-data";
 import { cn } from "@/lib/utils";
 
@@ -76,8 +74,6 @@ export function AppShell({
   const { user, demoMode, signOut, loading } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { orgs, orgId, setOrgId, vendor, setVendor } = useOrg();
-  const { vendors } = useDataset();
   const { datasets, activeId, setActiveId } = useActiveDataset();
 
   useEffect(() => {
@@ -159,63 +155,33 @@ export function AppShell({
           </div>
 
           <div className="ml-auto flex items-center gap-2">
-            {datasets.length > 0 && (
-              <Select
-                value={activeId ?? ALL}
-                onValueChange={(v) => {
-                  const id = v === ALL ? null : v;
-                  setActiveId(id);
-                  const name = datasets.find((d) => d.id === id)?.file_name;
-                  toast.success(
-                    id
-                      ? `Switched active workspace dataset to ${name}`
-                      : "Using every stored dataset",
-                  );
-                }}
-              >
-                <SelectTrigger className="hidden w-[230px] bg-background xl:flex">
-                  <FolderOpen className="size-4 text-muted-foreground" />
-                  <SelectValue placeholder="Active dataset" />
-                </SelectTrigger>
-                <SelectContent className="max-h-72">
-                  <SelectItem value={ALL}>All datasets combined</SelectItem>
-                  {datasets.map((d) => (
-                    <SelectItem key={d.id} value={d.id}>
-                      {d.file_name} ({d.row_count.toLocaleString("en-IN")} rows)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-
-            <Select value={orgId} onValueChange={setOrgId}>
-              <SelectTrigger className="w-[190px] bg-background">
-                <Building2 className="size-4 text-muted-foreground" />
-                <SelectValue placeholder="Select organization" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>All organizations</SelectItem>
-                {orgs.map((o) => (
-                  <SelectItem key={o.id} value={o.id}>
-                    {o.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={vendor} onValueChange={setVendor}>
-              <SelectTrigger className="hidden w-[170px] bg-background lg:flex">
-                <SelectValue placeholder="All vendors" />
+            <Select
+              value={activeId ?? ALL}
+              onValueChange={(v) => {
+                const id = v === ALL ? null : v;
+                setActiveId(id);
+                const name = datasets.find((d) => d.id === id)?.file_name;
+                toast.success(
+                  id
+                    ? `Switched active workspace dataset to ${name}`
+                    : "Using every stored dataset",
+                );
+              }}
+            >
+              <SelectTrigger className="w-[190px] border-primary/40 bg-primary/5 font-medium sm:w-[320px]">
+                <FolderOpen className="size-4 text-primary" />
+                <SelectValue placeholder="Active dataset" />
               </SelectTrigger>
               <SelectContent className="max-h-72">
-                <SelectItem value={ALL}>All vendors</SelectItem>
-                {vendors.map((v) => (
-                  <SelectItem key={v} value={v}>
-                    {v}
+                <SelectItem value={ALL}>All datasets combined</SelectItem>
+                {datasets.map((d) => (
+                  <SelectItem key={d.id} value={d.id}>
+                    📁 {d.file_name} ({d.row_count.toLocaleString("en-IN")} rows)
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+
 
             <Select defaultValue="ytd">
               <SelectTrigger className="w-[132px] bg-background">
