@@ -55,6 +55,7 @@ import { VirtualTable } from "@/components/finance/VirtualTable";
 import { collectColumns, DataGrid, labelFor, numericColumns } from "@/components/finance/DataGrid";
 import { type EtlResult, issueTone, runEtlChunked, streamTabular } from "@/lib/etl";
 import { detectSchema, type Detection } from "@/lib/schema-detect";
+import { fetchAllRows, withRawColumns } from "@/lib/fetch-all";
 
 const BATCH_SIZE = 1000;
 const MAX_CONCURRENT = 3;
@@ -141,16 +142,21 @@ function UploadPage() {
     queryKey: ["dataset-rows", viewer?.id ?? "none"],
     enabled: !!viewer && !!user,
     queryFn: async () => {
-      let q = supabase
-        .from(viewer!.table_name)
-        .select("*")
-        .eq("user_id", user!.id)
-        .eq("source_file", viewer!.file_name)
-        .limit(20000);
-      if (scopeOrgId) q = q.eq("org_id", scopeOrgId);
-      const { data, error } = await q;
-      if (error) throw error;
-      return (data ?? []) as Record<string, unknown>[];
+      const rows = await fetchAllRows<Record<string, unknown>>((from, to) => {
+        let q = supabase
+          .from(viewer!.table_name)
+          .select("*")
+          .eq("user_id", user!.id)
+          .eq("source_file", viewer!.file_name)
+          .range(from, to);
+        if (scopeOrgId) q = q.eq("org_id", scopeOrgId);
+        return q as unknown as PromiseLike<{
+          data: Record<string, unknown>[] | null;
+          error: { message: string } | null;
+        }>;
+      });
+      // Original upload columns live in raw_data; merge them back so all 39+ render.
+      return rows.map(withRawColumns);
     },
   });
 
@@ -804,8 +810,8 @@ function UploadPage() {
                 </Button>
               ))}
             <Badge variant="secondary" className="ml-auto tabular">
-              Showing {filteredRows.length.toLocaleString("en-IN")} rows ·{" "}
-              {viewerCols.length} of {allViewerCols.length} columns
+              Showing all {filteredRows.length.toLocaleString("en-IN")} rows ·{" "}
+              {viewerCols.length} of {allViewerCols.length} columns loaded
             </Badge>
           </div>
 

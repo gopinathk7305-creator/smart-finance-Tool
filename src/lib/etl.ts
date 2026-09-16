@@ -234,6 +234,7 @@ export function runEtl(
         vendor_client: vendor || UNASSIGNED,
         status,
         source_file: fileName,
+        raw_data: r,
       });
       return;
     }
@@ -282,6 +283,7 @@ export function runEtl(
         pf_deduction: pf,
         tds_deduction: cleanAmount(r["tds_deduction"]).value || computed.monthlyTds,
         source_file: fileName,
+        raw_data: r,
       });
       return;
     }
@@ -310,6 +312,7 @@ export function runEtl(
         department: normaliseLabel(r["department"]) || UNASSIGNED,
         budgeted_amount: amt.value,
         source_file: fileName,
+        raw_data: r,
       });
       return;
     }
@@ -348,6 +351,7 @@ export function runEtl(
       amount: amt.value,
       status: cleanText(r["status"]).toLowerCase() === "settled" ? "settled" : "outstanding",
       source_file: fileName,
+      raw_data: r,
     });
   });
 

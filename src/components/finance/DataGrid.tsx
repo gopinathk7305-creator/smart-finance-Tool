@@ -1,11 +1,11 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useMemo, useRef } from "react";
 
-const HIDDEN = new Set(["user_id", "org_id", "source_file"]);
+const HIDDEN = new Set(["user_id", "org_id", "source_file", "raw_data"]);
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}([T ]|$)/;
 
 /** Collects every column present across the dataset, not just the first row. */
-export function collectColumns(rows: Record<string, unknown>[], sample = 200): string[] {
+export function collectColumns(rows: Record<string, unknown>[], sample = 1000): string[] {
   const seen: string[] = [];
   const set = new Set<string>();
   rows.slice(0, sample).forEach((r) => {
