@@ -78,6 +78,14 @@ export function ActiveDatasetProvider({ children }: { children: ReactNode }) {
     setActiveIdState(id);
   }, []);
 
+  // Default: the most recently uploaded dataset drives the workspace.
+  useEffect(() => {
+    if (!hydrated || activeId || datasets.length === 0) return;
+    if (window.localStorage.getItem(ACTIVE_KEY) === "") return;
+    setActiveIdState(datasets[0]!.id);
+    window.localStorage.setItem(ACTIVE_KEY, datasets[0]!.id);
+  }, [hydrated, activeId, datasets]);
+
   const refreshDatasets = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ["dataset-registry"] });
   }, [queryClient]);
