@@ -73,8 +73,8 @@ export function ActiveDatasetProvider({ children }: { children: ReactNode }) {
   const datasets = data ?? [];
 
   const setActiveId = useCallback((id: string | null) => {
-    if (id) window.localStorage.setItem(ACTIVE_KEY, id);
-    else window.localStorage.removeItem(ACTIVE_KEY);
+    // "" records an explicit "all datasets" choice so it survives reloads.
+    window.localStorage.setItem(ACTIVE_KEY, id ?? "");
     setActiveIdState(id);
   }, []);
 
