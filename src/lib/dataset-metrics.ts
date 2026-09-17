@@ -45,7 +45,7 @@ export function useActiveDatasetMetrics(): ActiveDatasetMetrics {
       revenue,
       expenses,
       netProfit,
-      ebitda: netProfit + payrollCost * 0,
+      ebitda: netProfit + taxDeductions,
       taxDeductions,
       riskFlags: overdue + dupes,
       live,
