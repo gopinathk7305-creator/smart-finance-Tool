@@ -1,6 +1,11 @@
+import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
-import { useDataset } from "@/lib/dataset";
+import { supabase } from "@/integrations/supabase/client";
+import { useActiveDataset } from "@/lib/active-dataset";
+import { useAuth } from "@/lib/auth";
+import { useDatasetPeek } from "@/lib/dataset";
+import { useWorkspace } from "@/lib/workspace";
 
 export interface ActiveDatasetMetrics {
   revenue: number;
@@ -15,26 +20,78 @@ export interface ActiveDatasetMetrics {
   rowCount: number;
 }
 
+interface SummaryRow {
+  revenue: number | string;
+  expenses: number | string;
+  tax_deductions: number | string;
+  overdue_count: number;
+  duplicate_count: number;
+  txn_count: number;
+  payroll_count: number;
+  arap_count: number;
+}
+
 /**
- * Single source of aggregated numbers for every KPI card, summary header and
- * chart. It reads the same scoped dataset (active dataset + date range), so a
- * dataset switch recalculates all modules in one pass.
+ * Aggregated numbers for every KPI card come straight from Postgres
+ * (`dataset_summary` RPC): one tiny payload instead of 50,000 rows in browser
+ * memory. Raw-row maths is only used as a fallback (demo data / offline).
  */
 export function useActiveDatasetMetrics(): ActiveDatasetMetrics {
-  const { txns, pays, araps, live, loading } = useDataset();
+  const { user } = useAuth();
+  const { activeFile } = useActiveDataset();
+  const { range } = useWorkspace();
+  const peek = useDatasetPeek();
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["dataset-summary", user?.id ?? "anon", activeFile ?? "all", range.start ?? "", range.end ?? ""],
+    enabled: !!user,
+    staleTime: 60_000,
+    queryFn: async (): Promise<SummaryRow | null> => {
+      const { data: rows, error } = await supabase.rpc("dataset_summary", {
+        p_source_file: activeFile,
+        p_start: range.start || null,
+        p_end: range.end || null,
+      });
+      if (error) throw new Error(error.message);
+      const row = (Array.isArray(rows) ? rows[0] : rows) as SummaryRow | undefined;
+      return row ?? null;
+    },
+  });
 
   return useMemo(() => {
+    const rowCount = data ? data.txn_count + data.payroll_count + data.arap_count : 0;
+
+    if (data && rowCount > 0) {
+      const revenue = Number(data.revenue);
+      const expenses = Number(data.expenses);
+      const taxDeductions = Number(data.tax_deductions);
+      const netProfit = revenue - expenses;
+      return {
+        revenue,
+        expenses,
+        netProfit,
+        ebitda: netProfit + taxDeductions,
+        taxDeductions,
+        riskFlags: data.overdue_count + data.duplicate_count,
+        live: true,
+        loading: false,
+        rowCount,
+      };
+    }
+
+    // Fallback: compute from whatever rows the visible page already holds.
+    const { txns, pays, araps } = peek;
     const revenue = txns.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
     const expenses = txns.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
     const taxDeductions = pays.reduce((s, p) => s + p.pf_deduction + p.tds_deduction, 0);
     const netProfit = revenue - expenses;
     const overdue = araps.filter((a) => a.status === "outstanding").length;
-    const duplicates = new Set<string>();
+    const seen = new Set<string>();
     let dupes = 0;
     txns.forEach((t) => {
       const key = `${t.date}|${t.vendor_client}|${t.amount}`;
-      if (duplicates.has(key)) dupes += 1;
-      else duplicates.add(key);
+      if (seen.has(key)) dupes += 1;
+      else seen.add(key);
     });
 
     return {
@@ -44,9 +101,9 @@ export function useActiveDatasetMetrics(): ActiveDatasetMetrics {
       ebitda: netProfit + taxDeductions,
       taxDeductions,
       riskFlags: overdue + dupes,
-      live,
-      loading,
+      live: peek.live,
+      loading: !!user && isLoading && !data,
       rowCount: txns.length + pays.length + araps.length,
     };
-  }, [txns, pays, araps, live, loading]);
+  }, [data, isLoading, user, peek]);
 }

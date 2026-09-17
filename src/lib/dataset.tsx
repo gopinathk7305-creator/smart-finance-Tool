@@ -120,7 +120,7 @@ function useDatasetInternal(fetchEnabled: boolean): Dataset {
   // Realtime cloud sync: any insert/update/delete on the ingested tables
   // refreshes every page that reads the dataset.
   useEffect(() => {
-    if (!user) return;
+    if (!user || !fetchEnabled) return;
     const channel = supabase.channel(`dataset-sync-${user.id}-${Math.random().toString(36).slice(2)}`);
     ["transactions", "payroll_records", "budget_targets", "arap_records"].forEach((table) => {
       channel.on("postgres_changes", { event: "*", schema: "public", table }, () => refresh());
@@ -129,7 +129,7 @@ function useDatasetInternal(fetchEnabled: boolean): Dataset {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [user, refresh]);
+  }, [user, refresh, fetchEnabled]);
 
   const fallback = user ? localFallbacks.get(user.id) : undefined;
   const combinedRaw = data
