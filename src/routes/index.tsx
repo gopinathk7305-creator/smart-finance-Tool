@@ -1,5 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { AlertTriangle, CheckCircle2, Info, Landmark, TrendingDown, TrendingUp, Wallet } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Info,
+  Landmark,
+  ShieldAlert,
+  TrendingDown,
+  TrendingUp,
+  Wallet,
+} from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -18,10 +27,14 @@ import {
 
 import { useRef } from "react";
 
+import { ActiveDatasetBanner } from "@/components/finance/ActiveDatasetBanner";
 import { AiReportButton } from "@/components/finance/AiReportButton";
 import { AppShell } from "@/components/finance/AppShell";
 import { KpiCard } from "@/components/finance/KpiCard";
+import { useActiveDataset } from "@/lib/active-dataset";
+import { useActiveDatasetMetrics } from "@/lib/dataset-metrics";
 import { useDataset } from "@/lib/dataset";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   actualsByCategory,
@@ -79,6 +92,12 @@ function Dashboard() {
 
   const toneIcon = { danger: AlertTriangle, warning: Info, success: CheckCircle2 };
   const chartsRef = useRef<HTMLDivElement>(null);
+  const metrics = useActiveDatasetMetrics();
+  const { syncing } = useActiveDataset();
+  const busy = syncing || metrics.loading;
+  const recent = [...txns]
+    .sort((a, b) => (a.date < b.date ? 1 : -1))
+    .slice(0, 10);
 
   const buildReport = () => ({
     page: "dashboard" as const,
@@ -114,10 +133,18 @@ function Dashboard() {
 
   return (
     <AppShell title="Executive Dashboard" subtitle={live ? "Live view of your uploaded data" : "Sample data · upload your files to see real numbers"}>
+      <ActiveDatasetBanner />
       <div className="mb-4 flex justify-end">
         <AiReportButton build={buildReport} />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {busy ? (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-[104px] rounded-xl" />
+          ))}
+        </div>
+      ) : (
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <KpiCard
           label="Total Revenue"
           value={inr(t.revenue, true)}
@@ -149,7 +176,16 @@ function Dashboard() {
           icon={Wallet}
           tone="neutral"
         />
+        <KpiCard
+          label="Audit & Risk Flags"
+          value={`${metrics.riskFlags}`}
+          hint="Duplicates & overdue items"
+          icon={ShieldAlert}
+          tone={metrics.riskFlags > 0 ? "warning" : "success"}
+        />
       </div>
+      )}
+
 
       <div ref={chartsRef}>
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
@@ -268,6 +304,51 @@ function Dashboard() {
         </Card>
       </div>
       </div>
+
+      <Card className="mt-4 border-border shadow-card">
+        <CardHeader>
+          <CardTitle className="text-base">Recent Transactions</CardTitle>
+          <CardDescription>Latest 10 entries from the active dataset</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {busy ? (
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-9 rounded-md" />
+              ))}
+            </div>
+          ) : recent.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No transactions in the selected period.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                    <th className="py-2 pr-3 font-medium">Date</th>
+                    <th className="py-2 pr-3 font-medium">Party</th>
+                    <th className="py-2 pr-3 font-medium">Category</th>
+                    <th className="py-2 pr-3 font-medium">Type</th>
+                    <th className="py-2 text-right font-medium">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recent.map((r, i) => (
+                    <tr key={r.id ?? i} className="border-b border-border/60 last:border-0">
+                      <td className="py-2 pr-3 whitespace-nowrap tabular-nums">{r.date}</td>
+                      <td className="py-2 pr-3">{r.vendor_client || "—"}</td>
+                      <td className="py-2 pr-3">{r.category || "—"}</td>
+                      <td className={`py-2 pr-3 ${r.type === "income" ? "text-success" : "text-danger"}`}>
+                        {r.type === "income" ? "Income" : "Expense"}
+                      </td>
+                      <td className="py-2 text-right font-mono tabular-nums">{inr(r.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </AppShell>
   );
 }
