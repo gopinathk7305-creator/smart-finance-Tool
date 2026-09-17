@@ -261,24 +261,27 @@ function Dashboard() {
                   data={topCats}
                   dataKey="value"
                   nameKey="name"
-                  innerRadius={45}
-                  outerRadius={78}
+                  cx="42%"
+                  cy="50%"
+                  innerRadius={42}
+                  outerRadius={68}
                   labelLine={{ stroke: "var(--border)" }}
                   label={({ cx, cy, midAngle, outerRadius, name, percent }) => {
                     const rad = Math.PI / 180;
-                    const r = (outerRadius ?? 0) + 12;
+                    const r = (outerRadius ?? 0) + 10;
                     const x = (cx ?? 0) + r * Math.cos(-(midAngle ?? 0) * rad);
                     const y = (cy ?? 0) + r * Math.sin(-(midAngle ?? 0) * rad);
+                    const short = name && name.length > 10 ? `${name.slice(0, 9)}…` : name;
                     return (
                       <text
                         x={x}
                         y={y}
                         fill="var(--foreground)"
-                        fontSize={11}
+                        fontSize={10}
                         textAnchor={x > (cx ?? 0) ? "start" : "end"}
                         dominantBaseline="central"
                       >
-                        {`${name && name.length > 14 ? `${name.slice(0, 13)}…` : name} (${Math.round((percent ?? 0) * 100)}%)`}
+                        {`${short} (${Math.round((percent ?? 0) * 100)}%)`}
                       </text>
                     );
                   }}
