@@ -383,6 +383,8 @@ function Dashboard() {
         </Card>
       </div>
       </div>
+      </>
+      )}
 
       <Card className="mt-4 border-border shadow-card">
         <CardHeader>
