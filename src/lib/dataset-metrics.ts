@@ -48,9 +48,9 @@ export function useActiveDatasetMetrics(): ActiveDatasetMetrics {
     staleTime: 60_000,
     queryFn: async (): Promise<SummaryRow | null> => {
       const { data: rows, error } = await supabase.rpc("dataset_summary", {
-        p_source_file: activeFile,
-        p_start: range.start || null,
-        p_end: range.end || null,
+        p_source_file: activeFile ?? undefined,
+        p_start: range.start || undefined,
+        p_end: range.end || undefined,
       });
       if (error) throw new Error(error.message);
       const row = (Array.isArray(rows) ? rows[0] : rows) as SummaryRow | undefined;
