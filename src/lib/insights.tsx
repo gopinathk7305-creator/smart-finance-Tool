@@ -4,7 +4,7 @@
 
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 
-import { useDataset } from "@/lib/dataset";
+import { useDatasetPeek } from "@/lib/dataset";
 import { cashRunwayMonths, type ArApRecord, type Transaction } from "@/lib/finance-data";
 
 export interface InsightLine {
@@ -131,7 +131,7 @@ const Ctx = createContext<InsightsCtx | null>(null);
 export function InsightsProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [sourceFile, setSourceFile] = useState("");
-  const { txns, pays, araps, buds } = useDataset();
+  const { txns, pays, araps, buds } = useDatasetPeek();
 
   const insights = useMemo(
     () => computeInsights(txns, pays.length, araps, buds.length),
@@ -164,7 +164,7 @@ export function useInsights(): InsightsCtx {
   const ctx = useContext(Ctx);
   const [open, setOpen] = useState(false);
   const [sourceFile, setSourceFile] = useState("");
-  const { txns, pays, araps, buds } = useDataset();
+  const { txns, pays, araps, buds } = useDatasetPeek();
   const insights = useMemo(
     () => computeInsights(txns, pays.length, araps, buds.length),
     [txns, pays, araps, buds],
