@@ -1,5 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { AlertTriangle, CheckCircle2, Info, Landmark, TrendingDown, TrendingUp, Wallet } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Info,
+  Landmark,
+  ShieldAlert,
+  TrendingDown,
+  TrendingUp,
+  Wallet,
+} from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -18,10 +27,14 @@ import {
 
 import { useRef } from "react";
 
+import { ActiveDatasetBanner } from "@/components/finance/ActiveDatasetBanner";
 import { AiReportButton } from "@/components/finance/AiReportButton";
 import { AppShell } from "@/components/finance/AppShell";
 import { KpiCard } from "@/components/finance/KpiCard";
+import { useActiveDataset } from "@/lib/active-dataset";
+import { useActiveDatasetMetrics } from "@/lib/dataset-metrics";
 import { useDataset } from "@/lib/dataset";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   actualsByCategory,
