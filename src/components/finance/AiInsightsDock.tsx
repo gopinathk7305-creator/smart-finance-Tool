@@ -17,7 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth";
-import { useDataset } from "@/lib/dataset";
+import { useDatasetPeek } from "@/lib/dataset";
 import { explainDataset } from "@/lib/ai.functions";
 import { inr } from "@/lib/finance-data";
 import { useInsights, type DatasetInsights } from "@/lib/insights";
@@ -28,7 +28,7 @@ export function AiInsightsDock() {
   const { open, setOpen, openInsights, insights, sourceFile } = useInsights();
   const { user } = useAuth();
   const { orgName } = useOrg();
-  const { live } = useDataset();
+  const { live } = useDatasetPeek();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
 

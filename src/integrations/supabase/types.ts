@@ -610,6 +610,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      dataset_summary: {
+        Args: { p_end?: string; p_source_file?: string; p_start?: string }
+        Returns: {
+          arap_count: number
+          duplicate_count: number
+          expenses: number
+          overdue_count: number
+          payroll_count: number
+          revenue: number
+          tax_deductions: number
+          txn_count: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

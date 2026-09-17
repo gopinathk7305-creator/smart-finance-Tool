@@ -82,12 +82,13 @@ export function ActiveDatasetProvider({ children }: { children: ReactNode }) {
       // "" records an explicit "all datasets" choice so it survives reloads.
       window.localStorage.setItem(ACTIVE_KEY, id ?? "");
       setActiveIdState(id);
-      // Every module reads the same cached dataset query: invalidating it here
-      // forces one refetch that re-renders all 11 modules at once.
+      // Only the module currently on screen refetches; every other module
+      // stays stale and reloads lazily when the user opens it. Keeps a 50k-row
+      // switch instant instead of blocking on 11 modules at once.
       setSyncing(true);
-      void queryClient
-        .invalidateQueries({ queryKey: ["dataset"] })
-        .finally(() => window.setTimeout(() => setSyncing(false), 350));
+      queryClient.invalidateQueries({ queryKey: ["dataset"], refetchType: "active" });
+      queryClient.invalidateQueries({ queryKey: ["dataset-summary"], refetchType: "active" });
+      window.setTimeout(() => setSyncing(false), 300);
     },
     [queryClient],
   );
