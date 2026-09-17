@@ -304,6 +304,51 @@ function Dashboard() {
         </Card>
       </div>
       </div>
+
+      <Card className="mt-4 border-border shadow-card">
+        <CardHeader>
+          <CardTitle className="text-base">Recent Transactions</CardTitle>
+          <CardDescription>Latest 10 entries from the active dataset</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {busy ? (
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-9 rounded-md" />
+              ))}
+            </div>
+          ) : recent.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No transactions in the selected period.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                    <th className="py-2 pr-3 font-medium">Date</th>
+                    <th className="py-2 pr-3 font-medium">Party</th>
+                    <th className="py-2 pr-3 font-medium">Category</th>
+                    <th className="py-2 pr-3 font-medium">Type</th>
+                    <th className="py-2 text-right font-medium">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recent.map((r, i) => (
+                    <tr key={r.id ?? i} className="border-b border-border/60 last:border-0">
+                      <td className="py-2 pr-3 whitespace-nowrap tabular-nums">{r.date}</td>
+                      <td className="py-2 pr-3">{r.vendor_client || "—"}</td>
+                      <td className="py-2 pr-3">{r.category || "—"}</td>
+                      <td className={`py-2 pr-3 ${r.type === "income" ? "text-success" : "text-danger"}`}>
+                        {r.type === "income" ? "Income" : "Expense"}
+                      </td>
+                      <td className="py-2 text-right font-mono tabular-nums">{inr(r.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </AppShell>
   );
 }
