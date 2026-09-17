@@ -47,11 +47,11 @@ export function useActiveDatasetMetrics(): ActiveDatasetMetrics {
     enabled: !!user,
     staleTime: 60_000,
     queryFn: async (): Promise<SummaryRow | null> => {
-      const { data: rows, error } = await supabase.rpc("dataset_summary", {
-        p_source_file: activeFile ?? undefined,
-        p_start: range.start || undefined,
-        p_end: range.end || undefined,
-      });
+      const args: { p_source_file?: string; p_start?: string; p_end?: string } = {};
+      if (activeFile) args.p_source_file = activeFile;
+      if (range.start) args.p_start = range.start;
+      if (range.end) args.p_end = range.end;
+      const { data: rows, error } = await supabase.rpc("dataset_summary", args);
       if (error) throw new Error(error.message);
       const row = (Array.isArray(rows) ? rows[0] : rows) as SummaryRow | undefined;
       return row ?? null;
