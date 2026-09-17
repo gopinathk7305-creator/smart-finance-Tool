@@ -176,7 +176,16 @@ function Dashboard() {
           icon={Wallet}
           tone="neutral"
         />
+        <KpiCard
+          label="Audit & Risk Flags"
+          value={`${metrics.riskFlags}`}
+          hint="Duplicates & overdue items"
+          icon={ShieldAlert}
+          tone={metrics.riskFlags > 0 ? "warning" : "success"}
+        />
       </div>
+      )}
+
 
       <div ref={chartsRef}>
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
