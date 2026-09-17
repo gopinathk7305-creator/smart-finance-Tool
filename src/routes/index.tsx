@@ -16,6 +16,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  LabelList,
   Legend,
   Pie,
   PieChart,
@@ -42,6 +43,7 @@ import {
   actualsByCategory,
   alerts,
   cashRunwayMonths,
+  formatCompactCurrency,
   inr,
   monthlySummary,
   totals,
@@ -226,8 +228,22 @@ function Dashboard() {
                 />
                 <Tooltip formatter={(v) => inr(Number(v))} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="revenue" name="Revenue" fill="var(--brand)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="expense" name="Expense" fill="var(--danger)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="revenue" name="Revenue" fill="var(--brand)" radius={[4, 4, 0, 0]}>
+                  <LabelList
+                    dataKey="revenue"
+                    position="top"
+                    style={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                    formatter={(val: number) => formatCompactCurrency(Number(val))}
+                  />
+                </Bar>
+                <Bar dataKey="expense" name="Expense" fill="var(--danger)" radius={[4, 4, 0, 0]}>
+                  <LabelList
+                    dataKey="expense"
+                    position="top"
+                    style={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                    formatter={(val: number) => formatCompactCurrency(Number(val))}
+                  />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -241,7 +257,35 @@ function Dashboard() {
           <CardContent className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={topCats} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90}>
+                <Pie
+                  data={topCats}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="42%"
+                  cy="50%"
+                  innerRadius={42}
+                  outerRadius={68}
+                  labelLine={{ stroke: "var(--border)" }}
+                  label={({ cx, cy, midAngle, outerRadius, name, percent }) => {
+                    const rad = Math.PI / 180;
+                    const r = (outerRadius ?? 0) + 10;
+                    const x = (cx ?? 0) + r * Math.cos(-(midAngle ?? 0) * rad);
+                    const y = (cy ?? 0) + r * Math.sin(-(midAngle ?? 0) * rad);
+                    const short = name && name.length > 10 ? `${name.slice(0, 9)}…` : name;
+                    return (
+                      <text
+                        x={x}
+                        y={y}
+                        fill="var(--foreground)"
+                        fontSize={10}
+                        textAnchor={x > (cx ?? 0) ? "start" : "end"}
+                        dominantBaseline="central"
+                      >
+                        {`${short} (${Math.round((percent ?? 0) * 100)}%)`}
+                      </text>
+                    );
+                  }}
+                >
                   {topCats.map((_, i) => (
                     <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                   ))}
@@ -262,7 +306,7 @@ function Dashboard() {
           </CardHeader>
           <CardContent className="h-[260px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={series}>
+              <AreaChart data={series} margin={{ right: 36 }}>
                 <defs>
                   <linearGradient id="cashFill" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="var(--brand)" stopOpacity={0.35} />
@@ -286,7 +330,14 @@ function Dashboard() {
                   stroke="var(--brand)"
                   strokeWidth={2}
                   fill="url(#cashFill)"
-                />
+                >
+                  <LabelList
+                    dataKey="cash"
+                    position="top"
+                    style={{ fontSize: 9, fill: "var(--muted-foreground)" }}
+                    formatter={(val: number) => formatCompactCurrency(Number(val))}
+                  />
+                </Area>
               </AreaChart>
             </ResponsiveContainer>
           </CardContent>

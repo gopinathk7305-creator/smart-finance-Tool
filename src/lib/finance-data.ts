@@ -391,6 +391,12 @@ function compactInr(v: number) {
   return `${sign}\u20B9${Math.round(abs)}`;
 }
 
+/** Compact currency for chart data labels: ₹6.8Cr / ₹45L / ₹12.5K. */
+export function formatCompactCurrency(value: number): string {
+  if (!Number.isFinite(value)) return "₹0";
+  return compactInr(value);
+}
+
 function groupIndian(n: number) {
   const s = String(n);
   if (s.length <= 3) return s;
