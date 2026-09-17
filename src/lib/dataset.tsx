@@ -244,13 +244,20 @@ function useDatasetInternal(fetchEnabled: boolean): Dataset {
 
 /**
  * Raw rows (original uploaded column names, raw_data flattened back in) for the
- * active dataset. Cache-only: it never triggers a fetch of its own.
+ * active dataset. Subscribes to the dataset cache with useQuery so a header
+ * dataset switch (or a finished fetch) re-renders every dashboard widget, but
+ * never starts a fetch of its own.
  */
 export function useDatasetRaw(): Record<string, unknown>[] {
   const { user } = useAuth();
   const { activeFile } = useActiveDataset();
-  const queryClient = useQueryClient();
-  const cached = queryClient.getQueryData<CloudDataset>(["dataset", user?.id ?? "anon"]);
+
+  // enabled:false keeps this read-only while still subscribing to cache updates.
+  const { data: cached } = useQuery<CloudDataset>({
+    queryKey: ["dataset", user?.id ?? "anon"],
+    queryFn: fetchDataset,
+    enabled: false,
+  });
   const fallback = user ? localFallbacks.get(user.id) : undefined;
 
   return useMemo(() => {
