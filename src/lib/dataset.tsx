@@ -118,9 +118,11 @@ function useDatasetInternal(fetchEnabled: boolean): Dataset {
   const { range } = useWorkspace();
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["dataset", user?.id ?? "anon"],
-    queryFn: fetchDataset,
+  const { data, isLoading } = useQuery<CloudDataset>({
+    // activeFile is part of the key, so switching datasets in the header
+    // refetches straight away instead of reusing a stale snapshot.
+    queryKey: datasetKey(user?.id ?? "anon", activeFile),
+    queryFn: () => fetchDataset(activeFile),
     enabled: fetchEnabled && !!user,
   });
 
