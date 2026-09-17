@@ -18,7 +18,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { KpiCard } from "@/components/finance/KpiCard";
 import { compactMoney, titleCase, type AdaptiveDashboard as Profile } from "@/lib/adaptive-dashboard";
 
-const SERIES_COLORS = ["var(--brand)", "var(--danger)", "var(--success)"];
+const SERIES_COLORS = [
+  "var(--brand)",
+  "var(--primary)",
+  "var(--success)",
+  "var(--warning)",
+  "var(--danger)",
+  "var(--muted-foreground)",
+];
 const PIE_COLORS = [
   "var(--brand)",
   "var(--primary)",
