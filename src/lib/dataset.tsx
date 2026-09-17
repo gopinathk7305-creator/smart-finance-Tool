@@ -82,7 +82,25 @@ export function clearLocalDatasetRows(userId: string, bucket: DatasetBucket) {
   if (!Object.keys(current).length) localFallbacks.delete(userId);
 }
 
+/**
+ * Full dataset read for the page the user is actually looking at.
+ * Only the visible module pulls raw rows — other modules load lazily on view.
+ */
 export function useDataset(): Dataset {
+  return useDatasetInternal(true);
+}
+
+/**
+ * Cache-only view of the dataset: subscribes to whatever the visible page has
+ * already loaded but never starts a fetch itself. Used by always-mounted shell
+ * pieces (header banner, insights dock) so a 50k-row dataset is not downloaded
+ * on every page.
+ */
+export function useDatasetPeek(): Dataset {
+  return useDatasetInternal(false);
+}
+
+function useDatasetInternal(fetchEnabled: boolean): Dataset {
   const { user } = useAuth();
   const { orgId, vendor } = useOrg();
   const { activeFile } = useActiveDataset();
@@ -92,7 +110,7 @@ export function useDataset(): Dataset {
   const { data, isLoading } = useQuery({
     queryKey: ["dataset", user?.id ?? "anon"],
     queryFn: fetchDataset,
-    enabled: !!user,
+    enabled: fetchEnabled && !!user,
   });
 
   const refresh = useCallback(() => {
