@@ -73,7 +73,16 @@ const PIE_COLORS = [
 ];
 
 function Dashboard() {
-  const { txns, live } = useDataset();
+  const { txns: mapped, live } = useDataset();
+  const { activeId, syncing } = useActiveDataset();
+  const dyn = useDynamicDashboard(activeId);
+
+  // Canonical columns first; if the uploaded file used its own header names the
+  // auto-mapper's normalised rows drive every figure instead.
+  const canonical = totals(mapped);
+  const txns =
+    canonical.revenue === 0 && canonical.expense === 0 && dyn.usable ? dyn.txns : mapped;
+
   const series = monthlySummary(txns);
   const t = totals(txns);
   const runway = cashRunwayMonths(txns);
@@ -81,9 +90,10 @@ function Dashboard() {
   const h1 = series.slice(0, 6);
   const h2 = series.slice(6);
   const sum = (a: typeof series, k: "revenue" | "expense") => a.reduce((s, m) => s + m[k], 0);
-  const revDelta = ((sum(h2, "revenue") - sum(h1, "revenue")) / sum(h1, "revenue")) * 100;
-  const expDelta = ((sum(h2, "expense") - sum(h1, "expense")) / sum(h1, "expense")) * 100;
-  const margin = (t.netProfit / t.revenue) * 100;
+  const pctChange = (a: number, b: number) => (a > 0 ? ((b - a) / a) * 100 : 0);
+  const revDelta = pctChange(sum(h1, "revenue"), sum(h2, "revenue"));
+  const expDelta = pctChange(sum(h1, "expense"), sum(h2, "expense"));
+  const margin = safeMargin(t.netProfit, t.revenue);
 
   const topCats = [...actualsByCategory(txns).entries()]
     .sort((a, b) => b[1] - a[1])
