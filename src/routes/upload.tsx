@@ -472,24 +472,44 @@ function UploadPage() {
 
   const purge = async (ds: StoredDataset) => {
     if (!user) return;
-    let q = supabase
-      .from(ds.table_name)
-      .delete()
-      .eq("user_id", user.id)
-      .eq("source_file", ds.file_name);
-    if (scopeOrgId) q = q.eq("org_id", scopeOrgId);
-    const { error } = await q;
-    if (error) {
-      toast.error(error.message);
-      return;
+    setDeleting({ id: ds.id, removed: 0 });
+    try {
+      let removed = 0;
+      for (let guard = 0; guard < 200; guard += 1) {
+        const { data, error } = await supabase.rpc("purge_dataset_batch", {
+          p_table: ds.table_name,
+          p_source_file: ds.file_name,
+          p_org_id: scopeOrgId ?? null,
+          p_limit: 5000,
+        } as never);
+        if (error) {
+          toast.error(`Could not finish deleting: ${error.message}`);
+          setDeleting(null);
+          return;
+        }
+        const count = Number(data ?? 0) || 0;
+        removed += count;
+        setDeleting({ id: ds.id, removed });
+        if (count === 0) break;
+        await new Promise((r) => window.setTimeout(r, 0));
+      }
+      const { error: metaError } = await supabase.from("uploaded_datasets").delete().eq("id", ds.id);
+      if (metaError) {
+        toast.error(`Rows removed, but the file entry stayed: ${metaError.message}`);
+        setDeleting(null);
+        return;
+      }
+      if (activeId === ds.id) setActiveId(null);
+      refresh();
+      void stored.refetch();
+      refreshDatasets();
+      setConfirmDelete(null);
+      toast.success(`${ds.file_name} deleted — ${removed.toLocaleString("en-IN")} rows purged`);
+    } finally {
+      setDeleting(null);
     }
-    await supabase.from("uploaded_datasets").delete().eq("id", ds.id);
-    if (activeId === ds.id) setActiveId(null);
-    refresh();
-    void stored.refetch();
-    refreshDatasets();
-    toast.success(`${ds.file_name} purged from cloud storage`);
   };
+
 
   /* ------------------------------------------------ derived */
 
