@@ -32,20 +32,28 @@ export interface Dataset {
 
 type Row<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"];
 
-async function fetchDataset() {
+/**
+ * Rows for the active dataset only. Scoping the fetch (instead of downloading
+ * every file and filtering in the browser) keeps a switch fast and guarantees
+ * the newly selected file's rows are actually present.
+ */
+async function fetchDataset(activeFile?: string | null) {
+  const scope = <T,>(q: T): T =>
+    activeFile ? ((q as { eq: (c: string, v: string) => T }).eq("source_file", activeFile) as T) : q;
+
   // Every table is paged past the 1,000-row response cap.
   const [t, p, b, a] = await Promise.all([
     fetchAllRows<Row<"transactions">>((from, to) =>
-      supabase.from("transactions").select("*").order("txn_date").range(from, to),
+      scope(supabase.from("transactions").select("*").order("txn_date")).range(from, to),
     ),
     fetchAllRows<Row<"payroll_records">>((from, to) =>
-      supabase.from("payroll_records").select("*").order("employee_id").range(from, to),
+      scope(supabase.from("payroll_records").select("*").order("employee_id")).range(from, to),
     ),
     fetchAllRows<Row<"budget_targets">>((from, to) =>
-      supabase.from("budget_targets").select("*").range(from, to),
+      scope(supabase.from("budget_targets").select("*")).range(from, to),
     ),
     fetchAllRows<Row<"arap_records">>((from, to) =>
-      supabase.from("arap_records").select("*").range(from, to),
+      scope(supabase.from("arap_records").select("*")).range(from, to),
     ),
   ]);
 
@@ -53,6 +61,9 @@ async function fetchDataset() {
 }
 
 type CloudDataset = Awaited<ReturnType<typeof fetchDataset>>;
+/** cache key scoped to the active dataset so a header switch refetches */
+const datasetKey = (userId: string, activeFile?: string | null) =>
+  ["dataset", userId, activeFile ?? "all"] as const;
 type DatasetBucket = keyof CloudDataset;
 const localFallbacks = new Map<string, Partial<CloudDataset>>();
 
@@ -69,7 +80,7 @@ export function cacheLocalDatasetRows(
 ) {
   const current = localFallbacks.get(userId) ?? {};
   localFallbacks.set(userId, { ...current, [bucket]: rows });
-  queryClient.setQueryData<CloudDataset>(["dataset", userId], (cloud) => {
+  queryClient.setQueriesData<CloudDataset>({ queryKey: ["dataset", userId] }, (cloud) => {
     const base = cloud ?? { t: [], p: [], b: [], a: [] };
     return { ...base, [bucket]: mergeRows(base[bucket] as never[], rows as never[]) } as CloudDataset;
   });
@@ -107,9 +118,11 @@ function useDatasetInternal(fetchEnabled: boolean): Dataset {
   const { range } = useWorkspace();
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["dataset", user?.id ?? "anon"],
-    queryFn: fetchDataset,
+  const { data, isLoading } = useQuery<CloudDataset>({
+    // activeFile is part of the key, so switching datasets in the header
+    // refetches straight away instead of reusing a stale snapshot.
+    queryKey: datasetKey(user?.id ?? "anon", activeFile),
+    queryFn: () => fetchDataset(activeFile),
     enabled: fetchEnabled && !!user,
   });
 
@@ -254,8 +267,8 @@ export function useDatasetRaw(): Record<string, unknown>[] {
 
   // enabled:false keeps this read-only while still subscribing to cache updates.
   const { data: cached } = useQuery<CloudDataset>({
-    queryKey: ["dataset", user?.id ?? "anon"],
-    queryFn: fetchDataset,
+    queryKey: datasetKey(user?.id ?? "anon", activeFile),
+    queryFn: () => fetchDataset(activeFile),
     enabled: false,
   });
   const fallback = user ? localFallbacks.get(user.id) : undefined;
