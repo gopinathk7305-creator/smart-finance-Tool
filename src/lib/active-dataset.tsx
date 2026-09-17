@@ -31,6 +31,8 @@ interface ActiveDatasetValue {
   /** file name used to isolate rows across every module */
   activeFile: string | null;
   loading: boolean;
+  /** true while a dataset switch is propagating to every module */
+  syncing: boolean;
   setActiveId: (id: string | null) => void;
   refreshDatasets: () => void;
 }
@@ -41,6 +43,7 @@ const ActiveDatasetContext = createContext<ActiveDatasetValue>({
   active: null,
   activeFile: null,
   loading: false,
+  syncing: false,
   setActiveId: () => {},
   refreshDatasets: () => {},
 });
