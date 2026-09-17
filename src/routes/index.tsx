@@ -2,7 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   AlertTriangle,
   CheckCircle2,
+  Columns3,
   Info,
+  Rows3,
   Landmark,
   ShieldAlert,
   TrendingDown,
@@ -85,15 +87,19 @@ function Dashboard() {
   // Schema-driven engine: any dataset whose columns aren't recognisable finance
   // fields still gets KPI cards and charts built from its own schema.
   const adaptive = useAdaptiveDashboard(activeId);
-  // A specific uploaded dataset drives the whole dashboard from its own schema;
-  // the canonical finance view is only used for the combined/demo view.
-  const adaptiveMode = adaptive.ready && (Boolean(activeId) || !dyn.usable);
+  // Whenever the active dataset's own rows carry usable money columns we bind the
+  // executive dashboard straight to those records; the schema-driven adaptive view
+  // is only a fallback for datasets with no recognisable monetary fields.
+  const recordsMode = dyn.usable && dyn.rowCount > 0;
+  const adaptiveMode = adaptive.ready && !recordsMode;
 
   // Canonical columns first; if the uploaded file used its own header names the
   // auto-mapper's normalised rows drive every figure instead.
   const canonical = totals(mapped);
   const txns =
-    canonical.revenue === 0 && canonical.expense === 0 && dyn.usable ? dyn.txns : mapped;
+    recordsMode && (Boolean(activeId) || (canonical.revenue === 0 && canonical.expense === 0))
+      ? dyn.txns
+      : mapped;
 
   const series = monthlySummary(txns);
   const t = totals(txns);
@@ -122,7 +128,9 @@ function Dashboard() {
   const chartsRef = useRef<HTMLDivElement>(null);
   const metrics = useActiveDatasetMetrics();
   const riskFlags = metrics.riskFlags || dyn.riskFlags;
-  const busy = syncing || metrics.loading;
+  // Never show skeletons once the active dataset's rows are in hand — real figures
+  // beat placeholders even while the background summary is still refreshing.
+  const busy = (syncing || metrics.loading) && txns.length === 0;
   const recent = [...txns]
     .sort((a, b) => (a.date < b.date ? 1 : -1))
     .slice(0, 10);
@@ -215,6 +223,24 @@ function Dashboard() {
           icon={ShieldAlert}
           tone={riskFlags > 0 ? "warning" : "success"}
         />
+        {recordsMode && (
+          <>
+            <KpiCard
+              label="Records Loaded"
+              value={dyn.rowCount.toLocaleString("en-IN")}
+              hint="Rows in the active dataset"
+              icon={Rows3}
+              tone="neutral"
+            />
+            <KpiCard
+              label="Active Columns"
+              value={`${dyn.columnCount}`}
+              hint="Fields detected in this file"
+              icon={Columns3}
+              tone="neutral"
+            />
+          </>
+        )}
       </div>
       )}
 

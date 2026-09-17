@@ -28,6 +28,8 @@ export interface DynamicDashboard {
   /** true when the auto-mapper found usable money columns */
   usable: boolean;
   rowCount: number;
+  /** number of columns present in the active dataset's records */
+  columnCount: number;
 }
 
 /**
@@ -68,6 +70,7 @@ export function useDynamicDashboard(activeDatasetId?: string | null): DynamicDas
       groupLabel,
       usable: revenue > 0 || expenses > 0,
       rowCount: rows.length,
+      columnCount: schema.columns.length,
     };
   }, [rows, activeDatasetId]);
 }
