@@ -178,6 +178,9 @@ function UploadPage() {
   const [fixed, setFixed] = useState(false);
   const [progress, setProgress] = useState<{ label: string; pct: number; eta: string } | null>(null);
   const [viewer, setViewer] = useState<StoredDataset | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<StoredDataset | null>(null);
+  const [deleting, setDeleting] = useState<{ id: string; removed: number } | null>(null);
+
   const [search, setSearch] = useState("");
   const [hiddenViewerCols, setHiddenViewerCols] = useState<Set<string>>(new Set());
   const [fixedRows, setFixedRows] = useState<Record<string, unknown>[] | null>(null);
