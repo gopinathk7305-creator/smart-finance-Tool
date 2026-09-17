@@ -297,6 +297,14 @@ export function AppShell({
         </header>
 
         <main data-page-capture className="flex-1 p-4 md:p-6">
+          {syncing && (
+            <div className="mb-4 flex items-center gap-3 rounded-lg border border-primary/40 bg-primary/5 px-4 py-3">
+              <span className="size-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              <p className="text-sm font-medium text-foreground">
+                Activating {active?.file_name ?? "all datasets"}… syncing across 11 modules
+              </p>
+            </div>
+          )}
           {outOfRange && (
             <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-warning/40 bg-warning-soft px-4 py-3">
               <CalendarRange className="size-4 text-warning" />
