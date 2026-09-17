@@ -163,6 +163,10 @@ function Dashboard() {
       <div className="mb-4 flex justify-end">
         <AiReportButton build={buildReport} />
       </div>
+      {adaptiveMode ? (
+        <AdaptiveDashboard profile={adaptive} />
+      ) : (
+      <>
       {busy ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           {Array.from({ length: 5 }).map((_, i) => (
