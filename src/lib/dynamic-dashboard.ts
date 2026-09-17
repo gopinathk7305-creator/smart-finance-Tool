@@ -28,6 +28,8 @@ export interface DynamicDashboard {
   /** true when the auto-mapper found usable money columns */
   usable: boolean;
   rowCount: number;
+  /** number of columns present in the active dataset's records */
+  columnCount: number;
 }
 
 /**
