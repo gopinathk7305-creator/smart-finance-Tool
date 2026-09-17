@@ -28,6 +28,8 @@ export interface AdaptiveDashboard {
   trendSeries: string[];
   trendKey: string;
   trendLabel: string;
+  /** true when the trend series are category slices of one money column */
+  trendStacked: boolean;
   breakdown: { name: string; value: number }[];
   breakdownLabel: string;
   /** true when there is enough structure to render the adaptive widgets */
@@ -36,6 +38,18 @@ export interface AdaptiveDashboard {
 
 const compact = new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 2 });
 const plain = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 });
+
+/** ₹ in Lakhs/Crores, e.g. ₹6.8Cr / ₹45L. */
+export const compactMoney = (val: number) => {
+  const n = Number(val);
+  if (!Number.isFinite(n)) return "₹0";
+  const a = Math.abs(n);
+  const sign = n < 0 ? "-" : "";
+  if (a >= 1e7) return `${sign}₹${(a / 1e7).toFixed(a / 1e7 >= 100 ? 0 : 2)}Cr`;
+  if (a >= 1e5) return `${sign}₹${(a / 1e5).toFixed(a / 1e5 >= 100 ? 0 : 2)}L`;
+  if (a >= 1e3) return `${sign}₹${(a / 1e3).toFixed(1)}K`;
+  return `${sign}₹${plain.format(a)}`;
+};
 
 export const titleCase = (key: string) =>
   key
@@ -99,14 +113,14 @@ export function useAdaptiveDashboard(activeDatasetId?: string | null): AdaptiveD
       const total = rows.reduce((s, r) => s + parseNum(r?.[money]), 0);
       kpis.push({
         label: `Total ${titleCase(money)}`,
-        value: compact.format(total),
+        value: compactMoney(total),
         hint: `Sum of ${titleCase(money)}`,
         raw: total,
       });
       const avg = rowCount ? total / rowCount : 0;
       kpis.push({
         label: `Average ${titleCase(money)}`,
-        value: plain.format(Math.round(avg * 100) / 100),
+        value: compactMoney(avg),
         hint: `Across ${plain.format(rowCount)} records`,
         raw: avg,
       });
@@ -135,6 +149,7 @@ export function useAdaptiveDashboard(activeDatasetId?: string | null): AdaptiveD
     let trend: Record<string, string | number>[] = [];
     let trendKey = "bucket";
     let trendLabel = "";
+    let trendStacked = false;
 
     if (dateCol && money && groupCol) {
       // Group by the detected date column, split by the top values of the
@@ -161,6 +176,7 @@ export function useAdaptiveDashboard(activeDatasetId?: string | null): AdaptiveD
           });
         trendSeries = [...topCats.filter((c) => used.has(c)), ...(used.has("Other") ? ["Other"] : [])];
         trendLabel = `${titleCase(money)} by ${titleCase(dateCol)}, split by ${titleCase(groupCol)}`;
+        trendStacked = true;
       }
     }
 
@@ -214,6 +230,7 @@ export function useAdaptiveDashboard(activeDatasetId?: string | null): AdaptiveD
       trendSeries,
       trendKey,
       trendLabel,
+      trendStacked,
       breakdown,
       breakdownLabel,
       ready: rowCount > 0 && (trend.length > 0 || breakdown.length > 0),
