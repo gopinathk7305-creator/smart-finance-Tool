@@ -221,6 +221,24 @@ function Dashboard() {
           icon={ShieldAlert}
           tone={riskFlags > 0 ? "warning" : "success"}
         />
+        {recordsMode && (
+          <>
+            <KpiCard
+              label="Records Loaded"
+              value={dyn.rowCount.toLocaleString("en-IN")}
+              hint="Rows in the active dataset"
+              icon={Rows3}
+              tone="neutral"
+            />
+            <KpiCard
+              label="Active Columns"
+              value={`${dyn.columnCount}`}
+              hint="Fields detected in this file"
+              icon={Columns3}
+              tone="neutral"
+            />
+          </>
+        )}
       </div>
       )}
 
