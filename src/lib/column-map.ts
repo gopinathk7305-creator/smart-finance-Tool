@@ -89,7 +89,7 @@ export function mapRowsToTransactions(
     const date = map.date ? isoDate(row[map.date]) : "";
     const category = map.category ? String(row[map.category] ?? "").trim() || "Uncategorised" : "Uncategorised";
     const party = map.party ? String(row[map.party] ?? "").trim() : "";
-    const base = { date, category, subcategory: null as string | null, vendor_client: party, status: "paid" as const };
+    const base = { date, category, subcategory: "", vendor_client: party, status: "paid" as const };
 
     const rev = map.revenue ? parseNum(row[map.revenue]) : 0;
     const exp = map.expense ? parseNum(row[map.expense]) : 0;
