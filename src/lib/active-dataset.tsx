@@ -75,11 +75,20 @@ export function ActiveDatasetProvider({ children }: { children: ReactNode }) {
 
   const datasets = data ?? [];
 
-  const setActiveId = useCallback((id: string | null) => {
-    // "" records an explicit "all datasets" choice so it survives reloads.
-    window.localStorage.setItem(ACTIVE_KEY, id ?? "");
-    setActiveIdState(id);
-  }, []);
+  const setActiveId = useCallback(
+    (id: string | null) => {
+      // "" records an explicit "all datasets" choice so it survives reloads.
+      window.localStorage.setItem(ACTIVE_KEY, id ?? "");
+      setActiveIdState(id);
+      // Every module reads the same cached dataset query: invalidating it here
+      // forces one refetch that re-renders all 11 modules at once.
+      setSyncing(true);
+      void queryClient
+        .invalidateQueries({ queryKey: ["dataset"] })
+        .finally(() => window.setTimeout(() => setSyncing(false), 350));
+    },
+    [queryClient],
+  );
 
   // Default: the most recently uploaded dataset drives the workspace.
   useEffect(() => {
