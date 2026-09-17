@@ -209,8 +209,8 @@ export function AppShell({
                 const name = datasets.find((d) => d.id === id)?.file_name;
                 toast.success(
                   id
-                    ? `Switched active workspace dataset to ${name}`
-                    : "Using every stored dataset",
+                    ? `Activating ${name}… syncing across all 11 modules`
+                    : "Using every stored dataset — syncing all 11 modules",
                 );
               }}
             >
