@@ -2,7 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   AlertTriangle,
   CheckCircle2,
+  Columns3,
   Info,
+  Rows3,
   Landmark,
   ShieldAlert,
   TrendingDown,
