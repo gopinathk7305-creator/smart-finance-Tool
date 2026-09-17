@@ -7,7 +7,9 @@ import {
   Database,
   Eye,
   FolderOpen,
+  Loader2,
   Sparkles,
+
   Trash2,
   UploadCloud,
   XCircle,
