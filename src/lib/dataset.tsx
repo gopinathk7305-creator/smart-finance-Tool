@@ -1,9 +1,9 @@
 import { type QueryClient, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-import { fetchAllRows } from "@/lib/fetch-all";
+import { fetchAllRows, withRawColumns } from "@/lib/fetch-all";
 import { useAuth } from "@/lib/auth";
 import { ALL, demoDatasetFor, useOrg } from "@/lib/orgs";
 import { useActiveDataset } from "@/lib/active-dataset";
