@@ -80,7 +80,7 @@ export function cacheLocalDatasetRows(
 ) {
   const current = localFallbacks.get(userId) ?? {};
   localFallbacks.set(userId, { ...current, [bucket]: rows });
-  queryClient.setQueryData<CloudDataset>(["dataset", userId], (cloud) => {
+  queryClient.setQueriesData<CloudDataset>({ queryKey: ["dataset", userId] }, (cloud) => {
     const base = cloud ?? { t: [], p: [], b: [], a: [] };
     return { ...base, [bucket]: mergeRows(base[bucket] as never[], rows as never[]) } as CloudDataset;
   });
