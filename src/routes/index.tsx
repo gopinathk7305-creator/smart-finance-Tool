@@ -306,7 +306,7 @@ function Dashboard() {
           </CardHeader>
           <CardContent className="h-[260px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={series}>
+              <AreaChart data={series} margin={{ right: 36 }}>
                 <defs>
                   <linearGradient id="cashFill" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="var(--brand)" stopOpacity={0.35} />
