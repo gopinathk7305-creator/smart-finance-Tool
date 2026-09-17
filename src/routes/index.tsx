@@ -82,6 +82,10 @@ function Dashboard() {
   const { txns: mapped, live } = useDataset();
   const { activeId, syncing } = useActiveDataset();
   const dyn = useDynamicDashboard(activeId);
+  // Schema-driven engine: any dataset whose columns aren't recognisable finance
+  // fields still gets KPI cards and charts built from its own schema.
+  const adaptive = useAdaptiveDashboard(activeId);
+  const adaptiveMode = !dyn.usable && adaptive.ready;
 
   // Canonical columns first; if the uploaded file used its own header names the
   // auto-mapper's normalised rows drive every figure instead.
