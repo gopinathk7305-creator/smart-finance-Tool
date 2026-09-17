@@ -133,10 +133,18 @@ function Dashboard() {
 
   return (
     <AppShell title="Executive Dashboard" subtitle={live ? "Live view of your uploaded data" : "Sample data · upload your files to see real numbers"}>
+      <ActiveDatasetBanner />
       <div className="mb-4 flex justify-end">
         <AiReportButton build={buildReport} />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {busy ? (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-[104px] rounded-xl" />
+          ))}
+        </div>
+      ) : (
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <KpiCard
           label="Total Revenue"
           value={inr(t.revenue, true)}
