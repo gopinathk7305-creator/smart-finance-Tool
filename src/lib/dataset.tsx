@@ -61,6 +61,9 @@ async function fetchDataset(activeFile?: string | null) {
 }
 
 type CloudDataset = Awaited<ReturnType<typeof fetchDataset>>;
+/** cache key scoped to the active dataset so a header switch refetches */
+const datasetKey = (userId: string, activeFile?: string | null) =>
+  ["dataset", userId, activeFile ?? "all"] as const;
 type DatasetBucket = keyof CloudDataset;
 const localFallbacks = new Map<string, Partial<CloudDataset>>();
 
