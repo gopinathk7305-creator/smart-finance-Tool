@@ -70,6 +70,7 @@ export function useDynamicDashboard(activeDatasetId?: string | null): DynamicDas
       groupLabel,
       usable: revenue > 0 || expenses > 0,
       rowCount: rows.length,
+      columnCount: schema.columns.length,
     };
   }, [rows, activeDatasetId]);
 }
