@@ -749,9 +749,15 @@ function UploadPage() {
                         >
                           <Eye className="size-4" /> Open
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => void purge(ds)}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={deleting !== null}
+                          onClick={() => setConfirmDelete(ds)}
+                        >
                           <Trash2 className="size-4 text-danger" />
                         </Button>
+
                       </TableCell>
                     </TableRow>
                   ))}
