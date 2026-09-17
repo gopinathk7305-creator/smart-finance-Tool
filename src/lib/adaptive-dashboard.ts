@@ -36,7 +36,6 @@ export interface AdaptiveDashboard {
   ready: boolean;
 }
 
-const compact = new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 2 });
 const plain = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 });
 
 /** ₹ in Lakhs/Crores, e.g. ₹6.8Cr / ₹45L. */
