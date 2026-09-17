@@ -31,6 +31,8 @@ interface ActiveDatasetValue {
   /** file name used to isolate rows across every module */
   activeFile: string | null;
   loading: boolean;
+  /** true while a dataset switch is propagating to every module */
+  syncing: boolean;
   setActiveId: (id: string | null) => void;
   refreshDatasets: () => void;
 }
@@ -41,6 +43,7 @@ const ActiveDatasetContext = createContext<ActiveDatasetValue>({
   active: null,
   activeFile: null,
   loading: false,
+  syncing: false,
   setActiveId: () => {},
   refreshDatasets: () => {},
 });
@@ -50,6 +53,7 @@ export function ActiveDatasetProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [activeId, setActiveIdState] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     const saved = window.localStorage.getItem(ACTIVE_KEY);
@@ -72,11 +76,20 @@ export function ActiveDatasetProvider({ children }: { children: ReactNode }) {
 
   const datasets = data ?? [];
 
-  const setActiveId = useCallback((id: string | null) => {
-    // "" records an explicit "all datasets" choice so it survives reloads.
-    window.localStorage.setItem(ACTIVE_KEY, id ?? "");
-    setActiveIdState(id);
-  }, []);
+  const setActiveId = useCallback(
+    (id: string | null) => {
+      // "" records an explicit "all datasets" choice so it survives reloads.
+      window.localStorage.setItem(ACTIVE_KEY, id ?? "");
+      setActiveIdState(id);
+      // Every module reads the same cached dataset query: invalidating it here
+      // forces one refetch that re-renders all 11 modules at once.
+      setSyncing(true);
+      void queryClient
+        .invalidateQueries({ queryKey: ["dataset"] })
+        .finally(() => window.setTimeout(() => setSyncing(false), 350));
+    },
+    [queryClient],
+  );
 
   // Default: the most recently uploaded dataset drives the workspace.
   useEffect(() => {
@@ -98,10 +111,11 @@ export function ActiveDatasetProvider({ children }: { children: ReactNode }) {
       active,
       activeFile: active?.file_name ?? null,
       loading: !!user && isLoading,
+      syncing,
       setActiveId,
       refreshDatasets,
     };
-  }, [datasets, activeId, user, isLoading, setActiveId, refreshDatasets]);
+  }, [datasets, activeId, user, isLoading, syncing, setActiveId, refreshDatasets]);
 
   return <ActiveDatasetContext.Provider value={value}>{children}</ActiveDatasetContext.Provider>;
 }
