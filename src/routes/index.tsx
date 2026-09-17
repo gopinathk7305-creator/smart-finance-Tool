@@ -278,7 +278,7 @@ function Dashboard() {
                         textAnchor={x > (cx ?? 0) ? "start" : "end"}
                         dominantBaseline="central"
                       >
-                        {`${name} (${Math.round((percent ?? 0) * 100)}%)`}
+                        {`${name && name.length > 14 ? `${name.slice(0, 13)}…` : name} (${Math.round((percent ?? 0) * 100)}%)`}
                       </text>
                     );
                   }}
