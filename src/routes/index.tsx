@@ -95,7 +95,9 @@ function Dashboard() {
   // auto-mapper's normalised rows drive every figure instead.
   const canonical = totals(mapped);
   const txns =
-    canonical.revenue === 0 && canonical.expense === 0 && dyn.usable ? dyn.txns : mapped;
+    recordsMode && (Boolean(activeId) || (canonical.revenue === 0 && canonical.expense === 0))
+      ? dyn.txns
+      : mapped;
 
   const series = monthlySummary(txns);
   const t = totals(txns);
