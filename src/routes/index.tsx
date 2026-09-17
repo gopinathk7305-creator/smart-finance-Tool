@@ -33,6 +33,8 @@ import { AppShell } from "@/components/finance/AppShell";
 import { KpiCard } from "@/components/finance/KpiCard";
 import { useActiveDataset } from "@/lib/active-dataset";
 import { useActiveDatasetMetrics } from "@/lib/dataset-metrics";
+import { useDynamicDashboard } from "@/lib/dynamic-dashboard";
+import { safeMargin } from "@/lib/column-map";
 import { useDataset } from "@/lib/dataset";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -103,7 +105,6 @@ function Dashboard() {
   const toneIcon = { danger: AlertTriangle, warning: Info, success: CheckCircle2 };
   const chartsRef = useRef<HTMLDivElement>(null);
   const metrics = useActiveDatasetMetrics();
-  const { syncing } = useActiveDataset();
   const busy = syncing || metrics.loading;
   const recent = [...txns]
     .sort((a, b) => (a.date < b.date ? 1 : -1))
