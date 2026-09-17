@@ -85,9 +85,11 @@ function Dashboard() {
   // Schema-driven engine: any dataset whose columns aren't recognisable finance
   // fields still gets KPI cards and charts built from its own schema.
   const adaptive = useAdaptiveDashboard(activeId);
-  // A specific uploaded dataset drives the whole dashboard from its own schema;
-  // the canonical finance view is only used for the combined/demo view.
-  const adaptiveMode = adaptive.ready && (Boolean(activeId) || !dyn.usable);
+  // Whenever the active dataset's own rows carry usable money columns we bind the
+  // executive dashboard straight to those records; the schema-driven adaptive view
+  // is only a fallback for datasets with no recognisable monetary fields.
+  const recordsMode = dyn.usable && dyn.rowCount > 0;
+  const adaptiveMode = adaptive.ready && !recordsMode;
 
   // Canonical columns first; if the uploaded file used its own header names the
   // auto-mapper's normalised rows drive every figure instead.
