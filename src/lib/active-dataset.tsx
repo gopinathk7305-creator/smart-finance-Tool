@@ -111,10 +111,11 @@ export function ActiveDatasetProvider({ children }: { children: ReactNode }) {
       active,
       activeFile: active?.file_name ?? null,
       loading: !!user && isLoading,
+      syncing,
       setActiveId,
       refreshDatasets,
     };
-  }, [datasets, activeId, user, isLoading, setActiveId, refreshDatasets]);
+  }, [datasets, activeId, user, isLoading, syncing, setActiveId, refreshDatasets]);
 
   return <ActiveDatasetContext.Provider value={value}>{children}</ActiveDatasetContext.Provider>;
 }
