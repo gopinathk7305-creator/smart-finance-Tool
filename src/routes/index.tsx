@@ -29,10 +29,12 @@ import {
 import { useRef } from "react";
 
 import { ActiveDatasetBanner } from "@/components/finance/ActiveDatasetBanner";
+import { AdaptiveDashboard } from "@/components/finance/AdaptiveDashboard";
 import { AiReportButton } from "@/components/finance/AiReportButton";
 import { AppShell } from "@/components/finance/AppShell";
 import { KpiCard } from "@/components/finance/KpiCard";
 import { useActiveDataset } from "@/lib/active-dataset";
+import { useAdaptiveDashboard } from "@/lib/adaptive-dashboard";
 import { useActiveDatasetMetrics } from "@/lib/dataset-metrics";
 import { useDynamicDashboard } from "@/lib/dynamic-dashboard";
 import { safeMargin } from "@/lib/column-map";
