@@ -1,9 +1,9 @@
 import { type QueryClient, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-import { fetchAllRows } from "@/lib/fetch-all";
+import { fetchAllRows, withRawColumns } from "@/lib/fetch-all";
 import { useAuth } from "@/lib/auth";
 import { ALL, demoDatasetFor, useOrg } from "@/lib/orgs";
 import { useActiveDataset } from "@/lib/active-dataset";
@@ -240,6 +240,26 @@ function useDatasetInternal(fetchEnabled: boolean): Dataset {
       txnsInRange.length + arapsInRange.length + paysInRange.length === 0,
     refresh,
   };
+}
+
+/**
+ * Raw rows (original uploaded column names, raw_data flattened back in) for the
+ * active dataset. Cache-only: it never triggers a fetch of its own.
+ */
+export function useDatasetRaw(): Record<string, unknown>[] {
+  const { user } = useAuth();
+  const { activeFile } = useActiveDataset();
+  const queryClient = useQueryClient();
+  const cached = queryClient.getQueryData<CloudDataset>(["dataset", user?.id ?? "anon"]);
+  const fallback = user ? localFallbacks.get(user.id) : undefined;
+
+  return useMemo(() => {
+    const rows = mergeRows((cached?.t ?? []) as { id?: string }[], (fallback?.t ?? []) as { id?: string }[]);
+    const scoped = activeFile
+      ? rows.filter((r) => (r as { source_file?: string | null }).source_file === activeFile)
+      : rows;
+    return scoped.map((r) => withRawColumns(r as Record<string, unknown>));
+  }, [cached, fallback, activeFile]);
 }
 
 function byVendor<T>(rows: T[], vendor: string, pick: (r: T) => string): T[] {
