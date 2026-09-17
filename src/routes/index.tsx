@@ -97,14 +97,21 @@ function Dashboard() {
   const expDelta = pctChange(sum(h1, "expense"), sum(h2, "expense"));
   const margin = safeMargin(t.netProfit, t.revenue);
 
-  const topCats = [...actualsByCategory(txns).entries()]
+  const canonicalCats = [...actualsByCategory(txns).entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
     .map(([name, value]) => ({ name, value }));
+  // No recognisable expense categories? fall back to a generic distribution of
+  // whatever grouping column the uploaded file actually has.
+  const usingFallbackCats = canonicalCats.length === 0 && dyn.topGroups.length > 0;
+  const topCats = usingFallbackCats ? dyn.topGroups : canonicalCats;
+  const catsTitle = usingFallbackCats ? "Dataset Distribution" : "Top 5 Expense Categories";
+  const catsSubtitle = usingFallbackCats ? dyn.groupLabel : "Share of total spend";
 
   const toneIcon = { danger: AlertTriangle, warning: Info, success: CheckCircle2 };
   const chartsRef = useRef<HTMLDivElement>(null);
   const metrics = useActiveDatasetMetrics();
+  const riskFlags = metrics.riskFlags || dyn.riskFlags;
   const busy = syncing || metrics.loading;
   const recent = [...txns]
     .sort((a, b) => (a.date < b.date ? 1 : -1))
