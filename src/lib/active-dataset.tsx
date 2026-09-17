@@ -21,6 +21,7 @@ export interface DatasetSummary {
   dataset_key: string;
   row_count: number;
   modules: string[];
+  column_names: string[];
   created_at: string;
 }
 
@@ -67,7 +68,7 @@ export function ActiveDatasetProvider({ children }: { children: ReactNode }) {
     queryFn: async () => {
       const { data: rows } = await supabase
         .from("uploaded_datasets")
-        .select("id,file_name,table_name,dataset_key,row_count,modules,created_at")
+        .select("id,file_name,table_name,dataset_key,row_count,modules,column_names,created_at")
         .eq("user_id", user!.id)
         .order("created_at", { ascending: false });
       return (rows ?? []) as unknown as DatasetSummary[];
