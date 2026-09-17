@@ -26,10 +26,6 @@ export function useActiveDatasetMetrics(): ActiveDatasetMetrics {
   return useMemo(() => {
     const revenue = txns.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
     const expenses = txns.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
-    const payrollCost = pays.reduce(
-      (s, p) => s + p.basic_pay + p.allowances - p.deductions,
-      0,
-    );
     const taxDeductions = pays.reduce((s, p) => s + p.pf_deduction + p.tds_deduction, 0);
     const netProfit = revenue - expenses;
     const overdue = araps.filter((a) => a.status === "outstanding").length;
