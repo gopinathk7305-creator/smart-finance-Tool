@@ -92,6 +92,12 @@ function Dashboard() {
 
   const toneIcon = { danger: AlertTriangle, warning: Info, success: CheckCircle2 };
   const chartsRef = useRef<HTMLDivElement>(null);
+  const metrics = useActiveDatasetMetrics();
+  const { syncing } = useActiveDataset();
+  const busy = syncing || metrics.loading;
+  const recent = [...txns]
+    .sort((a, b) => (a.date < b.date ? 1 : -1))
+    .slice(0, 10);
 
   const buildReport = () => ({
     page: "dashboard" as const,
