@@ -53,6 +53,7 @@ export function ActiveDatasetProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [activeId, setActiveIdState] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     const saved = window.localStorage.getItem(ACTIVE_KEY);
