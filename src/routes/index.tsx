@@ -29,10 +29,12 @@ import {
 import { useRef } from "react";
 
 import { ActiveDatasetBanner } from "@/components/finance/ActiveDatasetBanner";
+import { AdaptiveDashboard } from "@/components/finance/AdaptiveDashboard";
 import { AiReportButton } from "@/components/finance/AiReportButton";
 import { AppShell } from "@/components/finance/AppShell";
 import { KpiCard } from "@/components/finance/KpiCard";
 import { useActiveDataset } from "@/lib/active-dataset";
+import { useAdaptiveDashboard } from "@/lib/adaptive-dashboard";
 import { useActiveDatasetMetrics } from "@/lib/dataset-metrics";
 import { useDynamicDashboard } from "@/lib/dynamic-dashboard";
 import { safeMargin } from "@/lib/column-map";
@@ -80,6 +82,10 @@ function Dashboard() {
   const { txns: mapped, live } = useDataset();
   const { activeId, syncing } = useActiveDataset();
   const dyn = useDynamicDashboard(activeId);
+  // Schema-driven engine: any dataset whose columns aren't recognisable finance
+  // fields still gets KPI cards and charts built from its own schema.
+  const adaptive = useAdaptiveDashboard(activeId);
+  const adaptiveMode = !dyn.usable && adaptive.ready;
 
   // Canonical columns first; if the uploaded file used its own header names the
   // auto-mapper's normalised rows drive every figure instead.
@@ -157,6 +163,10 @@ function Dashboard() {
       <div className="mb-4 flex justify-end">
         <AiReportButton build={buildReport} />
       </div>
+      {adaptiveMode ? (
+        <AdaptiveDashboard profile={adaptive} />
+      ) : (
+      <>
       {busy ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           {Array.from({ length: 5 }).map((_, i) => (
@@ -373,6 +383,8 @@ function Dashboard() {
         </Card>
       </div>
       </div>
+      </>
+      )}
 
       <Card className="mt-4 border-border shadow-card">
         <CardHeader>
