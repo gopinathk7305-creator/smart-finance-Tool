@@ -769,7 +769,57 @@ function UploadPage() {
       </Card>
 
       {/* ⚡ Dataset auto-detected modal */}
+      {/* Delete confirmation */}
+      <Dialog
+        open={confirmDelete !== null}
+        onOpenChange={(o) => {
+          if (!o && deleting === null) setConfirmDelete(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete {confirmDelete?.file_name}?</DialogTitle>
+            <DialogDescription>
+              This will purge all associated rows (
+              {(confirmDelete?.row_count ?? 0).toLocaleString("en-IN")} records) from cloud storage.
+              This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {deleting && (
+            <p className="text-sm text-muted-foreground">
+              Deleting records… Please wait — {deleting.removed.toLocaleString("en-IN")} rows removed
+              so far.
+            </p>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={deleting !== null}
+              onClick={() => setConfirmDelete(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-danger text-danger-foreground hover:bg-danger/90"
+              disabled={deleting !== null}
+              onClick={() => confirmDelete && void purge(confirmDelete)}
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" /> Deleting records… Please wait
+                </>
+              ) : (
+                <>
+                  <Trash2 className="size-4" /> Delete dataset
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={mappedOpen} onOpenChange={setMappedOpen}>
+
         <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>⚡ Dataset auto-detected &amp; successfully processed</DialogTitle>
