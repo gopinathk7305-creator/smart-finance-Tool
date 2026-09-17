@@ -3,6 +3,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  LabelList,
   Legend,
   Pie,
   PieChart,
@@ -15,9 +16,16 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { KpiCard } from "@/components/finance/KpiCard";
-import { titleCase, type AdaptiveDashboard as Profile } from "@/lib/adaptive-dashboard";
+import { compactMoney, titleCase, type AdaptiveDashboard as Profile } from "@/lib/adaptive-dashboard";
 
-const SERIES_COLORS = ["var(--brand)", "var(--danger)", "var(--success)"];
+const SERIES_COLORS = [
+  "var(--brand)",
+  "var(--primary)",
+  "var(--success)",
+  "var(--warning)",
+  "var(--danger)",
+  "var(--muted-foreground)",
+];
 const PIE_COLORS = [
   "var(--brand)",
   "var(--primary)",
@@ -26,7 +34,6 @@ const PIE_COLORS = [
   "var(--danger)",
 ];
 
-const compact = new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 2 });
 const full = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 });
 
 /**
@@ -34,7 +41,7 @@ const full = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 });
  * entirely from the columns present in the active dataset.
  */
 export function AdaptiveDashboard({ profile }: { profile: Profile }) {
-  const { kpis, trend, trendSeries, trendLabel, breakdown, breakdownLabel, schema } = profile;
+  const { kpis, trend, trendSeries, trendLabel, trendStacked, breakdown, breakdownLabel, schema } = profile;
 
   return (
     <div className="space-y-4">
@@ -70,7 +77,7 @@ export function AdaptiveDashboard({ profile }: { profile: Profile }) {
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis dataKey="bucket" tickLine={false} axisLine={false} fontSize={11} />
                   <YAxis
-                    tickFormatter={(v) => compact.format(Number(v))}
+                    tickFormatter={(v) => compactMoney(Number(v))}
                     tickLine={false}
                     axisLine={false}
                     fontSize={11}
@@ -83,9 +90,19 @@ export function AdaptiveDashboard({ profile }: { profile: Profile }) {
                       key={col}
                       dataKey={col}
                       name={titleCase(col)}
+                      {...(trendStacked ? { stackId: "a" } : {})}
                       fill={SERIES_COLORS[i % SERIES_COLORS.length]}
                       radius={[4, 4, 0, 0]}
-                    />
+                    >
+                      {(!trendStacked || i === trendSeries.length - 1) && (
+                        <LabelList
+                          dataKey={col}
+                          position="top"
+                          style={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                          formatter={(val: number) => compactMoney(Number(val))}
+                        />
+                      )}
+                    </Bar>
                   ))}
                 </BarChart>
               </ResponsiveContainer>
