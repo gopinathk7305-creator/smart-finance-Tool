@@ -630,6 +630,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      purge_dataset_batch: {
+        Args: {
+          p_limit?: number
+          p_org_id?: string
+          p_source_file: string
+          p_table: string
+        }
+        Returns: number
+      }
     }
     Enums: {
       app_role: "admin" | "finance_manager" | "analyst" | "viewer"
