@@ -32,20 +32,28 @@ export interface Dataset {
 
 type Row<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"];
 
-async function fetchDataset() {
+/**
+ * Rows for the active dataset only. Scoping the fetch (instead of downloading
+ * every file and filtering in the browser) keeps a switch fast and guarantees
+ * the newly selected file's rows are actually present.
+ */
+async function fetchDataset(activeFile?: string | null) {
+  const scope = <T,>(q: T): T =>
+    activeFile ? ((q as { eq: (c: string, v: string) => T }).eq("source_file", activeFile) as T) : q;
+
   // Every table is paged past the 1,000-row response cap.
   const [t, p, b, a] = await Promise.all([
     fetchAllRows<Row<"transactions">>((from, to) =>
-      supabase.from("transactions").select("*").order("txn_date").range(from, to),
+      scope(supabase.from("transactions").select("*").order("txn_date")).range(from, to),
     ),
     fetchAllRows<Row<"payroll_records">>((from, to) =>
-      supabase.from("payroll_records").select("*").order("employee_id").range(from, to),
+      scope(supabase.from("payroll_records").select("*").order("employee_id")).range(from, to),
     ),
     fetchAllRows<Row<"budget_targets">>((from, to) =>
-      supabase.from("budget_targets").select("*").range(from, to),
+      scope(supabase.from("budget_targets").select("*")).range(from, to),
     ),
     fetchAllRows<Row<"arap_records">>((from, to) =>
-      supabase.from("arap_records").select("*").range(from, to),
+      scope(supabase.from("arap_records").select("*")).range(from, to),
     ),
   ]);
 
