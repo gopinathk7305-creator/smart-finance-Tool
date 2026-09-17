@@ -126,7 +126,9 @@ function Dashboard() {
   const chartsRef = useRef<HTMLDivElement>(null);
   const metrics = useActiveDatasetMetrics();
   const riskFlags = metrics.riskFlags || dyn.riskFlags;
-  const busy = syncing || metrics.loading;
+  // Never show skeletons once the active dataset's rows are in hand — real figures
+  // beat placeholders even while the background summary is still refreshing.
+  const busy = (syncing || metrics.loading) && txns.length === 0;
   const recent = [...txns]
     .sort((a, b) => (a.date < b.date ? 1 : -1))
     .slice(0, 10);
