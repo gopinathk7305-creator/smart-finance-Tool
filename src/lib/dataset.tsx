@@ -267,8 +267,8 @@ export function useDatasetRaw(): Record<string, unknown>[] {
 
   // enabled:false keeps this read-only while still subscribing to cache updates.
   const { data: cached } = useQuery<CloudDataset>({
-    queryKey: ["dataset", user?.id ?? "anon"],
-    queryFn: fetchDataset,
+    queryKey: datasetKey(user?.id ?? "anon", activeFile),
+    queryFn: () => fetchDataset(activeFile),
     enabled: false,
   });
   const fallback = user ? localFallbacks.get(user.id) : undefined;
