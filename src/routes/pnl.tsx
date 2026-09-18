@@ -119,11 +119,11 @@ function PnlPage() {
       {
         label: "Gross Profit",
         value: inr(t.grossProfit, true),
-        delta: `${((t.grossProfit / t.revenue) * 100).toFixed(1)}% margin`,
+        delta: `${pctLabel(t.grossProfit, t.revenue)} margin`,
       },
-      { label: "EBITDA", value: inr(t.ebitda, true), delta: `${((t.ebitda / t.revenue) * 100).toFixed(1)}% of revenue` },
+      { label: "EBITDA", value: inr(t.ebitda, true), delta: `${pctLabel(t.ebitda, t.revenue)} of revenue` },
       { label: "Net Profit (Post-Tax)", value: inr(tx.netProfit, true), delta: `Effective tax ${tx.effectiveRate.toFixed(2)}%` },
-      { label: "Net Margin", value: `${((tx.netProfit / t.revenue) * 100).toFixed(1)}%`, delta: "FY 2026-27" },
+      { label: "Net Margin", value: pctLabel(tx.netProfit, t.revenue), delta: "FY 2026-27" },
     ],
     tables: [
       {
@@ -133,7 +133,7 @@ function PnlPage() {
         rows: rows.map((r) => [
           r.label,
           r.value < 0 ? `(${inr(Math.abs(r.value))})` : inr(r.value),
-          `${((r.value / t.revenue) * 100).toFixed(1)}%`,
+          pctLabel(r.value, t.revenue),
         ]),
       },
       {
@@ -158,8 +158,8 @@ function PnlPage() {
         numericFrom: 1,
         rows: marginSeries.map((m) => [
           m.month,
-          `${m.grossMargin.toFixed(1)}%`,
-          `${m.netMargin.toFixed(1)}%`,
+          `${safeMargin(m.grossProfit, m.revenue).toFixed(1)}%`,
+          `${safeMargin(m.ebitda, m.revenue).toFixed(1)}%`,
         ]),
       },
     ],
@@ -173,10 +173,10 @@ function PnlPage() {
         <AiReportButton build={buildReport} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard label="Gross Profit" value={inr(t.grossProfit, true)} icon={TrendingUp} tone="success" hint={`${((t.grossProfit / t.revenue) * 100).toFixed(1)}% margin`} />
-        <KpiCard label="EBITDA" value={inr(t.ebitda, true)} icon={Activity} hint={`${((t.ebitda / t.revenue) * 100).toFixed(1)}% of revenue`} />
+        <KpiCard label="Gross Profit" value={inr(t.grossProfit, true)} icon={TrendingUp} tone="success" hint={`${pctLabel(t.grossProfit, t.revenue)} margin`} />
+        <KpiCard label="EBITDA" value={inr(t.ebitda, true)} icon={Activity} hint={`${pctLabel(t.ebitda, t.revenue)} of revenue`} />
         <KpiCard label="Net Profit After Tax" value={inr(tx.netProfit, true)} icon={PiggyBank} tone={tx.netProfit > 0 ? "success" : "danger"} hint={`Effective tax ${tx.effectiveRate.toFixed(2)}%`} />
-        <KpiCard label="Net Margin" value={`${((tx.netProfit / t.revenue) * 100).toFixed(1)}%`} icon={Percent} tone="neutral" hint="FY 2026-27" />
+        <KpiCard label="Net Margin" value={pctLabel(tx.netProfit, t.revenue)} icon={Percent} tone="neutral" hint="FY 2026-27" />
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-5">
@@ -216,7 +216,7 @@ function PnlPage() {
                         r.kind === "grand" ? "text-primary-foreground/70" : "text-muted-foreground",
                       )}
                     >
-                      {((r.value / t.revenue) * 100).toFixed(1)}%
+                      {pctLabel(r.value, t.revenue)}
                     </span>
                   )}
                   <span>
