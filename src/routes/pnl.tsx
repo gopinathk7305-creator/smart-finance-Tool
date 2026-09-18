@@ -231,21 +231,31 @@ function PnlPage() {
         <Card className="border-border shadow-card lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-base">Margin Trend</CardTitle>
-            <CardDescription>Gross and net margin by month</CardDescription>
+            <CardDescription>
+              Gross margin (revenue − COGS) and EBITDA margin by month
+            </CardDescription>
           </CardHeader>
           <CardContent className="h-[340px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={marginSeries}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
-                <YAxis tickFormatter={(v) => `${Number(v).toFixed(0)}%`} tickLine={false} axisLine={false} fontSize={12} width={44} />
-                <Tooltip formatter={(v) => `${Number(v).toFixed(1)}%`} />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Line type="monotone" dataKey="grossMargin" name="Gross margin" stroke="var(--brand)" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="netMargin" name="Net margin" stroke="var(--success)" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
+            {marginSeries.length === 0 ? (
+              <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">
+                No dated revenue rows in this dataset yet — the monthly trend appears as soon as
+                revenue with dates is available.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={marginSeries}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
+                  <YAxis tickFormatter={(v) => `${Number(v).toFixed(0)}%`} tickLine={false} axisLine={false} fontSize={12} width={44} />
+                  <Tooltip formatter={(v) => `${Number(v).toFixed(1)}%`} />
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                  <Line type="monotone" dataKey="grossMargin" name="Gross margin" stroke="var(--brand)" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="ebitdaMargin" name="EBITDA margin" stroke="var(--success)" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
+
         </Card>
       </div>
 
