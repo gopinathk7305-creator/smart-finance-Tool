@@ -61,7 +61,10 @@ import { fetchAllRows, withRawColumns } from "@/lib/fetch-all";
 
 const BATCH_SIZE = 1000;
 const MAX_CONCURRENT = 3;
-const CLOUD_TIMEOUT_MS = 5000;
+// A 1,000-row insert on a busy connection can legitimately take tens of seconds.
+const CLOUD_TIMEOUT_MS = 45000;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
 export const Route = createFileRoute("/upload")({
@@ -366,7 +369,14 @@ function UploadPage() {
   const commit = async () => {
     if (!parsed || !detection || !parsed.rows.length || !user) return;
     setCommitting(true);
-    const rowsWithIds = parsed.rows.map((row) => ({ ...row, id: String(row["id"] ?? crypto.randomUUID()) }));
+    // Files often carry their own "id" column (1, 2, 3…) which the database
+    // rejects as a UUID and silently aborts the whole sync. Keep the original
+    // value inside raw_data and always store a valid UUID primary key.
+    const rowsWithIds = parsed.rows.map((row) => {
+      const candidate = String(row["id"] ?? "");
+      return { ...row, id: UUID_RE.test(candidate) ? candidate : crypto.randomUUID() };
+    });
+
     const batches: Record<string, unknown>[][] = [];
     for (let i = 0; i < rowsWithIds.length; i += BATCH_SIZE)
       batches.push(rowsWithIds.slice(i, i + BATCH_SIZE));
@@ -394,75 +404,103 @@ function UploadPage() {
 
     const bucket = detection.key === "transactions" ? "t" : detection.key === "payroll" ? "p" : detection.key === "budget" ? "b" : "a";
 
-    // Up to three 1,000-row upserts run together. A five-second race keeps the UI usable.
+    // Up to three 1,000-row upserts run together; each batch gets one retry
+    // before the upload gives up, so a single slow request no longer loses the file.
     let cursor = 0;
     const worker = async () => {
       while (cursor < total && !failure) {
         const index = cursor;
         cursor += 1;
         const batch = batches[index]!;
-        try {
-          const request = supabase.from(detection.table).upsert(batch as never, { onConflict: "id" });
-          const result = await Promise.race([
-            request,
-            new Promise<never>((_, reject) =>
-              window.setTimeout(() => reject(new Error("Cloud sync exceeded 5 seconds")), CLOUD_TIMEOUT_MS),
-            ),
-          ]);
-          batches[index] = [];
-          if (result.error) throw result.error;
-          completed += 1;
-          tick();
-        } catch (error) {
-          timedOut = error instanceof Error && error.message.includes("exceeded 5 seconds");
-          failure = error instanceof Error ? error.message : "Cloud sync failed";
+        let lastError: unknown = null;
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          try {
+            const request = supabase.from(detection.table).upsert(batch as never, { onConflict: "id" });
+            const result = await Promise.race([
+              request,
+              new Promise<never>((_, reject) =>
+                window.setTimeout(() => reject(new Error("cloud-timeout")), CLOUD_TIMEOUT_MS),
+              ),
+            ]);
+            if (result.error) throw result.error;
+            lastError = null;
+            break;
+          } catch (error) {
+            lastError = error;
+          }
+        }
+        if (lastError) {
+          timedOut = lastError instanceof Error && lastError.message === "cloud-timeout";
+          failure =
+            lastError instanceof Error
+              ? timedOut
+                ? "the cloud database took too long to respond"
+                : lastError.message
+              : "Cloud sync failed";
           return;
         }
+        batches[index] = [];
+        completed += 1;
+        tick();
       }
     };
     await Promise.all(Array.from({ length: Math.min(MAX_CONCURRENT, total) }, worker));
 
+    const synced = failure ? completed * BATCH_SIZE : parsed.rows.length;
+
+    if (failure) cacheLocalDatasetRows(queryClient, user.id, bucket, rowsWithIds);
+
+    // The dataset entry is written whether or not every batch landed, so the
+    // file always appears under "Manage cloud datasets" instead of vanishing.
+    if (synced > 0 || !failure) {
+      const { error: metadataError } = await supabase.from("uploaded_datasets").insert({
+        user_id: user.id,
+        org_id: scopeOrgId,
+        file_name: parsed.fileName,
+        dataset_key: detection.key,
+        table_name: detection.table,
+        row_count: synced,
+        column_names: detection.columns,
+        modules: detection.modules,
+        status: failure ? "partial" : "synced",
+      } as never);
+      if (metadataError)
+        toast.warning(`Rows synced, but dataset history could not be saved: ${metadataError.message}`);
+    }
+
+    setCommitting(false);
+    setProgress(null);
+
+    const refreshLists = async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["stored-datasets"] }),
+        queryClient.invalidateQueries({ queryKey: ["dataset-registry"] }),
+      ]);
+      await stored.refetch();
+      refreshDatasets();
+      refresh();
+    };
+
     if (failure) {
-      cacheLocalDatasetRows(queryClient, user.id, bucket, rowsWithIds);
-      setCommitting(false);
-      setProgress(null);
       setMappedOpen(false);
+      await refreshLists();
       toast.warning(
         timedOut
-          ? "Cloud sync is slow. Your data is available locally across every module now."
-          : `Cloud sync failed (${failure}). Your data is available locally across every module.`,
+          ? `Only ${synced.toLocaleString("en-IN")} rows reached the cloud (${failure}). The rest is available locally across every module.`
+          : `Cloud sync stopped (${failure}). Your data is available locally across every module.`,
       );
       window.setTimeout(() => openInsights(parsed.fileName), 300);
       return;
     }
-    completed = total;
-    tick(true);
-
-
-    const { error: metadataError } = await supabase.from("uploaded_datasets").insert({
-      user_id: user.id,
-      org_id: scopeOrgId,
-      file_name: parsed.fileName,
-      dataset_key: detection.key,
-      table_name: detection.table,
-      row_count: parsed.rows.length,
-      column_names: detection.columns,
-      modules: detection.modules,
-      status: "synced",
-    } as never);
-    if (metadataError) toast.warning(`Rows synced, but dataset history could not be saved: ${metadataError.message}`);
 
     clearLocalDatasetRows(user.id, bucket);
-    setCommitting(false);
-    setProgress(null);
     await logActivity(`Synced ${parsed.rows.length} clean ${detection.label} rows to cloud`, "Data Upload");
-    refresh();
-    void stored.refetch();
-    refreshDatasets();
+    await refreshLists();
     setMappedOpen(false);
     toast.success(`${parsed.rows.length} rows synced — every module refreshed`);
     window.setTimeout(() => openInsights(parsed.fileName), 900);
   };
+
 
   const activate = (id: string | null) => {
     setActiveId(id);
