@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { fetchAllRows, withRawColumns } from "@/lib/fetch-all";
-import { parseNum } from "@/lib/column-map";
+import { mapRowsToTransactions, parseNum } from "@/lib/column-map";
+import { deriveArAp, deriveBudget, derivePayroll } from "@/lib/module-derive";
 import { useAuth } from "@/lib/auth";
 import { ALL, demoDatasetFor, useOrg } from "@/lib/orgs";
 import { useActiveDataset } from "@/lib/active-dataset";
@@ -235,11 +236,25 @@ function useDatasetInternal(fetchEnabled: boolean): Dataset {
     status: r.status === "settled" ? "settled" : "outstanding",
   }));
 
+  // Cross-module fuzzy derivation: an uploaded file usually lands in one table
+  // only, so modules whose canonical table is empty map their metrics from the
+  // active dataset's own columns instead of showing ₹0.
+  const rawBucket = [combined.t, combined.p, combined.b, combined.a].find((rows) => rows.length) ?? [];
+  const rawRows = (inOrg(rawBucket as { org_id?: string | null }[]) as Record<string, unknown>[]).map((r) =>
+    withRawColumns(r),
+  );
+
+  const canonicalTotal = txns.reduce((s, t) => s + t.amount, 0);
+  const effectiveTxns = canonicalTotal > 0 ? txns : mapRowsToTransactions(rawRows);
+  const effectivePays = pays.length ? pays : derivePayroll(rawRows, effectiveTxns);
+  const effectiveBuds = buds.length ? buds : deriveBudget(rawRows);
+  const effectiveAraps = araps.length ? araps : deriveArAp(rawRows);
+
   // Global date-range filter: every module reads this dataset, so scoping here
   // syncs all pages to the header selection at once.
-  const txnsInRange = txns.filter((r) => inRange(r.date, range));
-  const arapsInRange = araps.filter((r) => inRange(r.invoice_date || r.due_date, range));
-  const paysInRange = pays.filter((r) => inRange(r.month_year, range));
+  const txnsInRange = effectiveTxns.filter((r) => inRange(r.date, range));
+  const arapsInRange = effectiveAraps.filter((r) => inRange(r.invoice_date || r.due_date, range));
+  const paysInRange = effectivePays.filter((r) => inRange(r.month_year, range));
 
   return {
     txns: byVendor(txnsInRange, vendor, (r) => r.vendor_client),
