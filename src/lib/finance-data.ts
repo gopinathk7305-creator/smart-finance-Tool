@@ -384,10 +384,17 @@ export function actualsByCategory(txns: Transaction[] = transactions) {
  *   Defaults to the built-in "COGS" bucket when the user has not defined their own.
  */
 export function totals(txns: Transaction[] = transactions, cogsCategories: string[] = ["COGS"]) {
-  const revenue = txns.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
-  const expense = txns.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+  const revenue = txns
+    .filter((t) => t.type === "income")
+    .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+  const expense = txns
+    .filter((t) => t.type === "expense")
+    .reduce((s, t) => s + (Number(t.amount) || 0), 0);
   const byCat = actualsByCategory(txns);
-  const wanted = new Set(cogsCategories.map((c) => c.toLowerCase()));
+  // Always recognise the canonical COGS bucket so a dataset with a "Cost of
+  // goods sold" column still splits gross profit even before the user defines
+  // their own COGS categories.
+  const wanted = new Set([...cogsCategories, "COGS"].map((c) => c.toLowerCase()));
   let cogs = 0;
   byCat.forEach((v, k) => {
     if (wanted.has(k.toLowerCase())) cogs += v;
@@ -400,6 +407,7 @@ export function totals(txns: Transaction[] = transactions, cogsCategories: strin
   const tax = Math.max(0, (ebitda - depreciation - interest) * 0.25);
   const netProfit = ebitda - (depreciation + interest + tax);
   return { revenue, expense, cogs, grossProfit, opex, ebitda, depreciation, interest, tax, netProfit };
+
 }
 
 export function cashRunwayMonths(txns: Transaction[] = transactions) {
