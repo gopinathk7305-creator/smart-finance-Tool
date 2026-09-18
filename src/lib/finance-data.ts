@@ -321,6 +321,52 @@ export function monthlySummary(txns: Transaction[] = transactions): MonthlySumma
   });
 }
 
+export interface MonthlyMargin {
+  month: string;
+  revenue: number;
+  cogs: number;
+  expense: number;
+  grossProfit: number;
+  ebitda: number;
+  grossMargin: number;
+  ebitdaMargin: number;
+  netMargin: number;
+}
+
+/**
+ * Month-by-month revenue / COGS / margins from the active dataset.
+ * Months with no revenue report 0% instead of NaN or -Infinity, and months with
+ * no rows at all are dropped so the trend line only plots real data.
+ */
+export function monthlyMargins(
+  txns: Transaction[] = transactions,
+  cogsCategories: string[] = ["COGS"],
+): MonthlyMargin[] {
+  const wanted = new Set((cogsCategories.length ? cogsCategories : ["COGS"]).map((c) => c.toLowerCase()));
+  return MONTHS.map((month, m) => {
+    const rows = txns.filter((t) => monthIndexOf(t.date) === m);
+    const revenue = rows.filter((r) => r.type === "income").reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const expense = rows.filter((r) => r.type === "expense").reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const cogs = rows
+      .filter((r) => r.type === "expense" && wanted.has((r.category || "").toLowerCase()))
+      .reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const grossProfit = revenue - cogs;
+    const ebitda = revenue - expense;
+    return {
+      month: month.slice(0, 3),
+      revenue,
+      cogs,
+      expense,
+      grossProfit,
+      ebitda,
+      grossMargin: safeMargin(grossProfit, revenue),
+      ebitdaMargin: safeMargin(ebitda, revenue),
+      netMargin: safeMargin(ebitda, revenue),
+      rows: rows.length,
+    };
+  }).filter((m) => m.rows > 0 || m.revenue > 0) as MonthlyMargin[];
+}
+
 export function actualsByCategory(txns: Transaction[] = transactions) {
   const map = new Map<string, number>();
   txns
