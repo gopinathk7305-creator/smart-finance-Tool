@@ -61,7 +61,10 @@ import { fetchAllRows, withRawColumns } from "@/lib/fetch-all";
 
 const BATCH_SIZE = 1000;
 const MAX_CONCURRENT = 3;
-const CLOUD_TIMEOUT_MS = 5000;
+// A 1,000-row insert on a busy connection can legitimately take tens of seconds.
+const CLOUD_TIMEOUT_MS = 45000;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
 export const Route = createFileRoute("/upload")({
