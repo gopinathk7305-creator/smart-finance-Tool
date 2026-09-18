@@ -493,8 +493,6 @@ function UploadPage() {
       return;
     }
 
-    completed = total;
-    tick(true);
     clearLocalDatasetRows(user.id, bucket);
     await logActivity(`Synced ${parsed.rows.length} clean ${detection.label} rows to cloud`, "Data Upload");
     await refreshLists();
