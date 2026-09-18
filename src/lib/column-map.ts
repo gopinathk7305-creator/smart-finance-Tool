@@ -116,8 +116,18 @@ export function mapRowsToTransactions(
 
     const rev = map.revenue ? parseNum(row[map.revenue]) : 0;
     const exp = map.expense ? parseNum(row[map.expense]) : 0;
-    if (rev || exp) {
+    const cogs = map.cogs ? parseNum(row[map.cogs]) : 0;
+    if (rev || exp || cogs) {
       if (rev) out.push({ ...base, id: `${i}-r`, type: "income", amount: Math.abs(rev) });
+      // Direct cost lands in its own COGS category so gross profit = revenue - COGS.
+      if (cogs)
+        out.push({
+          ...base,
+          category: COGS_LABEL,
+          id: `${i}-c`,
+          type: "expense",
+          amount: Math.abs(cogs),
+        });
       if (exp) out.push({ ...base, id: `${i}-e`, type: "expense", amount: Math.abs(exp) });
       return;
     }
@@ -133,4 +143,13 @@ export function mapRowsToTransactions(
 
 /** Safe margin: never NaN or -Infinity. */
 export const safeMargin = (netProfit: number, revenue: number) =>
-  revenue > 0 ? (netProfit / revenue) * 100 : 0;
+  revenue > 0 && Number.isFinite(netProfit) ? (netProfit / revenue) * 100 : 0;
+
+/** Safe percentage-of-whole, always a finite number. */
+export const safePct = (part: number, whole: number) =>
+  whole !== 0 && Number.isFinite(part) && Number.isFinite(whole) ? (part / whole) * 100 : 0;
+
+/** Format a percentage for display; non-finite or missing base renders as "N/A". */
+export const pctLabel = (part: number, whole: number, digits = 1) =>
+  whole > 0 && Number.isFinite(part) ? `${((part / whole) * 100).toFixed(digits)}%` : "N/A";
+
