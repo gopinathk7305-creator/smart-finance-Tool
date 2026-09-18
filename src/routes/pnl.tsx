@@ -263,7 +263,12 @@ function PnlPage() {
         <Card className="border-border shadow-card">
           <CardHeader>
             <CardTitle className="text-base">GST Breakdown</CardTitle>
-            <CardDescription>Output GST payable vs input tax credit (18% standard rate)</CardDescription>
+            <CardDescription>
+              {gst.fromColumns
+                ? "Output GST vs input tax credit read from your dataset's tax columns"
+                : "Output GST payable vs input tax credit (estimated at the 18% standard rate)"}
+            </CardDescription>
+
           </CardHeader>
           <CardContent className="space-y-1">
             <div className="flex justify-between rounded-md px-3 py-2 text-sm">
