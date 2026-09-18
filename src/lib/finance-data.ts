@@ -277,7 +277,30 @@ export const arApRecords: ArApRecord[] = buildArAp();
 
 /* ---------------- derived helpers ---------------- */
 
-export const monthIndexOf = (iso: string) => Number(iso.slice(5, 7)) - 1;
+/**
+ * Month index (0-11) from any date string an uploaded file may carry:
+ * ISO, dd/mm/yyyy, mm-dd-yy or anything Date.parse understands. Returns -1
+ * when the value is unusable so month-wise charts never break on bad dates.
+ */
+export const monthIndexOf = (raw: string | null | undefined) => {
+  if (!raw) return -1;
+  const s = String(raw).trim();
+  const iso = /^(\d{4})-(\d{1,2})/.exec(s);
+  if (iso) {
+    const m = Number(iso[2]);
+    return m >= 1 && m <= 12 ? m - 1 : -1;
+  }
+  const dmy = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})$/.exec(s);
+  if (dmy) {
+    const a = Number(dmy[1]);
+    const b = Number(dmy[2]);
+    // day-first unless the first part cannot be a day
+    const month = a > 12 ? b : a > 0 && b > 12 ? a : b;
+    return month >= 1 && month <= 12 ? month - 1 : -1;
+  }
+  const parsed = Date.parse(s);
+  return Number.isNaN(parsed) ? -1 : new Date(parsed).getMonth();
+};
 
 export interface MonthlySummary {
   month: string;
@@ -331,10 +354,13 @@ export function totals(txns: Transaction[] = transactions, cogsCategories: strin
 
 export function cashRunwayMonths(txns: Transaction[] = transactions) {
   const series = monthlySummary(txns);
+  if (series.length === 0) return 0;
   const last3 = series.slice(-3);
-  const burn = last3.reduce((s, m) => s + Math.max(0, m.expense - m.revenue), 0) / 3;
-  const cash = series[series.length - 1]!.cash;
-  return burn <= 0 ? Infinity : cash / burn;
+  const burn = last3.reduce((s, m) => s + Math.max(0, m.expense - m.revenue), 0) / (last3.length || 1);
+  const cash = Number(series[series.length - 1]?.cash) || 0;
+  if (burn <= 0) return Infinity;
+  // Never report a negative runway: no cash left means zero months of cover.
+  return cash <= 0 ? 0 : cash / burn;
 }
 
 export function agingBucket(dueISO: string) {
