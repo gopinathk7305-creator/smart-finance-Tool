@@ -73,10 +73,11 @@ export function detectColumns(rows: Record<string, unknown>[]): ColumnMap {
   });
 
   // A numeric-looking column is a better "amount" than nothing at all.
-  if (!map.amount && !map.revenue && !map.expense) {
+  if (!map.amount && !map.revenue && !map.expense && !map.cogs) {
     const numeric = pairs.find((p) => rows.slice(0, 25).some((r) => parseNum(r[p.key]) !== 0));
     if (numeric) map.amount = numeric.key;
   }
+
   return map;
 }
 
