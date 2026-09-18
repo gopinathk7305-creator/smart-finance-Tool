@@ -4,6 +4,7 @@ import { useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { ALL, useOrg } from "@/lib/orgs";
+import { useActiveDataset } from "@/lib/active-dataset";
 
 export type FindingStatus = "open" | "reviewed" | "closed";
 
@@ -57,10 +58,12 @@ export interface AuditHistoryApi {
 export function useAuditHistory(): AuditHistoryApi {
   const { user } = useAuth();
   const { orgId } = useOrg();
+  const { activeFile } = useActiveDataset();
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["audit-findings", user?.id ?? "anon"],
+    // active dataset in the key so a header switch re-reads findings
+    queryKey: ["audit-findings", user?.id ?? "anon", activeFile ?? "all"],
     enabled: !!user,
     queryFn: async () => {
       const { data: rows } = await supabase
