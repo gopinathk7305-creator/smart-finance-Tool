@@ -13,23 +13,45 @@ export const parseNum = (val: unknown): number => {
 
 export interface ColumnMap {
   revenue?: string;
+  cogs?: string;
   expense?: string;
   amount?: string;
   date?: string;
   category?: string;
   type?: string;
   party?: string;
+  gst?: string;
 }
 
+// Order matters: roles are resolved top-down, so the more specific role claims
+// its column before a broader one can swallow it (cogs before expense, and
+// "total amount" stays with `amount` so the type/sign path still classifies it).
 const SIGNALS: Record<keyof ColumnMap, string[]> = {
-  revenue: ["revenue", "income", "sales", "credit", "amount_in", "inflow", "receipt", "turnover"],
+  revenue: ["revenue", "income", "sales", "credit", "amount_in", "inflow", "receipt", "turnover", "gross_sales"],
+  cogs: [
+    "cost_of_goods_sold",
+    "cogs",
+    "cost_of_sales",
+    "cost_of_goods",
+    "direct_expenses",
+    "direct_expense",
+    "direct_cost",
+    "purchase_amount",
+    "purchases",
+    "material_cost",
+  ],
   expense: ["expense", "cost", "debit", "spending", "spend", "amount_out", "outflow", "payment"],
   amount: ["net_amount", "total_amount", "gross_amount", "amount", "value", "total"],
   date: ["txn_date", "transaction_date", "invoice_date", "date", "created", "time", "period", "month"],
   category: ["category", "sub_category", "subcategory", "department", "class", "head", "ledger", "type"],
   type: ["txn_type", "transaction_type", "entry_type", "dr_cr", "type", "nature"],
   party: ["vendor_client", "vendor", "client", "party_name", "party", "customer", "supplier", "name"],
+  gst: ["gst_amount", "gst", "tax_amount", "cgst", "sgst", "igst", "vat", "tax"],
 };
+
+/** COGS category label used so downstream P&L rollups recognise the bucket. */
+export const COGS_LABEL = "COGS";
+
 
 const canon = (k: string) => k.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
 
@@ -51,10 +73,11 @@ export function detectColumns(rows: Record<string, unknown>[]): ColumnMap {
   });
 
   // A numeric-looking column is a better "amount" than nothing at all.
-  if (!map.amount && !map.revenue && !map.expense) {
+  if (!map.amount && !map.revenue && !map.expense && !map.cogs) {
     const numeric = pairs.find((p) => rows.slice(0, 25).some((r) => parseNum(r[p.key]) !== 0));
     if (numeric) map.amount = numeric.key;
   }
+
   return map;
 }
 
@@ -93,8 +116,18 @@ export function mapRowsToTransactions(
 
     const rev = map.revenue ? parseNum(row[map.revenue]) : 0;
     const exp = map.expense ? parseNum(row[map.expense]) : 0;
-    if (rev || exp) {
+    const cogs = map.cogs ? parseNum(row[map.cogs]) : 0;
+    if (rev || exp || cogs) {
       if (rev) out.push({ ...base, id: `${i}-r`, type: "income", amount: Math.abs(rev) });
+      // Direct cost lands in its own COGS category so gross profit = revenue - COGS.
+      if (cogs)
+        out.push({
+          ...base,
+          category: COGS_LABEL,
+          id: `${i}-c`,
+          type: "expense",
+          amount: Math.abs(cogs),
+        });
       if (exp) out.push({ ...base, id: `${i}-e`, type: "expense", amount: Math.abs(exp) });
       return;
     }
@@ -110,4 +143,13 @@ export function mapRowsToTransactions(
 
 /** Safe margin: never NaN or -Infinity. */
 export const safeMargin = (netProfit: number, revenue: number) =>
-  revenue > 0 ? (netProfit / revenue) * 100 : 0;
+  revenue > 0 && Number.isFinite(netProfit) ? (netProfit / revenue) * 100 : 0;
+
+/** Safe percentage-of-whole, always a finite number. */
+export const safePct = (part: number, whole: number) =>
+  whole !== 0 && Number.isFinite(part) && Number.isFinite(whole) ? (part / whole) * 100 : 0;
+
+/** Format a percentage for display; non-finite or missing base renders as "N/A". */
+export const pctLabel = (part: number, whole: number, digits = 1) =>
+  whole > 0 && Number.isFinite(part) ? `${((part / whole) * 100).toFixed(digits)}%` : "N/A";
+

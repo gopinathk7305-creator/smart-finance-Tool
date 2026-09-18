@@ -1,6 +1,10 @@
 // Mock financial dataset + calculation utilities.
 // All figures are illustrative demo data for FY2026.
 
+import { safeMargin } from "@/lib/column-map";
+
+
+
 export type TxnType = "income" | "expense";
 
 export interface Transaction {
@@ -321,6 +325,52 @@ export function monthlySummary(txns: Transaction[] = transactions): MonthlySumma
   });
 }
 
+export interface MonthlyMargin {
+  month: string;
+  revenue: number;
+  cogs: number;
+  expense: number;
+  grossProfit: number;
+  ebitda: number;
+  grossMargin: number;
+  ebitdaMargin: number;
+  netMargin: number;
+}
+
+/**
+ * Month-by-month revenue / COGS / margins from the active dataset.
+ * Months with no revenue report 0% instead of NaN or -Infinity, and months with
+ * no rows at all are dropped so the trend line only plots real data.
+ */
+export function monthlyMargins(
+  txns: Transaction[] = transactions,
+  cogsCategories: string[] = ["COGS"],
+): MonthlyMargin[] {
+  const wanted = new Set((cogsCategories.length ? cogsCategories : ["COGS"]).map((c) => c.toLowerCase()));
+  return MONTHS.map((month, m) => {
+    const rows = txns.filter((t) => monthIndexOf(t.date) === m);
+    const revenue = rows.filter((r) => r.type === "income").reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const expense = rows.filter((r) => r.type === "expense").reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const cogs = rows
+      .filter((r) => r.type === "expense" && wanted.has((r.category || "").toLowerCase()))
+      .reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const grossProfit = revenue - cogs;
+    const ebitda = revenue - expense;
+    return {
+      month: month.slice(0, 3),
+      revenue,
+      cogs,
+      expense,
+      grossProfit,
+      ebitda,
+      grossMargin: safeMargin(grossProfit, revenue),
+      ebitdaMargin: safeMargin(ebitda, revenue),
+      netMargin: safeMargin(ebitda, revenue),
+      rows: rows.length,
+    };
+  }).filter((m) => m.rows > 0 || m.revenue > 0) as MonthlyMargin[];
+}
+
 export function actualsByCategory(txns: Transaction[] = transactions) {
   const map = new Map<string, number>();
   txns
@@ -334,10 +384,17 @@ export function actualsByCategory(txns: Transaction[] = transactions) {
  *   Defaults to the built-in "COGS" bucket when the user has not defined their own.
  */
 export function totals(txns: Transaction[] = transactions, cogsCategories: string[] = ["COGS"]) {
-  const revenue = txns.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
-  const expense = txns.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+  const revenue = txns
+    .filter((t) => t.type === "income")
+    .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+  const expense = txns
+    .filter((t) => t.type === "expense")
+    .reduce((s, t) => s + (Number(t.amount) || 0), 0);
   const byCat = actualsByCategory(txns);
-  const wanted = new Set(cogsCategories.map((c) => c.toLowerCase()));
+  // Always recognise the canonical COGS bucket so a dataset with a "Cost of
+  // goods sold" column still splits gross profit even before the user defines
+  // their own COGS categories.
+  const wanted = new Set([...cogsCategories, "COGS"].map((c) => c.toLowerCase()));
   let cogs = 0;
   byCat.forEach((v, k) => {
     if (wanted.has(k.toLowerCase())) cogs += v;
@@ -350,6 +407,7 @@ export function totals(txns: Transaction[] = transactions, cogsCategories: strin
   const tax = Math.max(0, (ebitda - depreciation - interest) * 0.25);
   const netProfit = ebitda - (depreciation + interest + tax);
   return { revenue, expense, cogs, grossProfit, opex, ebitda, depreciation, interest, tax, netProfit };
+
 }
 
 export function cashRunwayMonths(txns: Transaction[] = transactions) {

@@ -6,7 +6,7 @@
 // actually has onto each module's shape, so switching datasets populates all
 // pages instead of rendering ₹0 cards.
 
-import { parseNum } from "@/lib/column-map";
+import { detectColumns, parseNum } from "@/lib/column-map";
 import type { ArApRecord, BudgetTarget, PayrollRecord, Transaction } from "@/lib/finance-data";
 
 const canon = (k: string) => k.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
@@ -188,4 +188,86 @@ export function deriveBudget(rows: Record<string, unknown>[]): BudgetTarget[] {
     department: g.dept,
     budgeted_amount: g.amount,
   }));
+}
+
+/* ---------------------------------- GST ---------------------------------- */
+
+export interface GstPosition {
+  outputGst: number;
+  inputCredit: number;
+  payable: number;
+  /** true when real tax columns were found, false when estimated at 18%. */
+  fromColumns: boolean;
+  source: string;
+}
+
+const GST_SIGNALS = ["gst_amount", "output_gst", "gst", "tax_amount", "cgst", "sgst", "igst", "vat", "tax"];
+const ITC_SIGNALS = ["input_tax_credit", "itc", "input_gst", "input_credit", "purchase_tax"];
+
+/**
+ * GST position from the active dataset. Uses explicit tax columns (GST / tax
+ * amount / CGST+SGST+IGST) when present, splitting them into output tax on
+ * income rows and input credit on expense rows; otherwise estimates both at the
+ * 18% standard rate on taxable revenue and expenses.
+ */
+export function deriveGst(
+  rows: Record<string, unknown>[],
+  revenue: number,
+  expense: number,
+  rate = 0.18,
+): GstPosition {
+  const estimate = (): GstPosition => ({
+    outputGst: Math.round(Math.max(0, revenue) * rate),
+    inputCredit: Math.round(Math.max(0, expense) * 0.6 * rate),
+    payable: Math.round(Math.max(0, revenue) * rate) - Math.round(Math.max(0, expense) * 0.6 * rate),
+    fromColumns: false,
+    source: `Estimated at ${(rate * 100).toFixed(0)}% standard rate`,
+  });
+
+  if (!rows.length) return estimate();
+
+  const sample = rows.find((r) => r && Object.keys(r).length) ?? {};
+  const keys = Object.keys(sample);
+  const taxCols = keys.filter((k) => GST_SIGNALS.some((s) => canon(k) === s || canon(k).includes(s)));
+  const itcCols = keys.filter((k) => ITC_SIGNALS.some((s) => canon(k) === s || canon(k).includes(s)));
+  if (!taxCols.length && !itcCols.length) return estimate();
+
+  const map = detectColumns(rows);
+  const rowTax = (row: Record<string, unknown>, cols: string[]) =>
+    cols.reduce((s, c) => s + Math.abs(parseNum(row[c])), 0);
+
+  let output = 0;
+  let credit = 0;
+  rows.forEach((row) => {
+    const tax = rowTax(row, taxCols);
+    const itc = rowTax(row, itcCols);
+    credit += itc;
+    if (!tax) return;
+
+    const rev = map.revenue ? parseNum(row[map.revenue]) : 0;
+    const exp = map.expense ? parseNum(row[map.expense]) : 0;
+    const cogs = map.cogs ? parseNum(row[map.cogs]) : 0;
+    const typeText = map.type ? String(row[map.type] ?? "").trim().toLowerCase() : "";
+    const amount = map.amount ? parseNum(row[map.amount]) : 0;
+
+    let income: boolean;
+    if (rev || exp || cogs) income = rev > 0 && rev >= exp + cogs;
+    else if (typeText)
+      income = ["income", "revenue", "credit", "cr", "sale", "sales", "inflow", "receipt"].some(
+        (w) => typeText === w || typeText.includes(w),
+      );
+    else income = amount >= 0;
+
+    if (income) output += tax;
+    else credit += tax;
+  });
+
+  if (output === 0 && credit === 0) return estimate();
+  return {
+    outputGst: Math.round(output),
+    inputCredit: Math.round(credit),
+    payable: Math.round(output - credit),
+    fromColumns: true,
+    source: `From ${[...taxCols, ...itcCols].join(", ")}`,
+  };
 }

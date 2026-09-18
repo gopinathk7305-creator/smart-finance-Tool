@@ -25,12 +25,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { actualsByCategory, inr, monthlySummary, totals } from "@/lib/finance-data";
-import { gstSummary } from "@/lib/enterprise-data";
+import { actualsByCategory, inr, monthlyMargins, totals } from "@/lib/finance-data";
+import { pctLabel, safeMargin } from "@/lib/column-map";
+import { deriveGst } from "@/lib/module-derive";
 import { useCategories } from "@/lib/categories";
-import { useDataset } from "@/lib/dataset";
+import { useDataset, useDatasetRaw } from "@/lib/dataset";
 import { corporateTax, type CorporateRate, type SurchargeBand } from "@/lib/tax";
 import { cn } from "@/lib/utils";
+
 
 export const Route = createFileRoute("/pnl")({
   head: () => ({
@@ -59,8 +61,10 @@ function PnlPage() {
   const { categories, cogsNames, live: liveCats } = useCategories();
   const t = totals(txns, cogsNames);
   const cats = actualsByCategory(txns);
-  const series = monthlySummary(txns);
-  const gst = gstSummary(t.revenue, t.expense);
+  const marginSeries = monthlyMargins(txns, cogsNames);
+  const rawRows = useDatasetRaw();
+  const gst = deriveGst(rawRows, t.revenue, t.expense);
+
 
   // Taxable profit: EBITDA less depreciation & amortisation and finance cost.
   const ebit = t.ebitda - t.depreciation - t.interest;
@@ -93,11 +97,6 @@ function PnlPage() {
     { label: "Net Profit After Tax", value: tx.netProfit, kind: "grand" },
   ];
 
-  const marginSeries = series.map((m) => ({
-    month: m.month,
-    grossMargin: ((m.revenue - m.revenue * 0.22) / m.revenue) * 100,
-    netMargin: (m.profit / m.revenue) * 100,
-  }));
 
   const taxRows: [string, string][] = [
     ["EBITDA", inr(t.ebitda)],
@@ -120,11 +119,11 @@ function PnlPage() {
       {
         label: "Gross Profit",
         value: inr(t.grossProfit, true),
-        delta: `${((t.grossProfit / t.revenue) * 100).toFixed(1)}% margin`,
+        delta: `${pctLabel(t.grossProfit, t.revenue)} margin`,
       },
-      { label: "EBITDA", value: inr(t.ebitda, true), delta: `${((t.ebitda / t.revenue) * 100).toFixed(1)}% of revenue` },
+      { label: "EBITDA", value: inr(t.ebitda, true), delta: `${pctLabel(t.ebitda, t.revenue)} of revenue` },
       { label: "Net Profit (Post-Tax)", value: inr(tx.netProfit, true), delta: `Effective tax ${tx.effectiveRate.toFixed(2)}%` },
-      { label: "Net Margin", value: `${((tx.netProfit / t.revenue) * 100).toFixed(1)}%`, delta: "FY 2026-27" },
+      { label: "Net Margin", value: pctLabel(tx.netProfit, t.revenue), delta: "FY 2026-27" },
     ],
     tables: [
       {
@@ -134,7 +133,7 @@ function PnlPage() {
         rows: rows.map((r) => [
           r.label,
           r.value < 0 ? `(${inr(Math.abs(r.value))})` : inr(r.value),
-          `${((r.value / t.revenue) * 100).toFixed(1)}%`,
+          pctLabel(r.value, t.revenue),
         ]),
       },
       {
@@ -159,8 +158,8 @@ function PnlPage() {
         numericFrom: 1,
         rows: marginSeries.map((m) => [
           m.month,
-          `${m.grossMargin.toFixed(1)}%`,
-          `${m.netMargin.toFixed(1)}%`,
+          `${safeMargin(m.grossProfit, m.revenue).toFixed(1)}%`,
+          `${safeMargin(m.ebitda, m.revenue).toFixed(1)}%`,
         ]),
       },
     ],
@@ -174,10 +173,10 @@ function PnlPage() {
         <AiReportButton build={buildReport} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard label="Gross Profit" value={inr(t.grossProfit, true)} icon={TrendingUp} tone="success" hint={`${((t.grossProfit / t.revenue) * 100).toFixed(1)}% margin`} />
-        <KpiCard label="EBITDA" value={inr(t.ebitda, true)} icon={Activity} hint={`${((t.ebitda / t.revenue) * 100).toFixed(1)}% of revenue`} />
+        <KpiCard label="Gross Profit" value={inr(t.grossProfit, true)} icon={TrendingUp} tone="success" hint={`${pctLabel(t.grossProfit, t.revenue)} margin`} />
+        <KpiCard label="EBITDA" value={inr(t.ebitda, true)} icon={Activity} hint={`${pctLabel(t.ebitda, t.revenue)} of revenue`} />
         <KpiCard label="Net Profit After Tax" value={inr(tx.netProfit, true)} icon={PiggyBank} tone={tx.netProfit > 0 ? "success" : "danger"} hint={`Effective tax ${tx.effectiveRate.toFixed(2)}%`} />
-        <KpiCard label="Net Margin" value={`${((tx.netProfit / t.revenue) * 100).toFixed(1)}%`} icon={Percent} tone="neutral" hint="FY 2026-27" />
+        <KpiCard label="Net Margin" value={pctLabel(tx.netProfit, t.revenue)} icon={Percent} tone="neutral" hint="FY 2026-27" />
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-5">
@@ -217,7 +216,7 @@ function PnlPage() {
                         r.kind === "grand" ? "text-primary-foreground/70" : "text-muted-foreground",
                       )}
                     >
-                      {((r.value / t.revenue) * 100).toFixed(1)}%
+                      {pctLabel(r.value, t.revenue)}
                     </span>
                   )}
                   <span>
@@ -232,21 +231,31 @@ function PnlPage() {
         <Card className="border-border shadow-card lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-base">Margin Trend</CardTitle>
-            <CardDescription>Gross and net margin by month</CardDescription>
+            <CardDescription>
+              Gross margin (revenue − COGS) and EBITDA margin by month
+            </CardDescription>
           </CardHeader>
           <CardContent className="h-[340px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={marginSeries}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
-                <YAxis tickFormatter={(v) => `${Number(v).toFixed(0)}%`} tickLine={false} axisLine={false} fontSize={12} width={44} />
-                <Tooltip formatter={(v) => `${Number(v).toFixed(1)}%`} />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Line type="monotone" dataKey="grossMargin" name="Gross margin" stroke="var(--brand)" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="netMargin" name="Net margin" stroke="var(--success)" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
+            {marginSeries.length === 0 ? (
+              <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">
+                No dated revenue rows in this dataset yet — the monthly trend appears as soon as
+                revenue with dates is available.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={marginSeries}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
+                  <YAxis tickFormatter={(v) => `${Number(v).toFixed(0)}%`} tickLine={false} axisLine={false} fontSize={12} width={44} />
+                  <Tooltip formatter={(v) => `${Number(v).toFixed(1)}%`} />
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                  <Line type="monotone" dataKey="grossMargin" name="Gross margin" stroke="var(--brand)" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="ebitdaMargin" name="EBITDA margin" stroke="var(--success)" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
+
         </Card>
       </div>
 
@@ -254,7 +263,12 @@ function PnlPage() {
         <Card className="border-border shadow-card">
           <CardHeader>
             <CardTitle className="text-base">GST Breakdown</CardTitle>
-            <CardDescription>Output GST payable vs input tax credit (18% standard rate)</CardDescription>
+            <CardDescription>
+              {gst.fromColumns
+                ? "Output GST vs input tax credit read from your dataset's tax columns"
+                : "Output GST payable vs input tax credit (estimated at the 18% standard rate)"}
+            </CardDescription>
+
           </CardHeader>
           <CardContent className="space-y-1">
             <div className="flex justify-between rounded-md px-3 py-2 text-sm">
