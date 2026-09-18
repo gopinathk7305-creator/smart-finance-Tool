@@ -100,7 +100,7 @@ function CompliancePage() {
   const today = new Date().toISOString().slice(0, 10);
 
   const { data: filedRows } = useQuery({
-    queryKey: ["compliance-filings", user?.id ?? "anon"],
+    queryKey: ["compliance-filings", user?.id ?? "anon", activeFile ?? "all"],
     enabled: !!user,
     queryFn: async () => {
       const { data } = await supabase.from("compliance_filings").select("*");
