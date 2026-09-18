@@ -369,7 +369,14 @@ function UploadPage() {
   const commit = async () => {
     if (!parsed || !detection || !parsed.rows.length || !user) return;
     setCommitting(true);
-    const rowsWithIds = parsed.rows.map((row) => ({ ...row, id: String(row["id"] ?? crypto.randomUUID()) }));
+    // Files often carry their own "id" column (1, 2, 3…) which the database
+    // rejects as a UUID and silently aborts the whole sync. Keep the original
+    // value inside raw_data and always store a valid UUID primary key.
+    const rowsWithIds = parsed.rows.map((row) => {
+      const candidate = String(row["id"] ?? "");
+      return { ...row, id: UUID_RE.test(candidate) ? candidate : crypto.randomUUID() };
+    });
+
     const batches: Record<string, unknown>[][] = [];
     for (let i = 0; i < rowsWithIds.length; i += BATCH_SIZE)
       batches.push(rowsWithIds.slice(i, i + BATCH_SIZE));
