@@ -25,9 +25,22 @@ export async function fetchAllRows<T>(
   return out;
 }
 
-/** Merges the stored raw upload payload back onto a row so every original column renders. */
+/**
+ * Merges the stored raw upload payload back onto a row so every original column
+ * renders. Keys are normalised (lowercase + underscore) so header variants line
+ * up, and a blank stored column never overwrites the original uploaded value.
+ */
 export function withRawColumns<T extends Record<string, unknown>>(row: T): Record<string, unknown> {
   const { raw_data: raw, ...rest } = row as Record<string, unknown>;
-  if (!raw || typeof raw !== "object") return rest;
-  return { ...(raw as Record<string, unknown>), ...rest };
+  const out: Record<string, unknown> = {};
+  const put = (key: string, value: unknown) => {
+    const k = normaliseKey(key) || key;
+    if (isBlank(out[k]) || !isBlank(value)) {
+      if (isBlank(out[k]) || !isBlank(value)) out[k] = isBlank(value) && !isBlank(out[k]) ? out[k] : value;
+    }
+  };
+  if (raw && typeof raw === "object")
+    Object.entries(raw as Record<string, unknown>).forEach(([k, v]) => put(k, v));
+  Object.entries(rest).forEach(([k, v]) => put(k, v));
+  return out;
 }
