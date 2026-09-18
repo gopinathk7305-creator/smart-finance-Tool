@@ -2,6 +2,8 @@
 // pages through .range() until the last partial page arrives, so 15,000 or
 // 50,000 row files load completely.
 
+import { isBlank, normaliseKey } from "@/lib/clean";
+
 export const PAGE_SIZE = 1000;
 
 interface PageResult<T> {
@@ -35,9 +37,8 @@ export function withRawColumns<T extends Record<string, unknown>>(row: T): Recor
   const out: Record<string, unknown> = {};
   const put = (key: string, value: unknown) => {
     const k = normaliseKey(key) || key;
-    if (isBlank(out[k]) || !isBlank(value)) {
-      if (isBlank(out[k]) || !isBlank(value)) out[k] = isBlank(value) && !isBlank(out[k]) ? out[k] : value;
-    }
+    if (isBlank(value) && !isBlank(out[k])) return;
+    out[k] = value;
   };
   if (raw && typeof raw === "object")
     Object.entries(raw as Record<string, unknown>).forEach(([k, v]) => put(k, v));
