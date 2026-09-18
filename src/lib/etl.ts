@@ -3,6 +3,7 @@
 // and returns rows ready to insert into the cloud database.
 
 import { parseCSV, toNumber } from "@/lib/csv";
+import { toISODateSafe } from "@/lib/clean";
 import { computeTax } from "@/lib/enterprise-data";
 import type { PayrollRecord } from "@/lib/finance-data";
 
