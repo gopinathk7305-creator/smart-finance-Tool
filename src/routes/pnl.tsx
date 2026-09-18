@@ -97,11 +97,6 @@ function PnlPage() {
     { label: "Net Profit After Tax", value: tx.netProfit, kind: "grand" },
   ];
 
-  const marginSeries = series.map((m) => ({
-    month: m.month,
-    grossMargin: ((m.revenue - m.revenue * 0.22) / m.revenue) * 100,
-    netMargin: (m.profit / m.revenue) * 100,
-  }));
 
   const taxRows: [string, string][] = [
     ["EBITDA", inr(t.ebitda)],
