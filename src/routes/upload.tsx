@@ -58,6 +58,7 @@ import { collectColumns, DataGrid, labelFor, numericColumns } from "@/components
 import { type EtlResult, issueTone, runEtlChunked, streamTabular } from "@/lib/etl";
 import { detectSchema, type Detection } from "@/lib/schema-detect";
 import { fetchAllRows, withRawColumns } from "@/lib/fetch-all";
+import { DATE_KEY_RE, defaultFor, isBlank, parseAnyDate, toISODateSafe } from "@/lib/clean";
 
 const BATCH_SIZE = 1000;
 const MAX_CONCURRENT = 3;
