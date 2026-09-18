@@ -25,12 +25,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { actualsByCategory, inr, monthlySummary, totals } from "@/lib/finance-data";
-import { gstSummary } from "@/lib/enterprise-data";
+import { actualsByCategory, inr, monthlyMargins, totals } from "@/lib/finance-data";
+import { pctLabel, safeMargin } from "@/lib/column-map";
+import { deriveGst } from "@/lib/module-derive";
 import { useCategories } from "@/lib/categories";
-import { useDataset } from "@/lib/dataset";
+import { useDataset, useDatasetRaw } from "@/lib/dataset";
 import { corporateTax, type CorporateRate, type SurchargeBand } from "@/lib/tax";
 import { cn } from "@/lib/utils";
+
 
 export const Route = createFileRoute("/pnl")({
   head: () => ({
