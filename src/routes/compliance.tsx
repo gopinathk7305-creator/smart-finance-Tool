@@ -50,6 +50,7 @@ import {
 import { useDataset } from "@/lib/dataset";
 import { grossPay, inr, monthlySummary, totals } from "@/lib/finance-data";
 import { ALL, useOrg } from "@/lib/orgs";
+import { useActiveDataset } from "@/lib/active-dataset";
 import { corporateTax } from "@/lib/tax";
 
 export const Route = createFileRoute("/compliance")({
@@ -86,6 +87,7 @@ const GST_RATE = 0.18;
 function CompliancePage() {
   const { user } = useAuth();
   const { orgId, orgName } = useOrg();
+  const { activeFile } = useActiveDataset();
   const { txns, pays, live } = useDataset();
   const { cogsNames } = useCategories();
   const queryClient = useQueryClient();
