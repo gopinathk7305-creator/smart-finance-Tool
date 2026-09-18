@@ -92,6 +92,8 @@ export function parseAnyDate(input: unknown): Date | null {
 }
 
 function fromSerial(serial: number): Date | null {
+  if (serial > 1e11) return new Date(serial); // epoch milliseconds
+  if (serial > 1e9) return new Date(serial * 1000); // epoch seconds
   if (serial <= 0 || serial > 80000) return null;
   const ms = Math.round((serial - 25569) * 86400 * 1000);
   const dt = new Date(ms);
