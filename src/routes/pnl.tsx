@@ -61,8 +61,10 @@ function PnlPage() {
   const { categories, cogsNames, live: liveCats } = useCategories();
   const t = totals(txns, cogsNames);
   const cats = actualsByCategory(txns);
-  const series = monthlySummary(txns);
-  const gst = gstSummary(t.revenue, t.expense);
+  const marginSeries = monthlyMargins(txns, cogsNames);
+  const rawRows = useDatasetRaw();
+  const gst = deriveGst(rawRows, t.revenue, t.expense);
+
 
   // Taxable profit: EBITDA less depreciation & amortisation and finance cost.
   const ebit = t.ebitda - t.depreciation - t.interest;
