@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { fetchAllRows, withRawColumns } from "@/lib/fetch-all";
+import { parseNum } from "@/lib/column-map";
 import { useAuth } from "@/lib/auth";
 import { ALL, demoDatasetFor, useOrg } from "@/lib/orgs";
 import { useActiveDataset } from "@/lib/active-dataset";
@@ -194,43 +195,43 @@ function useDatasetInternal(fetchEnabled: boolean): Dataset {
 
   const txns: Transaction[] = inOrg(combined.t).map((r) => ({
     id: r.id,
-    date: r.txn_date,
-    category: r.category,
-    subcategory: r.subcategory,
+    date: r.txn_date ?? "",
+    category: r.category ?? "Uncategorised",
+    subcategory: r.subcategory ?? "",
     type: r.type === "income" ? "income" : "expense",
-    amount: Number(r.amount),
-    vendor_client: r.vendor_client,
+    amount: parseNum(r.amount),
+    vendor_client: r.vendor_client ?? "",
     status: r.status === "pending" ? "pending" : "paid",
   }));
 
   const pays: PayrollRecord[] = inOrg(combined.p).map((r) => ({
     id: r.id,
-    month_year: r.month_year,
-    employee_id: r.employee_id,
-    name: r.name,
-    department: r.department,
-    basic_pay: Number(r.basic_pay),
-    allowances: Number(r.allowances),
-    deductions: Number(r.deductions),
-    pf_deduction: Number(r.pf_deduction),
-    tds_deduction: Number(r.tds_deduction),
+    month_year: r.month_year ?? "",
+    employee_id: r.employee_id ?? "",
+    name: r.name ?? "",
+    department: r.department ?? "",
+    basic_pay: parseNum(r.basic_pay),
+    allowances: parseNum(r.allowances),
+    deductions: parseNum(r.deductions),
+    pf_deduction: parseNum(r.pf_deduction),
+    tds_deduction: parseNum(r.tds_deduction),
   }));
 
   const buds: BudgetTarget[] = inOrg(combined.b).map((r) => ({
     id: r.id,
-    fiscal_year: r.fiscal_year,
-    category: r.category,
-    department: r.department,
-    budgeted_amount: Number(r.budgeted_amount),
+    fiscal_year: r.fiscal_year ?? "",
+    category: r.category ?? "",
+    department: r.department ?? "",
+    budgeted_amount: parseNum(r.budgeted_amount),
   }));
 
   const araps: ArApRecord[] = inOrg(combined.a).map((r) => ({
     id: r.id,
     type: r.type === "AP" ? "AP" : "AR",
-    party_name: r.party_name,
+    party_name: r.party_name ?? "",
     invoice_date: r.invoice_date ?? "",
     due_date: r.due_date ?? "",
-    amount: Number(r.amount),
+    amount: parseNum(r.amount),
     status: r.status === "settled" ? "settled" : "outstanding",
   }));
 
