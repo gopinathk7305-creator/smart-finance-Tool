@@ -80,27 +80,14 @@ export function cleanAmount(v: unknown): { value: number; blank: boolean; negati
   return { value: Math.abs(n), blank: n === 0, negative: n < 0 };
 }
 
-/** Step 2 — date detection + validation (rejects impossible calendar dates). */
+/**
+ * Step 2 — tolerant date parsing: ISO, DD/MM/YYYY, MM/DD/YYYY, textual months,
+ * Excel serial numbers and epoch values all resolve to an ISO calendar date.
+ */
 export function cleanDate(v: unknown): { iso: string | null; raw: string } {
   const raw = cleanText(v);
   if (!raw) return { iso: null, raw };
-  const m =
-    raw.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/) ??
-    (() => {
-      const d = raw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
-      return d ? ([d[0], d[3], d[2], d[1]] as unknown as RegExpMatchArray) : null;
-    })();
-  if (m) {
-    const y = Number(m[1]);
-    const mo = Number(m[2]);
-    const d = Number(m[3]);
-    const dt = new Date(Date.UTC(y, mo - 1, d));
-    const ok =
-      mo >= 1 && mo <= 12 && d >= 1 && dt.getUTCMonth() === mo - 1 && dt.getUTCDate() === d;
-    return { iso: ok ? dt.toISOString().slice(0, 10) : null, raw };
-  }
-  const parsed = Date.parse(raw);
-  return { iso: Number.isNaN(parsed) ? null : new Date(parsed).toISOString().slice(0, 10), raw };
+  return { iso: toISODateSafe(raw), raw };
 }
 
 const GSTIN_RE = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
