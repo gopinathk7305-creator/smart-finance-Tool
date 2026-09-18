@@ -1,6 +1,10 @@
 // Mock financial dataset + calculation utilities.
 // All figures are illustrative demo data for FY2026.
 
+import { safeMargin } from "@/lib/column-map";
+
+
+
 export type TxnType = "income" | "expense";
 
 export interface Transaction {
