@@ -58,6 +58,7 @@ import { collectColumns, DataGrid, labelFor, numericColumns } from "@/components
 import { type EtlResult, issueTone, runEtlChunked, streamTabular } from "@/lib/etl";
 import { detectSchema, type Detection } from "@/lib/schema-detect";
 import { fetchAllRows, withRawColumns } from "@/lib/fetch-all";
+import { DATE_KEY_RE, defaultFor, isBlank, parseAnyDate, toISODateSafe } from "@/lib/clean";
 
 const BATCH_SIZE = 1000;
 const MAX_CONCURRENT = 3;
@@ -103,7 +104,7 @@ interface StoredDataset {
   created_at: string;
 }
 
-const DATE_COL = /(date|_at|period|month)/i;
+const DATE_COL = DATE_KEY_RE;
 
 interface RowHealth {
   empty: number;
@@ -124,21 +125,23 @@ function auditRows(
   rows.forEach((r) => {
     cols.forEach((c) => {
       const v = r[c];
-      if (v === null || v === undefined || v === "") {
+      if (isBlank(v)) {
         empty += 1;
         return;
       }
-      if (typeof v === "string") {
-        if (v !== v.trim()) untrimmed += 1;
-        if (DATE_COL.test(c) && Number.isNaN(new Date(v.trim()).getTime())) badDates += 1;
-      }
+      if (typeof v === "string" && v !== v.trim()) untrimmed += 1;
+      if (DATE_COL.test(c) && !numeric.has(c) && !parseAnyDate(v)) badDates += 1;
     });
   });
-  void numeric;
   return { empty, badDates, untrimmed, total: rows.length * Math.max(1, cols.length) };
 }
 
-/** Trims text, blanks unparseable dates and fills empty numeric cells with 0. */
+/**
+ * Automated cleaning routine: trims text, rewrites every date column to ISO
+ * (falling back to the row's created_at when unparseable), and fills blanks with
+ * sensible defaults — INR currency, 0/18% tax rates, System / Unassigned people
+ * and 0 for numeric columns.
+ */
 function autoFixRows(
   rows: Record<string, unknown>[],
   cols: string[],
@@ -146,18 +149,22 @@ function autoFixRows(
 ): Record<string, unknown>[] {
   return rows.map((r) => {
     const out: Record<string, unknown> = { ...r };
+    const fallbackDate =
+      toISODateSafe(r["created_at"]) ??
+      toISODateSafe(r["txn_date"]) ??
+      toISODateSafe(r["invoice_date"]) ??
+      new Date().toISOString().slice(0, 10);
+
     cols.forEach((c) => {
-      const v = out[c];
-      if (typeof v === "string") {
-        const t = v.trim();
-        if (DATE_COL.test(c) && t && Number.isNaN(new Date(t).getTime())) {
-          out[c] = "";
-          return;
-        }
-        out[c] = t;
+      if (typeof out[c] === "string") out[c] = (out[c] as string).trim();
+
+      if (DATE_COL.test(c) && !numeric.has(c)) {
+        out[c] = toISODateSafe(out[c]) ?? fallbackDate;
+        return;
       }
-      if (out[c] === null || out[c] === undefined || out[c] === "") {
-        if (numeric.has(c)) out[c] = 0;
+      if (isBlank(out[c])) {
+        const fill = defaultFor(c, numeric.has(c));
+        if (fill !== undefined) out[c] = fill;
       }
     });
     return out;
