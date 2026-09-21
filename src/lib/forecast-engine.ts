@@ -300,7 +300,10 @@ export function runForecast(
     cumulative += scenProfit;
 
     const burn = Math.max(0, -scenProfit);
-    const bandWidth = 0.06 * (i + 1);
+    // Band width learned from historical volatility; it shrinks as the dataset
+    // carries more months of actuals and widens further into the future.
+    const band95 = bandWidthFor(profitStats, i + 1, 1.96);
+    const band80 = bandWidthFor(profitStats, i + 1, 1.282);
 
     return {
       month,
