@@ -43,15 +43,17 @@ import { safeMargin } from "@/lib/column-map";
 import { useDataset } from "@/lib/dataset";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useDatasetRaw } from "@/lib/dataset";
+import { deriveAlerts } from "@/lib/live-alerts";
 import {
   actualsByCategory,
-  alerts,
   cashRunwayMonths,
   formatCompactCurrency,
   inr,
   monthlySummary,
   totals,
 } from "@/lib/finance-data";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -125,9 +127,24 @@ function Dashboard() {
   const catsSubtitle = usingFallbackCats ? dyn.groupLabel : "Share of total spend";
 
   const toneIcon = { danger: AlertTriangle, warning: Info, success: CheckCircle2 };
+
   const chartsRef = useRef<HTMLDivElement>(null);
   const metrics = useActiveDatasetMetrics();
   const riskFlags = metrics.riskFlags || dyn.riskFlags;
+  const rawRows = useDatasetRaw();
+  // Alerts are computed from the active dataset's own rows — status columns,
+  // duplicate amounts, category concentration and the real monthly series.
+  const liveAlerts = deriveAlerts({
+    rows: rawRows,
+    txns,
+    series,
+    categories: topCats,
+    revenue: t.revenue,
+    expense: t.expense,
+    netProfit: t.netProfit,
+    riskFlags,
+  });
+
   // Never show skeletons once the active dataset's rows are in hand — real figures
   // beat placeholders even while the background summary is still refreshing.
   const busy = (syncing || metrics.loading) && txns.length === 0;
@@ -387,7 +404,7 @@ function Dashboard() {
             <CardDescription>Auto-generated from current data</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {alerts.map((a) => {
+            {liveAlerts.map((a) => {
               const Icon = toneIcon[a.tone];
               const tone =
                 a.tone === "danger"
