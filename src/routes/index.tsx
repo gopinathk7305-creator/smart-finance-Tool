@@ -17,11 +17,8 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
   LabelList,
   Legend,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -76,13 +73,6 @@ export const Route = createFileRoute("/")({
   component: Dashboard,
 });
 
-const PIE_COLORS = [
-  "var(--brand)",
-  "var(--primary)",
-  "var(--success)",
-  "var(--warning)",
-  "var(--danger)",
-];
 
 function Dashboard() {
   const { txns: mapped, live } = useDataset();
