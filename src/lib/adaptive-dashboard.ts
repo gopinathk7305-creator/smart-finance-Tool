@@ -30,7 +30,11 @@ export interface AdaptiveDashboard {
   trendLabel: string;
   /** true when the trend series are category slices of one money column */
   trendStacked: boolean;
+  /** chronological cumulative running total of the primary money column */
+  cumulative: { bucket: string; value: number }[];
+  cumulativeLabel: string;
   breakdown: { name: string; value: number }[];
+
   breakdownLabel: string;
   /** true when there is enough structure to render the adaptive widgets */
   ready: boolean;
@@ -74,10 +78,39 @@ const monthOf = (val: unknown): string => {
 };
 
 const MONEY_HINTS = ["amount", "revenue", "income", "sales", "value", "total", "net", "gross", "price", "cost", "expense", "salary", "balance", "pay", "credit", "debit"];
+const INFLOW_HINTS = ["revenue", "sales", "income", "turnover", "credit", "receipt", "inflow"];
+const OUTFLOW_HINTS = ["expense", "cost", "debit", "spend", "outflow", "payment", "purchase", "cogs", "salary"];
+
+const canonKey = (k: string) => k.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+
+/** First numeric column whose name matches one of the hint words, in hint order. */
+function pickByHints(numeric: string[], hints: string[], exclude?: string): string | undefined {
+  for (const hint of hints) {
+    const hit = numeric.find((c) => c !== exclude && canonKey(c).includes(hint));
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
+/** Categorical column with the most distinct values (ignoring near-unique id-like columns). */
+function highestCardinality(rows: Record<string, unknown>[], categorical: string[]): string | undefined {
+  const sample = rows.slice(0, 500);
+  if (!sample.length) return categorical[0];
+  let best: { col: string; uniques: number } | undefined;
+  categorical.forEach((col) => {
+    const set = new Set(sample.map((r) => String(r?.[col] ?? "").trim()).filter(Boolean));
+    if (!set.size) return;
+    if (set.size > sample.length * 0.9) return; // id-like column
+    if (!best || set.size > best.uniques) best = { col, uniques: set.size };
+  });
+  return best?.col ?? categorical[0];
+}
 
 /** Pick the most meaningful numeric column: money-named first, then widest spread. */
 function primaryNumeric(rows: Record<string, unknown>[], numeric: string[]): string | undefined {
   if (!numeric.length) return undefined;
+  const inflow = pickByHints(numeric, INFLOW_HINTS);
+  if (inflow) return inflow;
   const named = numeric.find((c) => MONEY_HINTS.some((w) => c.toLowerCase().includes(w)));
   if (named) return named;
   const sample = rows.slice(0, 200);
@@ -88,6 +121,7 @@ function primaryNumeric(rows: Record<string, unknown>[], numeric: string[]): str
   });
   return best?.col;
 }
+
 
 /**
  * Inspect the active dataset and derive every dashboard widget from its schema.
@@ -103,45 +137,70 @@ export function useAdaptiveDashboard(activeDatasetId?: string | null): AdaptiveD
     const columnCount = schema.columns.length;
 
     const money = primaryNumeric(rows, schema.numeric);
+    const secondary = money ? pickByHints(schema.numeric, OUTFLOW_HINTS, money) : undefined;
     const dateCol = schema.dates[0];
-    const groupCol = schema.categorical[0] ?? schema.flags[0];
+    const groupCol = highestCardinality(rows, schema.categorical) ?? schema.flags[0];
+
+    const sum = (col: string) => rows.reduce((s, r) => s + (Number(parseNum(r?.[col])) || 0), 0);
 
     // ---- KPI cards -------------------------------------------------------
     const kpis: AdaptiveKpi[] = [];
+    const primaryTotal = money ? sum(money) : 0;
     if (money) {
-      const total = rows.reduce((s, r) => s + parseNum(r?.[money]), 0);
       kpis.push({
         label: `Total ${titleCase(money)}`,
-        value: compactMoney(total),
+        value: compactMoney(primaryTotal),
         hint: `Sum of ${titleCase(money)}`,
-        raw: total,
+        raw: primaryTotal,
       });
-      const avg = rowCount ? total / rowCount : 0;
+    } else {
+      kpis.push({ label: "Records", value: plain.format(rowCount), hint: "Rows in this dataset", raw: rowCount });
+    }
+
+    // Card 2: outflow/cost total when detected, otherwise average of the primary field.
+    if (secondary) {
+      const secTotal = sum(secondary);
+      kpis.push({
+        label: `Total ${titleCase(secondary)}`,
+        value: compactMoney(secTotal),
+        hint: `Sum of ${titleCase(secondary)}`,
+        raw: secTotal,
+      });
+      // Card 3: margin/ratio between primary and secondary.
+      const margin = primaryTotal > 0 ? ((primaryTotal - secTotal) / primaryTotal) * 100 : NaN;
+      kpis.push({
+        label: "Net Margin",
+        value: Number.isFinite(margin) ? `${margin.toFixed(1)}%` : "N/A",
+        hint: `(${titleCase(money ?? "")} − ${titleCase(secondary)}) ÷ ${titleCase(money ?? "")}`,
+        ...(Number.isFinite(margin) ? { raw: margin } : {}),
+      });
+    } else if (money) {
+      const avg = rowCount ? primaryTotal / rowCount : 0;
       kpis.push({
         label: `Average ${titleCase(money)}`,
         value: compactMoney(avg),
         hint: `Across ${plain.format(rowCount)} records`,
         raw: avg,
       });
+      if (groupCol) {
+        const uniques = new Set(rows.map((r) => String(r?.[groupCol] ?? "").trim()).filter(Boolean));
+        kpis.push({
+          label: `Unique ${titleCase(groupCol)}`,
+          value: plain.format(uniques.size),
+          hint: `Distinct values in ${titleCase(groupCol)}`,
+          raw: uniques.size,
+        });
+      } else {
+        kpis.push({ label: "Numeric fields", value: `${schema.numeric.length}`, hint: "Measurable columns" });
+      }
     } else {
-      kpis.push({ label: "Records", value: plain.format(rowCount), hint: "Rows in this dataset", raw: rowCount });
       kpis.push({ label: "Numeric fields", value: `${schema.numeric.length}`, hint: "Measurable columns" });
-    }
-
-    if (groupCol) {
-      const uniques = new Set(rows.map((r) => String(r?.[groupCol] ?? "").trim()).filter(Boolean));
-      kpis.push({
-        label: `Unique ${titleCase(groupCol)}`,
-        value: plain.format(uniques.size),
-        hint: `Distinct values in ${titleCase(groupCol)}`,
-        raw: uniques.size,
-      });
-    } else {
       kpis.push({ label: "Text fields", value: `${schema.categorical.length}`, hint: "Groupable columns" });
     }
 
-    kpis.push({ label: "Total Rows", value: plain.format(rowCount), hint: "Dataset health", raw: rowCount });
+    kpis.push({ label: "Total Rows", value: plain.format(rowCount), hint: "Dataset volume", raw: rowCount });
     kpis.push({ label: "Active Columns", value: `${columnCount}`, hint: "Detected fields", raw: columnCount });
+
 
     // ---- Trend chart -----------------------------------------------------
     let trendSeries = (money ? [money, ...schema.numeric.filter((c) => c !== money)] : schema.numeric).slice(0, 3);
