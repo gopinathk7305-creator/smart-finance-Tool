@@ -161,6 +161,7 @@ export type Database = {
           department: string
           fiscal_year: string
           id: string
+          month: string
           org_id: string | null
           raw_data: Json
           source_file: string
@@ -173,6 +174,7 @@ export type Database = {
           department?: string
           fiscal_year?: string
           id?: string
+          month?: string
           org_id?: string | null
           raw_data?: Json
           source_file?: string
@@ -185,6 +187,7 @@ export type Database = {
           department?: string
           fiscal_year?: string
           id?: string
+          month?: string
           org_id?: string | null
           raw_data?: Json
           source_file?: string
