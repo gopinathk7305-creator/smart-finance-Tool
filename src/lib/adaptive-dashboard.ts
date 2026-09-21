@@ -271,7 +271,28 @@ export function useAdaptiveDashboard(activeDatasetId?: string | null): AdaptiveD
       trendLabel = `${trendSeries.map(titleCase).join(" vs ")} by ${titleCase(groupCol)}`;
     }
 
+    // ---- Cumulative trend ------------------------------------------------
+    let cumulative: { bucket: string; value: number }[] = [];
+    let cumulativeLabel = "";
+    if (money && dateCol) {
+      const buckets = new Map<string, number>();
+      rows.forEach((r) => {
+        const key = monthOf(r?.[dateCol]);
+        if (!key) return;
+        buckets.set(key, (buckets.get(key) ?? 0) + (Number(parseNum(r?.[money])) || 0));
+      });
+      let running = 0;
+      cumulative = [...buckets.entries()]
+        .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+        .map(([bucket, val]) => {
+          running += val;
+          return { bucket, value: running };
+        });
+      if (cumulative.length) cumulativeLabel = `Cumulative ${titleCase(money)} over ${titleCase(dateCol)}`;
+    }
+
     // ---- Distribution ----------------------------------------------------
+
     const breakdown = groupCol ? distribution(rows, groupCol, money) : [];
     const breakdownLabel = groupCol
       ? money
