@@ -6,6 +6,7 @@ import {
   Info,
   Rows3,
   Landmark,
+  Scale,
   ShieldAlert,
   TrendingDown,
   TrendingUp,
@@ -36,6 +37,7 @@ import { AiReportButton } from "@/components/finance/AiReportButton";
 import { AppShell } from "@/components/finance/AppShell";
 import { KpiCard } from "@/components/finance/KpiCard";
 import { useActiveDataset } from "@/lib/active-dataset";
+import { FISCAL_YEARS, useBudget } from "@/lib/budget";
 import { useAdaptiveDashboard } from "@/lib/adaptive-dashboard";
 import { useActiveDatasetMetrics } from "@/lib/dataset-metrics";
 import { useDynamicDashboard } from "@/lib/dynamic-dashboard";
@@ -126,6 +128,22 @@ function Dashboard() {
       .map(([name, value]) => ({ name, value }));
     return canonicalCats.length === 0 ? dyn.topGroups : canonicalCats;
   }, [txns, dyn.topGroups]);
+
+  // Budget variance headline: planned spend for the current fiscal year against
+  // real spend on the same categories (all spend when no category matches).
+  const budget = useBudget(FISCAL_YEARS[0]);
+  const budgetView = useMemo(() => {
+    const planned = budget.plannedTotal;
+    if (planned <= 0) return null;
+    const actualsMap = actualsByCategory(txns);
+    let actual = 0;
+    budget.rows.forEach((b) => {
+      actual += actualsMap.get(b.category) ?? 0;
+    });
+    if (actual === 0) actual = t.expense;
+    const variance = actual - planned;
+    return { planned, actual, variance, pct: planned ? (variance / planned) * 100 : 0 };
+  }, [budget.plannedTotal, budget.rows, txns, t.expense]);
 
   const toneIcon = { danger: AlertTriangle, warning: Info, success: CheckCircle2 };
 
@@ -240,6 +258,17 @@ function Dashboard() {
           icon={ShieldAlert}
           tone={riskFlags > 0 ? "warning" : "success"}
         />
+        {budgetView && (
+          <KpiCard
+            label="Budget Variance"
+            value={`${budgetView.variance >= 0 ? "+" : "−"}${inr(Math.abs(budgetView.variance), true)}`}
+            delta={budgetView.pct}
+            invertDelta
+            hint={`plan ${inr(budgetView.planned, true)} · actual ${inr(budgetView.actual, true)}`}
+            icon={Scale}
+            tone={budgetView.variance > 0 ? "danger" : "success"}
+          />
+        )}
         {recordsMode && (
           <>
             <KpiCard

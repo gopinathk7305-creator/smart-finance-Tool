@@ -5,7 +5,9 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  ComposedChart,
   Legend,
+  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -39,7 +41,7 @@ import {
 import { FISCAL_YEARS, useBudget } from "@/lib/budget";
 import { useCategories } from "@/lib/categories";
 import { useDataset } from "@/lib/dataset";
-import { actualsByCategory, inr } from "@/lib/finance-data";
+import { actualsByCategory, inr, monthlySummary } from "@/lib/finance-data";
 import { BASE_SCENARIO, runForecast } from "@/lib/forecast-engine";
 
 export const Route = createFileRoute("/budget")({
@@ -118,6 +120,22 @@ function BudgetPage() {
   }, [rows, actuals, actualTotal, forecastSpend]);
 
   const forecastGap = forecastSpend - plannedTotal;
+
+  // Monthly plan vs actual: the annual plan spread evenly across twelve months
+  // against the real month-by-month spend from the active dataset.
+  const monthlyPlan = useMemo(() => {
+    const perMonth = plannedTotal / 12;
+    return monthlySummary(txns).map((m) => {
+      const variance = m.expense - perMonth;
+      return {
+        month: m.month,
+        plan: Math.round(perMonth),
+        actual: m.expense,
+        variance,
+        variancePct: perMonth ? (variance / perMonth) * 100 : 0,
+      };
+    });
+  }, [txns, plannedTotal]);
 
   const submit = async () => {
     const value = Number(amount.replace(/[^0-9.]/g, ""));
@@ -327,6 +345,91 @@ function BudgetPage() {
           )}
         </CardContent>
       </Card>
+
+      <Card className="mt-4 border-border shadow-card">
+        <CardHeader>
+          <CardTitle className="text-base">Monthly Budget vs Actual</CardTitle>
+          <CardDescription>
+            Annual plan spread evenly ({inr(plannedTotal / 12, true)} a month) against real monthly spend
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="h-[320px]">
+          {plannedTotal === 0 ? (
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              Add budget lines above to compare them month by month.
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={monthlyPlan}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
+                <YAxis
+                  tickFormatter={(v) => inr(Number(v), true)}
+                  tickLine={false}
+                  axisLine={false}
+                  fontSize={12}
+                  width={70}
+                />
+                <Tooltip formatter={(v) => inr(Number(v))} />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                <Bar dataKey="actual" name="Actual spend" fill="var(--brand)" radius={[4, 4, 0, 0]} />
+                <Line
+                  type="monotone"
+                  dataKey="plan"
+                  name="Monthly plan"
+                  stroke="var(--primary)"
+                  strokeWidth={2}
+                  dot={false}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      {plannedTotal > 0 && (
+        <Card className="mt-4 border-border shadow-card">
+          <CardHeader>
+            <CardTitle className="text-base">Month-by-Month Variance</CardTitle>
+            <CardDescription>Over or under the monthly plan</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Month</TableHead>
+                    <TableHead className="text-right">Plan</TableHead>
+                    <TableHead className="text-right">Actual</TableHead>
+                    <TableHead className="text-right">Variance</TableHead>
+                    <TableHead className="text-right">Variance %</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {monthlyPlan.map((m) => (
+                    <TableRow key={`mp-${m.month}`}>
+                      <TableCell className="font-medium">{m.month}</TableCell>
+                      <TableCell className="tabular text-right">{inr(m.plan)}</TableCell>
+                      <TableCell className="tabular text-right">{inr(m.actual)}</TableCell>
+                      <TableCell
+                        className={`tabular text-right ${m.variance > 0 ? "text-danger" : "text-success"}`}
+                      >
+                        {m.variance > 0 ? "+" : "−"}
+                        {inr(Math.abs(m.variance))}
+                      </TableCell>
+                      <TableCell
+                        className={`tabular text-right ${m.variance > 0 ? "text-danger" : "text-success"}`}
+                      >
+                        {m.variancePct.toFixed(1)}%
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="mt-4 border-border shadow-card">
         <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
