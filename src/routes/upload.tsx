@@ -518,6 +518,8 @@ function UploadPage() {
         row_count: syncedRows,
         column_names: detection.columns,
         modules: detection.modules,
+        base_name: baseName,
+        version: versionNo,
         status: complete ? "synced" : "partial",
       } as never);
       if (metadataError)
