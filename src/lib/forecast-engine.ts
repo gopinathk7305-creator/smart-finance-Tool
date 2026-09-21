@@ -364,6 +364,13 @@ export function runForecast(
     netMargin: scenRevenueTotal ? (scenProfitTotal / scenRevenueTotal) * 100 : 0,
     payrollImpact: inputs.hires * inputs.avgSalary * STATUTORY_LOAD,
     cashImpact: endCash - rows[11]!.baseCash,
+    history: {
+      revenue: revStats,
+      expense: expStats,
+      profit: profitStats,
+      months: profitStats.months,
+      band95Pct: bandWidthFor(profitStats, 1, 1.96) * 100,
+    },
   };
 }
 
