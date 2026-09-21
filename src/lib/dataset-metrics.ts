@@ -45,7 +45,10 @@ export function useActiveDatasetMetrics(): ActiveDatasetMetrics {
   const { data, isLoading } = useQuery({
     queryKey: ["dataset-summary", user?.id ?? "anon", activeFile ?? "all", range.start ?? "", range.end ?? ""],
     enabled: !!user,
-    staleTime: 60_000,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    placeholderData: (prev: SummaryRow | null | undefined) => prev,
     queryFn: async (): Promise<SummaryRow | null> => {
       const args: { p_source_file?: string; p_start?: string; p_end?: string } = {};
       if (activeFile) args.p_source_file = activeFile;

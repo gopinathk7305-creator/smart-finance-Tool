@@ -141,53 +141,6 @@ export function AdaptiveDashboard({ profile }: { profile: Profile }) {
         </Card>
       )}
 
-      {finance.topExpense.length > 0 && (
-        <Card className="border-border shadow-card">
-          <CardHeader>
-            <CardTitle className="text-base">Top 5 Expense Categories</CardTitle>
-            <CardDescription>By {finance.categoryLabel} in the active dataset</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-2">
-            <div className="h-[260px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={finance.topExpense}
-                    dataKey="value"
-                    nameKey="name"
-                    innerRadius={54}
-                    outerRadius={82}
-                    paddingAngle={2}
-                  >
-                    {finance.topExpense.map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(v) => full.format(Number(v))} />
-                  <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <ul className="space-y-2 self-center">
-              {finance.topExpense.map((c, i) => (
-                <li key={c.name} className="flex items-center gap-2 text-sm">
-                  <span
-                    className="size-2.5 shrink-0 rounded-full"
-                    style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}
-                  />
-                  <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                  <span className="font-mono text-xs text-muted-foreground">
-                    {compactMoney(c.value)}
-                  </span>
-                  <Badge variant="secondary" className="font-mono text-[11px]">
-                    {c.share.toFixed(1)}%
-                  </Badge>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {kpis.map((k) => (

@@ -17,18 +17,17 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
   LabelList,
   Legend,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
+
+import { sumChunked } from "@/lib/aggregate";
 
 import { ActiveDatasetBanner } from "@/components/finance/ActiveDatasetBanner";
 import { AdaptiveDashboard } from "@/components/finance/AdaptiveDashboard";
@@ -74,13 +73,6 @@ export const Route = createFileRoute("/")({
   component: Dashboard,
 });
 
-const PIE_COLORS = [
-  "var(--brand)",
-  "var(--primary)",
-  "var(--success)",
-  "var(--warning)",
-  "var(--danger)",
-];
 
 function Dashboard() {
   const { txns: mapped, live } = useDataset();
@@ -97,34 +89,39 @@ function Dashboard() {
 
   // Canonical columns first; if the uploaded file used its own header names the
   // auto-mapper's normalised rows drive every figure instead.
-  const canonical = totals(mapped);
-  const txns =
-    recordsMode && (Boolean(activeId) || (canonical.revenue === 0 && canonical.expense === 0))
+  const txns = useMemo(() => {
+    const canonical = totals(mapped);
+    return recordsMode && (Boolean(activeId) || (canonical.revenue === 0 && canonical.expense === 0))
       ? dyn.txns
       : mapped;
+  }, [mapped, dyn.txns, recordsMode, activeId]);
 
-  const series = monthlySummary(txns);
-  const t = totals(txns);
-  const runway = cashRunwayMonths(txns);
+  // Row-level maths runs once per dataset change, in chunks of 2,000 rows.
+  const series = useMemo(() => monthlySummary(txns), [txns]);
+  const t = useMemo(() => totals(txns), [txns]);
+  const runway = useMemo(() => cashRunwayMonths(txns), [txns]);
 
-  const h1 = series.slice(0, 6);
-  const h2 = series.slice(6);
-  const sum = (a: typeof series, k: "revenue" | "expense") => a.reduce((s, m) => s + m[k], 0);
-  const pctChange = (a: number, b: number) => (a > 0 ? ((b - a) / a) * 100 : 0);
-  const revDelta = pctChange(sum(h1, "revenue"), sum(h2, "revenue"));
-  const expDelta = pctChange(sum(h1, "expense"), sum(h2, "expense"));
-  const margin = safeMargin(t.netProfit, t.revenue);
+  const { revDelta, expDelta, margin } = useMemo(() => {
+    const h1 = series.slice(0, 6);
+    const h2 = series.slice(6);
+    const sum = (a: typeof series, k: "revenue" | "expense") => sumChunked(a, (m) => m[k]);
+    const pctChange = (a: number, b: number) => (a > 0 ? ((b - a) / a) * 100 : 0);
+    return {
+      revDelta: pctChange(sum(h1, "revenue"), sum(h2, "revenue")),
+      expDelta: pctChange(sum(h1, "expense"), sum(h2, "expense")),
+      margin: safeMargin(t.netProfit, t.revenue),
+    };
+  }, [series, t.netProfit, t.revenue]);
 
-  const canonicalCats = [...actualsByCategory(txns).entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .map(([name, value]) => ({ name, value }));
-  // No recognisable expense categories? fall back to a generic distribution of
-  // whatever grouping column the uploaded file actually has.
-  const usingFallbackCats = canonicalCats.length === 0 && dyn.topGroups.length > 0;
-  const topCats = usingFallbackCats ? dyn.topGroups : canonicalCats;
-  const catsTitle = usingFallbackCats ? "Dataset Distribution" : "Top 5 Expense Categories";
-  const catsSubtitle = usingFallbackCats ? dyn.groupLabel : "Share of total spend";
+  // Spend concentration still feeds the live alerts engine even though the
+  // category donut widget has been retired from this dashboard.
+  const topCats = useMemo(() => {
+    const canonicalCats = [...actualsByCategory(txns).entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, value]) => ({ name, value }));
+    return canonicalCats.length === 0 ? dyn.topGroups : canonicalCats;
+  }, [txns, dyn.topGroups]);
 
   const toneIcon = { danger: AlertTriangle, warning: Info, success: CheckCircle2 };
 
@@ -134,23 +131,28 @@ function Dashboard() {
   const rawRows = useDatasetRaw();
   // Alerts are computed from the active dataset's own rows — status columns,
   // duplicate amounts, category concentration and the real monthly series.
-  const liveAlerts = deriveAlerts({
-    rows: rawRows,
-    txns,
-    series,
-    categories: topCats,
-    revenue: t.revenue,
-    expense: t.expense,
-    netProfit: t.netProfit,
-    riskFlags,
-  });
+  const liveAlerts = useMemo(
+    () =>
+      deriveAlerts({
+        rows: rawRows,
+        txns,
+        series,
+        categories: topCats,
+        revenue: t.revenue,
+        expense: t.expense,
+        netProfit: t.netProfit,
+        riskFlags,
+      }),
+    [rawRows, txns, series, topCats, t.revenue, t.expense, t.netProfit, riskFlags],
+  );
 
   // Never show skeletons once the active dataset's rows are in hand — real figures
   // beat placeholders even while the background summary is still refreshing.
   const busy = (syncing || metrics.loading) && txns.length === 0;
-  const recent = [...txns]
-    .sort((a, b) => (a.date < b.date ? 1 : -1))
-    .slice(0, 10);
+  const recent = useMemo(
+    () => [...txns].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 10),
+    [txns],
+  );
 
   const buildReport = () => ({
     page: "dashboard" as const,
@@ -172,12 +174,6 @@ function Dashboard() {
         columns: ["Month", "Revenue", "Expense", "Profit", "Cash Balance"],
         numericFrom: 1,
         rows: series.map((m) => [m.month, inr(m.revenue), inr(m.expense), inr(m.profit), inr(m.cash)]),
-      },
-      {
-        title: "Top 5 Expense Categories",
-        columns: ["Category", "Spend"],
-        numericFrom: 1,
-        rows: topCats.map((c) => [c.name, inr(c.value)]),
       },
     ],
     facts: `Revenue ${inr(t.revenue)}, expenses ${inr(t.expense)}, gross profit ${inr(t.grossProfit)}, EBITDA ${inr(t.ebitda)}, net profit ${inr(t.netProfit)}, net margin ${margin.toFixed(1)}%, cash runway ${Number.isFinite(runway) ? runway.toFixed(1) : "unlimited"} months. Largest spend categories: ${topCats.map((c) => `${c.name} ${inr(c.value)}`).join(", ")}. Data source: ${live ? "user-uploaded ledger" : "demo dataset"}.`,
@@ -263,13 +259,13 @@ function Dashboard() {
 
 
       <div ref={chartsRef}>
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <Card className="border-border shadow-card lg:col-span-2">
+      <div className="mt-4 grid gap-4">
+        <Card className="border-border shadow-card">
           <CardHeader>
             <CardTitle className="text-base">Monthly Revenue vs Expense</CardTitle>
             <CardDescription>Twelve month actuals, FY2026</CardDescription>
           </CardHeader>
-          <CardContent className="h-[300px]">
+          <CardContent className="h-[320px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={series} barGap={4}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
@@ -300,54 +296,6 @@ function Dashboard() {
                   />
                 </Bar>
               </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border shadow-card">
-          <CardHeader>
-            <CardTitle className="text-base">{catsTitle}</CardTitle>
-            <CardDescription>{catsSubtitle}</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={topCats}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="42%"
-                  cy="50%"
-                  innerRadius={42}
-                  outerRadius={68}
-                  labelLine={{ stroke: "var(--border)" }}
-                  label={({ cx, cy, midAngle, outerRadius, name, percent }) => {
-                    const rad = Math.PI / 180;
-                    const r = (outerRadius ?? 0) + 10;
-                    const x = (cx ?? 0) + r * Math.cos(-(midAngle ?? 0) * rad);
-                    const y = (cy ?? 0) + r * Math.sin(-(midAngle ?? 0) * rad);
-                    const short = name && name.length > 10 ? `${name.slice(0, 9)}…` : name;
-                    return (
-                      <text
-                        x={x}
-                        y={y}
-                        fill="var(--foreground)"
-                        fontSize={10}
-                        textAnchor={x > (cx ?? 0) ? "start" : "end"}
-                        dominantBaseline="central"
-                      >
-                        {`${short} (${Math.round((percent ?? 0) * 100)}%)`}
-                      </text>
-                    );
-                  }}
-                >
-                  {topCats.map((_, i) => (
-                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(v) => inr(Number(v))} />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
-              </PieChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>

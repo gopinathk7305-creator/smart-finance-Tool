@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 
+import { sumChunked } from "@/lib/aggregate";
 import { detectColumns, mapRowsToTransactions, type ColumnMap } from "@/lib/column-map";
 import { useDatasetRaw } from "@/lib/dataset";
 import {
@@ -46,8 +47,10 @@ export function useDynamicDashboard(activeDatasetId?: string | null): DynamicDas
     const schema = inspectSchema(rows);
     const mapping = detectColumns(rows);
     const txns = mapRowsToTransactions(rows, mapping);
-    const revenue = txns.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
-    const expenses = txns.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+    // Chunked (2,000-row blocks) so 50k+ row datasets aggregate without
+    // monopolising the main thread.
+    const revenue = sumChunked(txns, (t) => (t.type === "income" ? t.amount : 0));
+    const expenses = sumChunked(txns, (t) => (t.type === "expense" ? t.amount : 0));
 
     const groupBy = mapping.category ?? schema.categorical[0];
     const valueColumn = mapping.expense ?? mapping.amount ?? mapping.revenue ?? schema.numeric[0];
