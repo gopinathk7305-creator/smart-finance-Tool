@@ -19,7 +19,16 @@ export interface ReportTable {
 
 export interface ReportSpec {
   /** page key used for AI templating */
-  page: "dashboard" | "pnl" | "payroll" | "audit" | "forecast" | "reports" | "budget" | "compliance";
+  page:
+    | "dashboard"
+    | "pnl"
+    | "payroll"
+    | "audit"
+    | "forecast"
+    | "reports"
+    | "budget"
+    | "compliance"
+    | "balance-sheet";
   reportName: string;
   org: string;
   vendor?: string;

@@ -42,7 +42,7 @@ import { FISCAL_YEARS, useBudget } from "@/lib/budget";
 import { useCategories } from "@/lib/categories";
 import { useDataset } from "@/lib/dataset";
 import { actualsByCategory, inr, monthlySummary } from "@/lib/finance-data";
-import { BASE_SCENARIO, runForecast } from "@/lib/forecast-engine";
+import { BASE_SCENARIO, FY_MONTHS, runForecast } from "@/lib/forecast-engine";
 
 export const Route = createFileRoute("/budget")({
   head: () => ({
@@ -75,6 +75,7 @@ function BudgetPage() {
   const [category, setCategory] = useState("");
   const [department, setDepartment] = useState("");
   const [amount, setAmount] = useState("");
+  const [month, setMonth] = useState("Annual");
 
   const actuals = useMemo(() => actualsByCategory(txns), [txns]);
   const forecast = useMemo(
@@ -124,18 +125,22 @@ function BudgetPage() {
   // Monthly plan vs actual: the annual plan spread evenly across twelve months
   // against the real month-by-month spend from the active dataset.
   const monthlyPlan = useMemo(() => {
-    const perMonth = plannedTotal / 12;
+    const perMonth = budget.annualTotal / 12;
     return monthlySummary(txns).map((m) => {
-      const variance = m.expense - perMonth;
+      // A month-specific target wins over the annual plan spread evenly.
+      const target = budget.byMonth.get(m.month);
+      const plan = target ?? perMonth;
+      const variance = m.expense - plan;
       return {
         month: m.month,
-        plan: Math.round(perMonth),
+        plan: Math.round(plan),
+        custom: target !== undefined,
         actual: m.expense,
         variance,
-        variancePct: perMonth ? (variance / perMonth) * 100 : 0,
+        variancePct: plan ? (variance / plan) * 100 : 0,
       };
     });
-  }, [txns, plannedTotal]);
+  }, [txns, budget.annualTotal, budget.byMonth]);
 
   const submit = async () => {
     const value = Number(amount.replace(/[^0-9.]/g, ""));
@@ -153,10 +158,13 @@ function BudgetPage() {
         category,
         department: department || "General",
         budgeted_amount: value,
+        month,
       });
       setAmount("");
       setDepartment("");
-      toast.success(`${category} budget of ${inr(value)} saved`);
+      toast.success(
+        `${category} budget of ${inr(value)} saved${month === "Annual" ? "" : ` for ${month}`}`,
+      );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not save that budget line.");
     }
@@ -263,7 +271,7 @@ function BudgetPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 md:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-5">
             <div className="space-y-1.5">
               <Label htmlFor="budget-category" className="text-xs">
                 Category
@@ -304,6 +312,24 @@ function BudgetPage() {
                 onChange={(e) => setAmount(e.target.value)}
                 className="bg-background"
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="budget-month" className="text-xs">
+                Applies to
+              </Label>
+              <Select value={month} onValueChange={setMonth}>
+                <SelectTrigger id="budget-month" className="bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Annual">Whole year</SelectItem>
+                  {FY_MONTHS.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {m} only
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex items-end">
               <Button className="w-full" disabled={budget.saving} onClick={() => void submit()}>
@@ -350,7 +376,8 @@ function BudgetPage() {
         <CardHeader>
           <CardTitle className="text-base">Monthly Budget vs Actual</CardTitle>
           <CardDescription>
-            Annual plan spread evenly ({inr(plannedTotal / 12, true)} a month) against real monthly spend
+            Yearly plan spread evenly ({inr(budget.annualTotal / 12, true)} a month), replaced by any
+            month-specific target you set, against real monthly spend
           </CardDescription>
         </CardHeader>
         <CardContent className="h-[320px]">

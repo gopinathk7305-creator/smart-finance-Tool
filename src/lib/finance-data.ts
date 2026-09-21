@@ -37,6 +37,8 @@ export interface BudgetTarget {
   category: string;
   department: string;
   budgeted_amount: number;
+  /** "Annual" for a yearly plan, or an FY month label (Apr…Mar) for a monthly target. */
+  month?: string;
 }
 
 export interface ArApRecord {

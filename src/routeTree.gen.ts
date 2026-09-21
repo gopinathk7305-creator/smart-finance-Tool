@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuditRouteImport } from './routes/audit'
+import { Route as BalanceSheetRouteImport } from './routes/balance-sheet'
 import { Route as BudgetRouteImport } from './routes/budget'
 import { Route as CashflowRouteImport } from './routes/cashflow'
 import { Route as CompareRouteImport } from './routes/compare'
@@ -31,6 +32,11 @@ const IndexRoute = IndexRouteImport.update({
 const AuditRoute = AuditRouteImport.update({
   id: '/audit',
   path: '/audit',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BalanceSheetRoute = BalanceSheetRouteImport.update({
+  id: '/balance-sheet',
+  path: '/balance-sheet',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BudgetRoute = BudgetRouteImport.update({
@@ -92,6 +98,7 @@ const UsersRoute = UsersRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/audit': typeof AuditRoute
+  '/balance-sheet': typeof BalanceSheetRoute
   '/budget': typeof BudgetRoute
   '/cashflow': typeof CashflowRoute
   '/compare': typeof CompareRoute
@@ -107,6 +114,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/audit': typeof AuditRoute
+  '/balance-sheet': typeof BalanceSheetRoute
   '/budget': typeof BudgetRoute
   '/cashflow': typeof CashflowRoute
   '/compare': typeof CompareRoute
@@ -123,6 +131,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/audit': typeof AuditRoute
+  '/balance-sheet': typeof BalanceSheetRoute
   '/budget': typeof BudgetRoute
   '/cashflow': typeof CashflowRoute
   '/compare': typeof CompareRoute
@@ -140,6 +149,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/audit'
+    | '/balance-sheet'
     | '/budget'
     | '/cashflow'
     | '/compare'
@@ -155,6 +165,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/audit'
+    | '/balance-sheet'
     | '/budget'
     | '/cashflow'
     | '/compare'
@@ -170,6 +181,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/audit'
+    | '/balance-sheet'
     | '/budget'
     | '/cashflow'
     | '/compare'
@@ -186,6 +198,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuditRoute: typeof AuditRoute
+  BalanceSheetRoute: typeof BalanceSheetRoute
   BudgetRoute: typeof BudgetRoute
   CashflowRoute: typeof CashflowRoute
   CompareRoute: typeof CompareRoute
@@ -213,6 +226,13 @@ declare module '@tanstack/react-router' {
       path: '/audit'
       fullPath: '/audit'
       preLoaderRoute: typeof AuditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/balance-sheet': {
+      id: '/balance-sheet'
+      path: '/balance-sheet'
+      fullPath: '/balance-sheet'
+      preLoaderRoute: typeof BalanceSheetRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/budget': {
@@ -298,6 +318,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuditRoute: AuditRoute,
+  BalanceSheetRoute: BalanceSheetRoute,
   BudgetRoute: BudgetRoute,
   CashflowRoute: CashflowRoute,
   CompareRoute: CompareRoute,

@@ -14,12 +14,18 @@ export interface BudgetDraft {
   category: string;
   department: string;
   budgeted_amount: number;
+  /** "Annual" or an FY month label (Apr…Mar) for a month-specific target. */
+  month?: string;
 }
 
 export interface BudgetApi {
   rows: BudgetTarget[];
   /** planned annual spend keyed by category name (lower-cased) */
   byCategory: Map<string, number>;
+  /** month-specific planned spend keyed by FY month label (Apr…Mar) */
+  byMonth: Map<string, number>;
+  /** planned spend from rows tagged "Annual" only */
+  annualTotal: number;
   plannedTotal: number;
   live: boolean;
   loading: boolean;
@@ -51,6 +57,22 @@ export function useBudget(fiscalYear?: string): BudgetApi {
     return map;
   }, [rows]);
 
+  // Month-specific targets (rows tagged with an FY month rather than "Annual").
+  const byMonth = useMemo(() => {
+    const map = new Map<string, number>();
+    rows.forEach((r) => {
+      const m = r.month ?? "Annual";
+      if (m === "Annual") return;
+      map.set(m, (map.get(m) ?? 0) + r.budgeted_amount);
+    });
+    return map;
+  }, [rows]);
+
+  const annualTotal = useMemo(
+    () => rows.filter((r) => (r.month ?? "Annual") === "Annual").reduce((s, r) => s + r.budgeted_amount, 0),
+    [rows],
+  );
+
   const invalidate = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ["dataset"] });
   }, [queryClient]);
@@ -65,6 +87,7 @@ export function useBudget(fiscalYear?: string): BudgetApi {
         category: draft.category,
         department: draft.department,
         budgeted_amount: draft.budgeted_amount,
+        month: draft.month ?? "Annual",
         source_file: "manual entry",
       });
       if (error) throw error;
@@ -100,6 +123,8 @@ export function useBudget(fiscalYear?: string): BudgetApi {
   return {
     rows,
     byCategory,
+    byMonth,
+    annualTotal,
     plannedTotal: rows.reduce((s, r) => s + r.budgeted_amount, 0),
     live,
     loading,

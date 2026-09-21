@@ -100,8 +100,90 @@ export interface ForecastRow {
   scenCash: number;
   cumulative: number;
   runway: number;
+  /** 95% confidence bounds on scenario profit. */
   lower: number;
   upper: number;
+  /** 80% confidence bounds on scenario profit. */
+  lower80: number;
+  upper80: number;
+}
+
+/** Descriptive statistics learned from a dataset's historical monthly numbers. */
+export interface HistoryStats {
+  /** number of months with activity */
+  months: number;
+  mean: number;
+  /** ordinary-least-squares slope, rupees per month */
+  slope: number;
+  stdDev: number;
+  /** coefficient of variation (stdDev / mean) */
+  cv: number;
+  /** slope expressed as a monthly growth rate on the mean */
+  growthRate: number;
+  /** 3-month moving average of the most recent months */
+  movingAverage: number;
+}
+
+const EMPTY_STATS: HistoryStats = {
+  months: 0,
+  mean: 0,
+  slope: 0,
+  stdDev: 0,
+  cv: 0,
+  growthRate: 0,
+  movingAverage: 0,
+};
+
+/**
+ * Trend slope (linear regression), mean, standard deviation and moving average
+ * of a historical monthly series. Drives both the projection growth rate and
+ * the width of the confidence bands, so a longer history yields tighter bands.
+ */
+export function historyStats(values: number[]): HistoryStats {
+  const xs = values.filter((v) => Number.isFinite(v));
+  const n = xs.length;
+  if (n === 0) return EMPTY_STATS;
+  const mean = xs.reduce((s, v) => s + v, 0) / n;
+
+  let slope = 0;
+  if (n > 1) {
+    const xMean = (n - 1) / 2;
+    let num = 0;
+    let den = 0;
+    xs.forEach((v, i) => {
+      num += (i - xMean) * (v - mean);
+      den += (i - xMean) ** 2;
+    });
+    slope = den ? num / den : 0;
+  }
+
+  const variance = n > 1 ? xs.reduce((s, v) => s + (v - mean) ** 2, 0) / (n - 1) : 0;
+  const stdDev = Math.sqrt(variance);
+  const tail = xs.slice(-3);
+
+  return {
+    months: n,
+    mean,
+    slope,
+    stdDev,
+    cv: mean > 0 ? stdDev / mean : 0,
+    growthRate: mean > 0 ? slope / mean : 0,
+    movingAverage: tail.length ? tail.reduce((s, v) => s + v, 0) / tail.length : mean,
+  };
+}
+
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+/**
+ * Relative half-width of a confidence band for the n-th projected month.
+ * Volatility comes from the history's coefficient of variation; the standard
+ * error shrinks with the square root of the number of historical months, so
+ * 12+ months of actuals produce visibly tighter bands than 3 months.
+ */
+export function bandWidthFor(stats: HistoryStats, monthsAhead: number, z: number): number {
+  const volatility = stats.months > 1 ? clamp(stats.cv, 0.03, 0.9) : 0.35;
+  const standardError = volatility / Math.sqrt(Math.max(1, stats.months));
+  return clamp(z * standardError * Math.sqrt(monthsAhead), 0.01, 0.75);
 }
 
 export interface ForecastResult {
@@ -121,6 +203,16 @@ export interface ForecastResult {
   netMargin: number;
   payrollImpact: number;
   cashImpact: number;
+  /** statistics learned from the active dataset's historical months */
+  history: {
+    revenue: HistoryStats;
+    expense: HistoryStats;
+    profit: HistoryStats;
+    /** months of actuals the projection learned from */
+    months: number;
+    /** 95% band half-width for the first projected month, as a percentage */
+    band95Pct: number;
+  };
 }
 
 /**
@@ -150,6 +242,11 @@ export function runForecast(
   const lastRev = avg((s) => s.revenue) || 1;
   const lastExp = avg((s) => s.expense) || 1;
 
+  // Learn the trend from the dataset's own history instead of a fixed assumption.
+  const revStats = historyStats(sample.map((s) => s.revenue));
+  const expStats = historyStats(sample.map((s) => s.expense));
+  const profitStats = historyStats(sample.map((s) => s.profit));
+
   // Monthly people cost taken from the user's own payroll categories in the ledger.
   const payrollNames = new Set(payrollCategories.map((c) => c.toLowerCase()));
   const ledgerPayroll =
@@ -168,10 +265,12 @@ export function runForecast(
   // FY 2027-28 continues the same compounding curve one year further out.
   const offset = inputs.fy === "FY 2027-28" ? 12 : 0;
 
-  const gBase = 0.012;
+  // Baseline growth is the regression slope of the dataset's own monthly history,
+  // clamped to a sane band; with too little history we fall back to a gentle drift.
+  const gBase = revStats.months > 1 ? clamp(revStats.growthRate, -0.08, 0.12) : 0.012;
   const gScen =
     gBase + inputs.revenueGrowth / 100 / 12 - inputs.churn / 100 / 12 + inputs.priceFactor / 100 / 12;
-  const eBase = 0.009;
+  const eBase = expStats.months > 1 ? clamp(expStats.growthRate, -0.06, 0.1) : 0.009;
   const eScen = eBase + inputs.opexAdj / 100 / 12;
   const collectionDrag = Math.min(0.35, inputs.dso / 365);
 
@@ -211,7 +310,10 @@ export function runForecast(
     cumulative += scenProfit;
 
     const burn = Math.max(0, -scenProfit);
-    const bandWidth = 0.06 * (i + 1);
+    // Band width learned from historical volatility; it shrinks as the dataset
+    // carries more months of actuals and widens further into the future.
+    const band95 = bandWidthFor(profitStats, i + 1, 1.96);
+    const band80 = bandWidthFor(profitStats, i + 1, 1.282);
 
     return {
       month,
@@ -231,8 +333,10 @@ export function runForecast(
       scenCash: Math.round(scenCash),
       cumulative: Math.round(cumulative),
       runway: burn <= 0 ? 24 : Math.max(0, Math.round((scenCash / burn) * 10) / 10),
-      lower: Math.round(scenProfit * (1 - bandWidth)),
-      upper: Math.round(scenProfit * (1 + bandWidth)),
+      lower: Math.round(scenProfit - Math.abs(scenProfit) * band95),
+      upper: Math.round(scenProfit + Math.abs(scenProfit) * band95),
+      lower80: Math.round(scenProfit - Math.abs(scenProfit) * band80),
+      upper80: Math.round(scenProfit + Math.abs(scenProfit) * band80),
     };
   });
 
@@ -260,6 +364,13 @@ export function runForecast(
     netMargin: scenRevenueTotal ? (scenProfitTotal / scenRevenueTotal) * 100 : 0,
     payrollImpact: inputs.hires * inputs.avgSalary * STATUTORY_LOAD,
     cashImpact: endCash - rows[11]!.baseCash,
+    history: {
+      revenue: revStats,
+      expense: expStats,
+      profit: profitStats,
+      months: profitStats.months,
+      band95Pct: bandWidthFor(profitStats, 1, 1.96) * 100,
+    },
   };
 }
 
