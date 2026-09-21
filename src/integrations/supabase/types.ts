@@ -253,6 +253,45 @@ export type Database = {
           },
         ]
       }
+      dataset_monthly: {
+        Row: {
+          cash: number
+          expense: number
+          id: string
+          month_index: number
+          month_label: string
+          profit: number
+          revenue: number
+          source_file: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cash?: number
+          expense?: number
+          id?: string
+          month_index: number
+          month_label: string
+          profit?: number
+          revenue?: number
+          source_file: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          cash?: number
+          expense?: number
+          id?: string
+          month_index?: number
+          month_label?: string
+          profit?: number
+          revenue?: number
+          source_file?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       expense_categories: {
         Row: {
           created_at: string
@@ -638,6 +677,27 @@ export type Database = {
           p_table: string
         }
         Returns: number
+      }
+      refresh_dataset_monthly: {
+        Args: { p_source_file?: string }
+        Returns: {
+          cash: number
+          expense: number
+          id: string
+          month_index: number
+          month_label: string
+          profit: number
+          revenue: number
+          source_file: string
+          updated_at: string
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "dataset_monthly"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
     }
     Enums: {

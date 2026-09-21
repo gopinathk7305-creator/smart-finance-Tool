@@ -50,6 +50,13 @@
       "when": 1789637252944,
       "tag": "0006_purge_dataset_batched",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789983929034,
+      "tag": "0007_dataset_monthly_precompute",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
+  ArrowRightLeft,
   Bell,
   CalendarRange,
   Calculator,
@@ -55,6 +56,7 @@ const NAV = [
   { to: "/payroll", label: "Payroll & Tax", icon: Calculator },
   { to: "/budget", label: "Budget vs Actual", icon: Target },
   { to: "/pnl", label: "Financial Analysis", icon: TrendingUp },
+  { to: "/compare", label: "Compare Datasets", icon: ArrowRightLeft },
   { to: "/cashflow", label: "Cash Flow & AR/AP", icon: Wallet },
   { to: "/audit", label: "Internal Audit", icon: ShieldAlert },
   { to: "/compliance", label: "Compliance & Filings", icon: ShieldCheck },

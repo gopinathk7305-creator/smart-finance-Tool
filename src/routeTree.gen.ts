@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuditRouteImport } from './routes/audit'
 import { Route as BudgetRouteImport } from './routes/budget'
 import { Route as CashflowRouteImport } from './routes/cashflow'
+import { Route as CompareRouteImport } from './routes/compare'
 import { Route as ComplianceRouteImport } from './routes/compliance'
 import { Route as ForecastRouteImport } from './routes/forecast'
 import { Route as LoginRouteImport } from './routes/login'
@@ -40,6 +41,11 @@ const BudgetRoute = BudgetRouteImport.update({
 const CashflowRoute = CashflowRouteImport.update({
   id: '/cashflow',
   path: '/cashflow',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompareRoute = CompareRouteImport.update({
+  id: '/compare',
+  path: '/compare',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ComplianceRoute = ComplianceRouteImport.update({
@@ -88,6 +94,7 @@ export interface FileRoutesByFullPath {
   '/audit': typeof AuditRoute
   '/budget': typeof BudgetRoute
   '/cashflow': typeof CashflowRoute
+  '/compare': typeof CompareRoute
   '/compliance': typeof ComplianceRoute
   '/forecast': typeof ForecastRoute
   '/login': typeof LoginRoute
@@ -102,6 +109,7 @@ export interface FileRoutesByTo {
   '/audit': typeof AuditRoute
   '/budget': typeof BudgetRoute
   '/cashflow': typeof CashflowRoute
+  '/compare': typeof CompareRoute
   '/compliance': typeof ComplianceRoute
   '/forecast': typeof ForecastRoute
   '/login': typeof LoginRoute
@@ -117,6 +125,7 @@ export interface FileRoutesById {
   '/audit': typeof AuditRoute
   '/budget': typeof BudgetRoute
   '/cashflow': typeof CashflowRoute
+  '/compare': typeof CompareRoute
   '/compliance': typeof ComplianceRoute
   '/forecast': typeof ForecastRoute
   '/login': typeof LoginRoute
@@ -133,6 +142,7 @@ export interface FileRouteTypes {
     | '/audit'
     | '/budget'
     | '/cashflow'
+    | '/compare'
     | '/compliance'
     | '/forecast'
     | '/login'
@@ -147,6 +157,7 @@ export interface FileRouteTypes {
     | '/audit'
     | '/budget'
     | '/cashflow'
+    | '/compare'
     | '/compliance'
     | '/forecast'
     | '/login'
@@ -161,6 +172,7 @@ export interface FileRouteTypes {
     | '/audit'
     | '/budget'
     | '/cashflow'
+    | '/compare'
     | '/compliance'
     | '/forecast'
     | '/login'
@@ -176,6 +188,7 @@ export interface RootRouteChildren {
   AuditRoute: typeof AuditRoute
   BudgetRoute: typeof BudgetRoute
   CashflowRoute: typeof CashflowRoute
+  CompareRoute: typeof CompareRoute
   ComplianceRoute: typeof ComplianceRoute
   ForecastRoute: typeof ForecastRoute
   LoginRoute: typeof LoginRoute
@@ -214,6 +227,13 @@ declare module '@tanstack/react-router' {
       path: '/cashflow'
       fullPath: '/cashflow'
       preLoaderRoute: typeof CashflowRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/compare': {
+      id: '/compare'
+      path: '/compare'
+      fullPath: '/compare'
+      preLoaderRoute: typeof CompareRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/compliance': {
@@ -280,6 +300,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuditRoute: AuditRoute,
   BudgetRoute: BudgetRoute,
   CashflowRoute: CashflowRoute,
+  CompareRoute: CompareRoute,
   ComplianceRoute: ComplianceRoute,
   ForecastRoute: ForecastRoute,
   LoginRoute: LoginRoute,
