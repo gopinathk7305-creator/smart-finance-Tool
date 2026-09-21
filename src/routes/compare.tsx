@@ -91,9 +91,18 @@ function useDatasetTotals(sourceFile: string | null) {
 const EMPTY = { revenue: 0, expenses: 0, netProfit: 0, rows: 0 };
 
 function ComparePage() {
-  const { datasets, activeFile } = useActiveDataset();
+  const { datasets, active, activeFile } = useActiveDataset();
   const [left, setLeft] = useState<string | null>(null);
   const [right, setRight] = useState<string | null>(null);
+
+  // Every dated upload of the active file, newest first.
+  const activeBase = active?.base_name || active?.file_name || null;
+  const versions = useMemo(() => {
+    if (!activeBase) return [];
+    return datasets
+      .filter((d) => (d.base_name || d.file_name) === activeBase)
+      .sort((x, y) => (y.version ?? 1) - (x.version ?? 1));
+  }, [datasets, activeBase]);
 
   // Default: the active dataset on the left, the next most recent on the right.
   useEffect(() => {
