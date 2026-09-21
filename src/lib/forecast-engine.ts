@@ -100,8 +100,90 @@ export interface ForecastRow {
   scenCash: number;
   cumulative: number;
   runway: number;
+  /** 95% confidence bounds on scenario profit. */
   lower: number;
   upper: number;
+  /** 80% confidence bounds on scenario profit. */
+  lower80: number;
+  upper80: number;
+}
+
+/** Descriptive statistics learned from a dataset's historical monthly numbers. */
+export interface HistoryStats {
+  /** number of months with activity */
+  months: number;
+  mean: number;
+  /** ordinary-least-squares slope, rupees per month */
+  slope: number;
+  stdDev: number;
+  /** coefficient of variation (stdDev / mean) */
+  cv: number;
+  /** slope expressed as a monthly growth rate on the mean */
+  growthRate: number;
+  /** 3-month moving average of the most recent months */
+  movingAverage: number;
+}
+
+const EMPTY_STATS: HistoryStats = {
+  months: 0,
+  mean: 0,
+  slope: 0,
+  stdDev: 0,
+  cv: 0,
+  growthRate: 0,
+  movingAverage: 0,
+};
+
+/**
+ * Trend slope (linear regression), mean, standard deviation and moving average
+ * of a historical monthly series. Drives both the projection growth rate and
+ * the width of the confidence bands, so a longer history yields tighter bands.
+ */
+export function historyStats(values: number[]): HistoryStats {
+  const xs = values.filter((v) => Number.isFinite(v));
+  const n = xs.length;
+  if (n === 0) return EMPTY_STATS;
+  const mean = xs.reduce((s, v) => s + v, 0) / n;
+
+  let slope = 0;
+  if (n > 1) {
+    const xMean = (n - 1) / 2;
+    let num = 0;
+    let den = 0;
+    xs.forEach((v, i) => {
+      num += (i - xMean) * (v - mean);
+      den += (i - xMean) ** 2;
+    });
+    slope = den ? num / den : 0;
+  }
+
+  const variance = n > 1 ? xs.reduce((s, v) => s + (v - mean) ** 2, 0) / (n - 1) : 0;
+  const stdDev = Math.sqrt(variance);
+  const tail = xs.slice(-3);
+
+  return {
+    months: n,
+    mean,
+    slope,
+    stdDev,
+    cv: mean > 0 ? stdDev / mean : 0,
+    growthRate: mean > 0 ? slope / mean : 0,
+    movingAverage: tail.length ? tail.reduce((s, v) => s + v, 0) / tail.length : mean,
+  };
+}
+
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+/**
+ * Relative half-width of a confidence band for the n-th projected month.
+ * Volatility comes from the history's coefficient of variation; the standard
+ * error shrinks with the square root of the number of historical months, so
+ * 12+ months of actuals produce visibly tighter bands than 3 months.
+ */
+export function bandWidthFor(stats: HistoryStats, monthsAhead: number, z: number): number {
+  const volatility = stats.months > 1 ? clamp(stats.cv, 0.03, 0.9) : 0.35;
+  const standardError = volatility / Math.sqrt(Math.max(1, stats.months));
+  return clamp(z * standardError * Math.sqrt(monthsAhead), 0.01, 0.75);
 }
 
 export interface ForecastResult {
