@@ -126,6 +126,12 @@ function useDatasetInternal(fetchEnabled: boolean): Dataset {
     queryKey: datasetKey(user?.id ?? "anon", activeFile),
     queryFn: () => fetchDataset(activeFile),
     enabled: fetchEnabled && !!user,
+    // Rows for a dataset stay fresh for 10 minutes, so moving between modules
+    // (or back to a previously selected file) renders instantly from cache.
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    placeholderData: (prev) => prev,
   });
 
   const refresh = useCallback(() => {
