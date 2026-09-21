@@ -320,7 +320,54 @@ export function useAdaptiveDashboard(activeDatasetId?: string | null): AdaptiveD
         : `${titleCase(groupCol)} by record count`
       : "";
 
+    // ---- Finance view (revenue vs expense, categories, runway) -----------
+    const map = detectColumns(rows);
+    const txns = mapRowsToTransactions(rows, map);
+    const revenue = txns.reduce((s, t) => (t.type === "income" ? s + (Number(t.amount) || 0) : s), 0);
+    const expenses = txns.reduce((s, t) => (t.type === "expense" ? s + (Number(t.amount) || 0) : s), 0);
+    const monthMap = new Map<string, { revenue: number; expenses: number }>();
+    txns.forEach((t) => {
+      const key = monthOf(t.date);
+      if (!key) return;
+      const acc = monthMap.get(key) ?? { revenue: 0, expenses: 0 };
+      if (t.type === "income") acc.revenue += Number(t.amount) || 0;
+      else acc.expenses += Number(t.amount) || 0;
+      monthMap.set(key, acc);
+    });
+    const monthly = [...monthMap.entries()]
+      .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+      .map(([month, v]) => ({ month, revenue: v.revenue, expenses: v.expenses }));
+    const expenseMonths = monthly.filter((m) => m.expenses > 0).length;
+    const avgMonthlyExpense = expenseMonths > 0 ? expenses / expenseMonths : 0;
+    const balance = revenue - expenses;
+    const runwayMonths = avgMonthlyExpense > 0 && balance > 0 ? balance / avgMonthlyExpense : 0;
+    const catTotals = new Map<string, number>();
+    txns.forEach((t) => {
+      if (t.type !== "expense") return;
+      const name = String(t.category ?? "").trim() || "Uncategorised";
+      catTotals.set(name, (catTotals.get(name) ?? 0) + (Number(t.amount) || 0));
+    });
+    const topExpense = [...catTotals.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, value]) => ({
+        name,
+        value,
+        share: expenses > 0 ? (value / expenses) * 100 : 0,
+      }));
+
     return {
+      finance: {
+        ready: revenue > 0 || expenses > 0,
+        revenue,
+        expenses,
+        netProfit: balance,
+        margin: revenue > 0 ? ((revenue - expenses) / revenue) * 100 : 0,
+        runwayMonths,
+        monthly,
+        topExpense,
+        categoryLabel: map.category ? titleCase(map.category) : "Category",
+      },
       schema,
       rowCount,
       columnCount,
