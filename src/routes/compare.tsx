@@ -221,6 +221,65 @@ function ComparePage() {
         </CardContent>
       </Card>
 
+      {versions.length > 0 && (
+        <Card className="mt-4 border-border shadow-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <History className="size-4 text-brand" /> Version history — {activeBase}
+            </CardTitle>
+            <CardDescription>
+              Every upload of this file is kept with its date. Pick a past version to compare it against the
+              one you have active.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Version</TableHead>
+                  <TableHead>Uploaded</TableHead>
+                  <TableHead className="text-right">Rows</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {versions.map((v) => (
+                  <TableRow key={v.id}>
+                    <TableCell className="font-medium">
+                      <span className="flex items-center gap-2">
+                        Version {v.version ?? 1}
+                        {v.file_name === activeFile && (
+                          <Badge className="bg-success-soft text-success">Active</Badge>
+                        )}
+                      </span>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {new Date(v.created_at).toLocaleString("en-IN")}
+                    </TableCell>
+                    <TableCell className="text-right font-mono tabular-nums">
+                      {(v.row_count ?? 0).toLocaleString("en-IN")}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={v.file_name === activeFile}
+                        onClick={() => {
+                          setLeft(v.file_name);
+                          setRight(activeFile ?? v.file_name);
+                        }}
+                      >
+                        Compare with active
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           label="Revenue difference"
