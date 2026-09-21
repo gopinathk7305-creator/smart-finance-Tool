@@ -42,7 +42,7 @@ import { FISCAL_YEARS, useBudget } from "@/lib/budget";
 import { useCategories } from "@/lib/categories";
 import { useDataset } from "@/lib/dataset";
 import { actualsByCategory, inr, monthlySummary } from "@/lib/finance-data";
-import { BASE_SCENARIO, runForecast } from "@/lib/forecast-engine";
+import { BASE_SCENARIO, FY_MONTHS, runForecast } from "@/lib/forecast-engine";
 
 export const Route = createFileRoute("/budget")({
   head: () => ({
@@ -75,6 +75,7 @@ function BudgetPage() {
   const [category, setCategory] = useState("");
   const [department, setDepartment] = useState("");
   const [amount, setAmount] = useState("");
+  const [month, setMonth] = useState("Annual");
 
   const actuals = useMemo(() => actualsByCategory(txns), [txns]);
   const forecast = useMemo(
