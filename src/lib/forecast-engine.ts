@@ -255,10 +255,12 @@ export function runForecast(
   // FY 2027-28 continues the same compounding curve one year further out.
   const offset = inputs.fy === "FY 2027-28" ? 12 : 0;
 
-  const gBase = 0.012;
+  // Baseline growth is the regression slope of the dataset's own monthly history,
+  // clamped to a sane band; with too little history we fall back to a gentle drift.
+  const gBase = revStats.months > 1 ? clamp(revStats.growthRate, -0.08, 0.12) : 0.012;
   const gScen =
     gBase + inputs.revenueGrowth / 100 / 12 - inputs.churn / 100 / 12 + inputs.priceFactor / 100 / 12;
-  const eBase = 0.009;
+  const eBase = expStats.months > 1 ? clamp(expStats.growthRate, -0.06, 0.1) : 0.009;
   const eScen = eBase + inputs.opexAdj / 100 / 12;
   const collectionDrag = Math.min(0.35, inputs.dso / 365);
 
