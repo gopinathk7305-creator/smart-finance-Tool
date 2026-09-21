@@ -131,6 +131,20 @@ function Dashboard() {
   const chartsRef = useRef<HTMLDivElement>(null);
   const metrics = useActiveDatasetMetrics();
   const riskFlags = metrics.riskFlags || dyn.riskFlags;
+  const rawRows = useDatasetRaw();
+  // Alerts are computed from the active dataset's own rows — status columns,
+  // duplicate amounts, category concentration and the real monthly series.
+  const liveAlerts = deriveAlerts({
+    rows: rawRows,
+    txns,
+    series,
+    categories: topCats,
+    revenue: t.revenue,
+    expense: t.expense,
+    netProfit: t.netProfit,
+    riskFlags,
+  });
+
   // Never show skeletons once the active dataset's rows are in hand — real figures
   // beat placeholders even while the background summary is still refreshing.
   const busy = (syncing || metrics.loading) && txns.length === 0;
