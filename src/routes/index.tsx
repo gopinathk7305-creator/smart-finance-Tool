@@ -127,6 +127,7 @@ function Dashboard() {
   const catsSubtitle = usingFallbackCats ? dyn.groupLabel : "Share of total spend";
 
   const toneIcon = { danger: AlertTriangle, warning: Info, success: CheckCircle2 };
+
   const chartsRef = useRef<HTMLDivElement>(null);
   const metrics = useActiveDatasetMetrics();
   const riskFlags = metrics.riskFlags || dyn.riskFlags;
@@ -389,7 +390,7 @@ function Dashboard() {
             <CardDescription>Auto-generated from current data</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {alerts.map((a) => {
+            {liveAlerts.map((a) => {
               const Icon = toneIcon[a.tone];
               const tone =
                 a.tone === "danger"
