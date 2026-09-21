@@ -676,7 +676,12 @@ function ForecastPage() {
             <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
               <div>
                 <CardTitle className="text-base">Baseline vs Scenario</CardTitle>
-                <CardDescription>Next twelve months</CardDescription>
+                <CardDescription>
+                  Next twelve months ·{" "}
+                  {result.history.months > 1
+                    ? `learned from ${result.history.months} months of your actuals (±${result.history.band95Pct.toFixed(1)}% first-month band)`
+                    : "not enough history yet — using a gentle default trend"}
+                </CardDescription>
               </div>
               <div className="flex items-center gap-2">
                 {tab === "profit" && (
@@ -805,6 +810,29 @@ function ForecastPage() {
                         stroke="transparent"
                         fill="#0284c7"
                         fillOpacity={0.12}
+                      />
+                    )}
+                    {band && (
+                      <Area
+                        type="monotone"
+                        dataKey="upper80"
+                        name="80% confidence"
+                        stroke="transparent"
+                        fill="#0284c7"
+                        fillOpacity={0.2}
+                      />
+                    )}
+                    {band && (
+                      <Area
+                        type="monotone"
+                        dataKey="lower80"
+                        name="80% lower"
+                        stroke="#0284c7"
+                        strokeOpacity={0.25}
+                        strokeWidth={1}
+                        fill="transparent"
+                        legendType="none"
+                        tooltipType="none"
                       />
                     )}
                     {band && (
