@@ -312,8 +312,9 @@ export function useAdaptiveDashboard(activeDatasetId?: string | null): AdaptiveD
       trendStacked,
       cumulative,
       cumulativeLabel,
-
+      breakdown,
       breakdownLabel,
+
       ready: rowCount > 0 && (trend.length > 0 || breakdown.length > 0),
     };
   }, [rows, activeDatasetId]);
