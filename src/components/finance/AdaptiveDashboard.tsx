@@ -55,6 +55,7 @@ export function AdaptiveDashboard({ profile }: { profile: Profile }) {
     schema,
     cumulative,
     cumulativeLabel,
+    finance,
   } = profile;
 
 
@@ -72,6 +73,121 @@ export function AdaptiveDashboard({ profile }: { profile: Profile }) {
           )}
         </CardContent>
       </Card>
+
+      {finance.ready && (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <KpiCard
+            label="Total Revenue"
+            value={compactMoney(finance.revenue)}
+            hint="Sum of detected credit/revenue rows"
+          />
+          <KpiCard
+            label="Total Expenses"
+            value={compactMoney(finance.expenses)}
+            hint="Sum of detected debit/expense rows"
+          />
+          <KpiCard
+            label="Net Profit Margin"
+            value={`${finance.margin.toFixed(1)}%`}
+            hint={`Net ${compactMoney(finance.netProfit)} on revenue`}
+          />
+          <KpiCard
+            label="Cash Runway"
+            value={`${finance.runwayMonths.toFixed(1)} mo`}
+            hint="Balance ÷ average monthly expense"
+          />
+        </div>
+      )}
+
+      {finance.monthly.length > 0 && (
+        <Card className="border-border shadow-card">
+          <CardHeader>
+            <CardTitle className="text-base">Monthly Revenue vs Expenses</CardTitle>
+            <CardDescription>Grouped from the dates in your active file</CardDescription>
+          </CardHeader>
+          <CardContent className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={finance.monthly} barGap={4}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={11} />
+                <YAxis
+                  tickFormatter={(v) => compactMoney(Number(v))}
+                  tickLine={false}
+                  axisLine={false}
+                  fontSize={11}
+                  width={64}
+                />
+                <Tooltip formatter={(v) => full.format(Number(v))} />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                <Bar dataKey="revenue" name="Revenue" fill="var(--primary)" radius={[4, 4, 0, 0]}>
+                  <LabelList
+                    dataKey="revenue"
+                    position="top"
+                    style={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                    formatter={(val: number) => compactMoney(Number(val))}
+                  />
+                </Bar>
+                <Bar dataKey="expenses" name="Expenses" fill="var(--danger)" radius={[4, 4, 0, 0]}>
+                  <LabelList
+                    dataKey="expenses"
+                    position="top"
+                    style={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                    formatter={(val: number) => compactMoney(Number(val))}
+                  />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {finance.topExpense.length > 0 && (
+        <Card className="border-border shadow-card">
+          <CardHeader>
+            <CardTitle className="text-base">Top 5 Expense Categories</CardTitle>
+            <CardDescription>By {finance.categoryLabel} in the active dataset</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-2">
+            <div className="h-[260px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={finance.topExpense}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={54}
+                    outerRadius={82}
+                    paddingAngle={2}
+                  >
+                    {finance.topExpense.map((_, i) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v) => full.format(Number(v))} />
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <ul className="space-y-2 self-center">
+              {finance.topExpense.map((c, i) => (
+                <li key={c.name} className="flex items-center gap-2 text-sm">
+                  <span
+                    className="size-2.5 shrink-0 rounded-full"
+                    style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}
+                  />
+                  <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {compactMoney(c.value)}
+                  </span>
+                  <Badge variant="secondary" className="font-mono text-[11px]">
+                    {c.share.toFixed(1)}%
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {kpis.map((k) => (

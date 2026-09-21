@@ -5,7 +5,7 @@
 
 import { useMemo } from "react";
 
-import { parseNum } from "@/lib/column-map";
+import { detectColumns, mapRowsToTransactions, parseNum } from "@/lib/column-map";
 import { useDatasetRaw } from "@/lib/dataset";
 import { distribution, inspectSchema, type SchemaInspection } from "@/lib/schema-inspector";
 
@@ -17,7 +17,27 @@ export interface AdaptiveKpi {
   raw?: number;
 }
 
+/** Finance-aware view derived from the active dataset's own columns. */
+export interface AdaptiveFinance {
+  /** true when revenue or expense rows were recognised */
+  ready: boolean;
+  revenue: number;
+  expenses: number;
+  netProfit: number;
+  /** ((revenue - expenses) / revenue) * 100, 0 when revenue is 0 */
+  margin: number;
+  /** balance / average monthly expense, 0 when there is no burn */
+  runwayMonths: number;
+  /** month-by-month revenue vs expense */
+  monthly: { month: string; revenue: number; expenses: number }[];
+  /** top 5 expense categories with their share of total expense */
+  topExpense: { name: string; value: number; share: number }[];
+  categoryLabel: string;
+}
+
 export interface AdaptiveDashboard {
+  /** finance KPIs and charts mapped from the detected revenue/expense columns */
+  finance: AdaptiveFinance;
   schema: SchemaInspection;
   rowCount: number;
   columnCount: number;
@@ -300,7 +320,54 @@ export function useAdaptiveDashboard(activeDatasetId?: string | null): AdaptiveD
         : `${titleCase(groupCol)} by record count`
       : "";
 
+    // ---- Finance view (revenue vs expense, categories, runway) -----------
+    const map = detectColumns(rows);
+    const txns = mapRowsToTransactions(rows, map);
+    const revenue = txns.reduce((s, t) => (t.type === "income" ? s + (Number(t.amount) || 0) : s), 0);
+    const expenses = txns.reduce((s, t) => (t.type === "expense" ? s + (Number(t.amount) || 0) : s), 0);
+    const monthMap = new Map<string, { revenue: number; expenses: number }>();
+    txns.forEach((t) => {
+      const key = monthOf(t.date);
+      if (!key) return;
+      const acc = monthMap.get(key) ?? { revenue: 0, expenses: 0 };
+      if (t.type === "income") acc.revenue += Number(t.amount) || 0;
+      else acc.expenses += Number(t.amount) || 0;
+      monthMap.set(key, acc);
+    });
+    const monthly = [...monthMap.entries()]
+      .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+      .map(([month, v]) => ({ month, revenue: v.revenue, expenses: v.expenses }));
+    const expenseMonths = monthly.filter((m) => m.expenses > 0).length;
+    const avgMonthlyExpense = expenseMonths > 0 ? expenses / expenseMonths : 0;
+    const balance = revenue - expenses;
+    const runwayMonths = avgMonthlyExpense > 0 && balance > 0 ? balance / avgMonthlyExpense : 0;
+    const catTotals = new Map<string, number>();
+    txns.forEach((t) => {
+      if (t.type !== "expense") return;
+      const name = String(t.category ?? "").trim() || "Uncategorised";
+      catTotals.set(name, (catTotals.get(name) ?? 0) + (Number(t.amount) || 0));
+    });
+    const topExpense = [...catTotals.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, value]) => ({
+        name,
+        value,
+        share: expenses > 0 ? (value / expenses) * 100 : 0,
+      }));
+
     return {
+      finance: {
+        ready: revenue > 0 || expenses > 0,
+        revenue,
+        expenses,
+        netProfit: balance,
+        margin: revenue > 0 ? ((revenue - expenses) / revenue) * 100 : 0,
+        runwayMonths,
+        monthly,
+        topExpense,
+        categoryLabel: map.category ? titleCase(map.category) : "Category",
+      },
       schema,
       rowCount,
       columnCount,
