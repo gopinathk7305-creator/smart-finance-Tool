@@ -323,8 +323,10 @@ export function runForecast(
       scenCash: Math.round(scenCash),
       cumulative: Math.round(cumulative),
       runway: burn <= 0 ? 24 : Math.max(0, Math.round((scenCash / burn) * 10) / 10),
-      lower: Math.round(scenProfit * (1 - bandWidth)),
-      upper: Math.round(scenProfit * (1 + bandWidth)),
+      lower: Math.round(scenProfit - Math.abs(scenProfit) * band95),
+      upper: Math.round(scenProfit + Math.abs(scenProfit) * band95),
+      lower80: Math.round(scenProfit - Math.abs(scenProfit) * band80),
+      upper80: Math.round(scenProfit + Math.abs(scenProfit) * band80),
     };
   });
 
