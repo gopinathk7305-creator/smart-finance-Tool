@@ -22,6 +22,10 @@ export interface BudgetApi {
   rows: BudgetTarget[];
   /** planned annual spend keyed by category name (lower-cased) */
   byCategory: Map<string, number>;
+  /** month-specific planned spend keyed by FY month label (Apr…Mar) */
+  byMonth: Map<string, number>;
+  /** planned spend from rows tagged "Annual" only */
+  annualTotal: number;
   plannedTotal: number;
   live: boolean;
   loading: boolean;
@@ -119,6 +123,8 @@ export function useBudget(fiscalYear?: string): BudgetApi {
   return {
     rows,
     byCategory,
+    byMonth,
+    annualTotal,
     plannedTotal: rows.reduce((s, r) => s + r.budgeted_amount, 0),
     live,
     loading,
