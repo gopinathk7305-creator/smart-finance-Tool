@@ -14,6 +14,8 @@ export interface BudgetDraft {
   category: string;
   department: string;
   budgeted_amount: number;
+  /** "Annual" or an FY month label (Apr…Mar) for a month-specific target. */
+  month?: string;
 }
 
 export interface BudgetApi {
