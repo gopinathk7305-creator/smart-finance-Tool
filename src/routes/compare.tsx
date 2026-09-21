@@ -227,7 +227,7 @@ function ComparePage() {
         <Card className="mt-4 border-border shadow-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <History className="size-4 text-brand" /> Version history — {activeBase}
+              <HistoryIcon className="size-4 text-brand" /> Version history — {activeBase}
             </CardTitle>
             <CardDescription>
               Every upload of this file is kept with its date. Pick a past version to compare it against the
