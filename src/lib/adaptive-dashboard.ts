@@ -5,7 +5,7 @@
 
 import { useMemo } from "react";
 
-import { parseNum } from "@/lib/column-map";
+import { detectColumns, mapRowsToTransactions, parseNum } from "@/lib/column-map";
 import { useDatasetRaw } from "@/lib/dataset";
 import { distribution, inspectSchema, type SchemaInspection } from "@/lib/schema-inspector";
 
@@ -17,7 +17,27 @@ export interface AdaptiveKpi {
   raw?: number;
 }
 
+/** Finance-aware view derived from the active dataset's own columns. */
+export interface AdaptiveFinance {
+  /** true when revenue or expense rows were recognised */
+  ready: boolean;
+  revenue: number;
+  expenses: number;
+  netProfit: number;
+  /** ((revenue - expenses) / revenue) * 100, 0 when revenue is 0 */
+  margin: number;
+  /** balance / average monthly expense, 0 when there is no burn */
+  runwayMonths: number;
+  /** month-by-month revenue vs expense */
+  monthly: { month: string; revenue: number; expenses: number }[];
+  /** top 5 expense categories with their share of total expense */
+  topExpense: { name: string; value: number; share: number }[];
+  categoryLabel: string;
+}
+
 export interface AdaptiveDashboard {
+  /** finance KPIs and charts mapped from the detected revenue/expense columns */
+  finance: AdaptiveFinance;
   schema: SchemaInspection;
   rowCount: number;
   columnCount: number;
