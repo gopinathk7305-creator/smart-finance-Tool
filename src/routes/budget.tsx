@@ -124,18 +124,22 @@ function BudgetPage() {
   // Monthly plan vs actual: the annual plan spread evenly across twelve months
   // against the real month-by-month spend from the active dataset.
   const monthlyPlan = useMemo(() => {
-    const perMonth = plannedTotal / 12;
+    const perMonth = budget.annualTotal / 12;
     return monthlySummary(txns).map((m) => {
-      const variance = m.expense - perMonth;
+      // A month-specific target wins over the annual plan spread evenly.
+      const target = budget.byMonth.get(m.month);
+      const plan = target ?? perMonth;
+      const variance = m.expense - plan;
       return {
         month: m.month,
-        plan: Math.round(perMonth),
+        plan: Math.round(plan),
+        custom: target !== undefined,
         actual: m.expense,
         variance,
-        variancePct: perMonth ? (variance / perMonth) * 100 : 0,
+        variancePct: plan ? (variance / plan) * 100 : 0,
       };
     });
-  }, [txns, plannedTotal]);
+  }, [txns, budget.annualTotal, budget.byMonth]);
 
   const submit = async () => {
     const value = Number(amount.replace(/[^0-9.]/g, ""));
