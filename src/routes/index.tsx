@@ -43,15 +43,17 @@ import { safeMargin } from "@/lib/column-map";
 import { useDataset } from "@/lib/dataset";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useDatasetRaw } from "@/lib/dataset";
+import { deriveAlerts } from "@/lib/live-alerts";
 import {
   actualsByCategory,
-  alerts,
   cashRunwayMonths,
   formatCompactCurrency,
   inr,
   monthlySummary,
   totals,
 } from "@/lib/finance-data";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
