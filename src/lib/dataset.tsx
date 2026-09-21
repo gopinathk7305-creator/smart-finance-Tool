@@ -230,6 +230,7 @@ function useDatasetInternal(fetchEnabled: boolean): Dataset {
     category: r.category ?? "",
     department: r.department ?? "",
     budgeted_amount: parseNum(r.budgeted_amount),
+    month: (r as { month?: string }).month ?? "Annual",
   }));
 
   const araps: ArApRecord[] = inOrg(combined.a).map((r) => ({
