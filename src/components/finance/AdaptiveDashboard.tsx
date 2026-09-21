@@ -1,4 +1,7 @@
 import {
+  Area,
+  AreaChart,
+
   Bar,
   BarChart,
   CartesianGrid,
@@ -41,7 +44,19 @@ const full = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 });
  * entirely from the columns present in the active dataset.
  */
 export function AdaptiveDashboard({ profile }: { profile: Profile }) {
-  const { kpis, trend, trendSeries, trendLabel, trendStacked, breakdown, breakdownLabel, schema } = profile;
+  const {
+    kpis,
+    trend,
+    trendSeries,
+    trendLabel,
+    trendStacked,
+    breakdown,
+    breakdownLabel,
+    schema,
+    cumulative,
+    cumulativeLabel,
+  } = profile;
+
 
   return (
     <div className="space-y-4">
@@ -160,6 +175,53 @@ export function AdaptiveDashboard({ profile }: { profile: Profile }) {
           </Card>
         )}
       </div>
+
+      {cumulative.length > 1 && (
+        <Card className="border-border shadow-card">
+          <CardHeader>
+            <CardTitle className="text-base">{cumulativeLabel || "Cumulative Trend"}</CardTitle>
+            <CardDescription>Running total in chronological order</CardDescription>
+          </CardHeader>
+          <CardContent className="h-[260px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={cumulative}>
+                <defs>
+                  <linearGradient id="adaptiveCumulative" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--brand)" stopOpacity={0.45} />
+                    <stop offset="100%" stopColor="var(--brand)" stopOpacity={0.04} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis dataKey="bucket" tickLine={false} axisLine={false} fontSize={11} />
+                <YAxis
+                  tickFormatter={(v) => compactMoney(Number(v))}
+                  tickLine={false}
+                  axisLine={false}
+                  fontSize={11}
+                  width={64}
+                />
+                <Tooltip formatter={(v) => full.format(Number(v))} />
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  name="Cumulative"
+                  stroke="var(--brand)"
+                  strokeWidth={2}
+                  fill="url(#adaptiveCumulative)"
+                >
+                  <LabelList
+                    dataKey="value"
+                    position="top"
+                    style={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                    formatter={(val: number) => compactMoney(Number(val))}
+                  />
+                </Area>
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
     </div>
   );
 }
