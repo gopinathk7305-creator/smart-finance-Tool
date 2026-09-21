@@ -618,6 +618,24 @@ function UploadPage() {
   const warnings = parsed?.issues.filter((i) => i.severity === "warning") ?? [];
   const fixes = parsed?.issues.filter((i) => i.severity === "fixed") ?? [];
 
+  // Preview sample for the pre-upload review: first 500 parsed rows, showing the
+  // cleaned canonical fields plus every extra column the file carried.
+  const previewRows = useMemo(
+    () =>
+      ((parsed?.rows ?? []) as Record<string, unknown>[]).slice(0, 500).map((r) => {
+        const { raw_data: raw, ...canonical } = r;
+        const extras = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+        const out: Record<string, unknown> = { ...canonical };
+        Object.entries(extras).forEach(([k, v]) => {
+          const key = k.trim().toLowerCase().replace(/\s+/g, "_");
+          if (!(key in out)) out[key] = v;
+        });
+        return out;
+      }),
+    [parsed],
+  );
+  const previewColumns = useMemo(() => collectColumns(previewRows), [previewRows]);
+
   const highlights = useMemo(() => {
     if (!parsed || !detection) return [] as string[];
     const rows = parsed.rows as Record<string, unknown>[];
@@ -925,7 +943,7 @@ function UploadPage() {
 
       <Dialog open={mappedOpen} onOpenChange={setMappedOpen}>
 
-        <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-3xl">
+        <DialogContent className="max-h-[90vh] max-w-[95vw] overflow-y-auto sm:max-w-[95vw]">
           <DialogHeader>
             <DialogTitle>⚡ Dataset auto-detected &amp; successfully processed</DialogTitle>
             <DialogDescription>
@@ -966,6 +984,27 @@ function UploadPage() {
                     </li>
                   ))}
                 </ul>
+              </div>
+
+              {/* Preview step: every parsed column and value, before anything is uploaded. */}
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Data preview — parsed values
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {parsed.rows.length.toLocaleString("en-IN")} rows ready ·{" "}
+                    {previewColumns.length} columns · showing the first{" "}
+                    {Math.min(previewRows.length, parsed.rows.length).toLocaleString("en-IN")}
+                  </p>
+                </div>
+                {previewRows.length === 0 ? (
+                  <p className="rounded-md border border-border p-3 text-sm text-muted-foreground">
+                    No rows to preview.
+                  </p>
+                ) : (
+                  <DataGrid rows={previewRows} columns={previewColumns} maxHeight={340} />
+                )}
               </div>
 
               {parsed.issues.length === 0 ? (
