@@ -501,7 +501,7 @@ function UploadPage() {
     if (!complete) {
       cacheLocalDatasetRows(queryClient, user.id, bucket, rowsWithIds);
       console.error(
-        `[upload] ${unsynced.length} of ${totalRows} rows un-synced for ${parsed.fileName}`,
+        `[upload] ${unsynced.length} of ${totalRows} rows un-synced for ${versionedName}`,
         { errors: Array.from(new Set(errors)), unsyncedRows: unsynced },
       );
     }
@@ -512,7 +512,7 @@ function UploadPage() {
       const { error: metadataError } = await supabase.from("uploaded_datasets").insert({
         user_id: user.id,
         org_id: scopeOrgId,
-        file_name: parsed.fileName,
+        file_name: versionedName,
         dataset_key: detection.key,
         table_name: detection.table,
         row_count: syncedRows,
@@ -543,7 +543,7 @@ function UploadPage() {
       toast.warning(
         `${syncedRows.toLocaleString("en-IN")} of ${totalRows.toLocaleString("en-IN")} rows saved — ${unsynced.length.toLocaleString("en-IN")} could not be stored (${timedOut ? "the cloud database took too long to respond" : failure}). The rest is available locally across every module.`,
       );
-      window.setTimeout(() => openInsights(parsed.fileName), 300);
+      window.setTimeout(() => openInsights(versionedName), 300);
       return;
     }
 
@@ -552,7 +552,7 @@ function UploadPage() {
     await refreshLists();
     setMappedOpen(false);
     toast.success(`All ${totalRows.toLocaleString("en-IN")} rows synced — every module refreshed`);
-    window.setTimeout(() => openInsights(parsed.fileName), 900);
+    window.setTimeout(() => openInsights(versionedName), 900);
   };
 
 
