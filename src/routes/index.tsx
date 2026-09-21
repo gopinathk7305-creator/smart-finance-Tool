@@ -28,6 +28,7 @@ import {
 import { useMemo, useRef } from "react";
 
 import { sumChunked } from "@/lib/aggregate";
+import { useActiveMonthlySeries } from "@/lib/monthly-cache";
 
 import { ActiveDatasetBanner } from "@/components/finance/ActiveDatasetBanner";
 import { AdaptiveDashboard } from "@/components/finance/AdaptiveDashboard";
@@ -97,7 +98,10 @@ function Dashboard() {
   }, [mapped, dyn.txns, recordsMode, activeId]);
 
   // Row-level maths runs once per dataset change, in chunks of 2,000 rows.
-  const series = useMemo(() => monthlySummary(txns), [txns]);
+  // Revenue vs Expense and the cash balance come from the precomputed monthly
+  // table for this dataset (12 rows); browser maths is only the fallback.
+  const clientSeries = useMemo(() => monthlySummary(txns), [txns]);
+  const { series } = useActiveMonthlySeries(clientSeries);
   const t = useMemo(() => totals(txns), [txns]);
   const runway = useMemo(() => cashRunwayMonths(txns), [txns]);
 
