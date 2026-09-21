@@ -17,6 +17,10 @@ const ACTIVE_KEY = "financeiq.active-dataset";
 export interface DatasetSummary {
   id: string;
   file_name: string;
+  /** name of the original file, shared by every version of it */
+  base_name: string;
+  /** 1 for the first upload of a file, 2 for the next re-upload, and so on */
+  version: number;
   table_name: string;
   dataset_key: string;
   row_count: number;

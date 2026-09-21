@@ -803,7 +803,14 @@ function UploadPage() {
                 <TableBody>
                   {(stored.data ?? []).map((ds) => (
                     <TableRow key={ds.id}>
-                      <TableCell className="font-medium">{ds.file_name}</TableCell>
+                      <TableCell className="font-medium">
+                        <span className="flex flex-wrap items-center gap-1.5">
+                          {ds.base_name || ds.file_name}
+                          <Badge variant="secondary" className="text-[11px]">
+                            Version {ds.version ?? 1}
+                          </Badge>
+                        </span>
+                      </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {ds.modules.map((m) => (
