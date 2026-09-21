@@ -95,6 +95,8 @@ type TableName = Detection["table"];
 interface StoredDataset {
   id: string;
   file_name: string;
+  base_name: string;
+  version: number;
   table_name: TableName;
   dataset_key: string;
   row_count: number;
