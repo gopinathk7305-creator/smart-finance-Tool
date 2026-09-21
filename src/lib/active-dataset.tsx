@@ -17,6 +17,10 @@ const ACTIVE_KEY = "financeiq.active-dataset";
 export interface DatasetSummary {
   id: string;
   file_name: string;
+  /** name of the original file, shared by every version of it */
+  base_name: string;
+  /** 1 for the first upload of a file, 2 for the next re-upload, and so on */
+  version: number;
   table_name: string;
   dataset_key: string;
   row_count: number;
@@ -68,7 +72,9 @@ export function ActiveDatasetProvider({ children }: { children: ReactNode }) {
     queryFn: async () => {
       const { data: rows } = await supabase
         .from("uploaded_datasets")
-        .select("id,file_name,table_name,dataset_key,row_count,modules,column_names,created_at")
+        .select(
+          "id,file_name,base_name,version,table_name,dataset_key,row_count,modules,column_names,created_at",
+        )
         .eq("user_id", user!.id)
         .order("created_at", { ascending: false });
       return (rows ?? []) as unknown as DatasetSummary[];

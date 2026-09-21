@@ -57,6 +57,13 @@
       "when": 1789983929034,
       "tag": "0007_dataset_monthly_precompute",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789985673540,
+      "tag": "0008_dataset_versions",
+      "breakpoints": true
     }
   ]
 }

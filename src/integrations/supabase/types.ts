@@ -583,6 +583,7 @@ export type Database = {
       }
       uploaded_datasets: {
         Row: {
+          base_name: string
           column_names: string[]
           created_at: string
           dataset_key: string
@@ -594,8 +595,10 @@ export type Database = {
           status: string
           table_name: string
           user_id: string
+          version: number
         }
         Insert: {
+          base_name?: string
           column_names?: string[]
           created_at?: string
           dataset_key: string
@@ -607,8 +610,10 @@ export type Database = {
           status?: string
           table_name: string
           user_id: string
+          version?: number
         }
         Update: {
+          base_name?: string
           column_names?: string[]
           created_at?: string
           dataset_key?: string
@@ -620,6 +625,7 @@ export type Database = {
           status?: string
           table_name?: string
           user_id?: string
+          version?: number
         }
         Relationships: []
       }

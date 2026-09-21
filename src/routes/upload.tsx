@@ -95,6 +95,8 @@ type TableName = Detection["table"];
 interface StoredDataset {
   id: string;
   file_name: string;
+  base_name: string;
+  version: number;
   table_name: TableName;
   dataset_key: string;
   row_count: number;
@@ -376,12 +378,30 @@ function UploadPage() {
   const commit = async () => {
     if (!parsed || !detection || !parsed.rows.length || !user) return;
     setCommitting(true);
+
+    // Version history: re-uploading the same file keeps the earlier upload
+    // intact and stores this one as the next version, so past versions can be
+    // compared against the active dataset.
+    const baseName = parsed.fileName;
+    const { data: priorVersions } = await supabase
+      .from("uploaded_datasets")
+      .select("version")
+      .eq("user_id", user.id)
+      .or(`base_name.eq.${baseName},file_name.eq.${baseName}`);
+    const versionNo =
+      (priorVersions ?? []).reduce((max, r) => Math.max(max, Number(r.version) || 1), 0) + 1;
+    const versionedName = versionNo === 1 ? baseName : `${baseName} (v${versionNo})`;
+
     // Files often carry their own "id" column (1, 2, 3…) which the database
     // rejects as a UUID and silently aborts the whole sync. Keep the original
     // value inside raw_data and always store a valid UUID primary key.
     const rowsWithIds = parsed.rows.map((row) => {
       const candidate = String(row["id"] ?? "");
-      return { ...row, id: UUID_RE.test(candidate) ? candidate : crypto.randomUUID() };
+      return {
+        ...row,
+        source_file: versionedName,
+        id: UUID_RE.test(candidate) ? candidate : crypto.randomUUID(),
+      };
     });
 
     const batches: Record<string, unknown>[][] = [];
@@ -483,7 +503,7 @@ function UploadPage() {
     if (!complete) {
       cacheLocalDatasetRows(queryClient, user.id, bucket, rowsWithIds);
       console.error(
-        `[upload] ${unsynced.length} of ${totalRows} rows un-synced for ${parsed.fileName}`,
+        `[upload] ${unsynced.length} of ${totalRows} rows un-synced for ${versionedName}`,
         { errors: Array.from(new Set(errors)), unsyncedRows: unsynced },
       );
     }
@@ -494,12 +514,14 @@ function UploadPage() {
       const { error: metadataError } = await supabase.from("uploaded_datasets").insert({
         user_id: user.id,
         org_id: scopeOrgId,
-        file_name: parsed.fileName,
+        file_name: versionedName,
         dataset_key: detection.key,
         table_name: detection.table,
         row_count: syncedRows,
         column_names: detection.columns,
         modules: detection.modules,
+        base_name: baseName,
+        version: versionNo,
         status: complete ? "synced" : "partial",
       } as never);
       if (metadataError)
@@ -525,7 +547,7 @@ function UploadPage() {
       toast.warning(
         `${syncedRows.toLocaleString("en-IN")} of ${totalRows.toLocaleString("en-IN")} rows saved — ${unsynced.length.toLocaleString("en-IN")} could not be stored (${timedOut ? "the cloud database took too long to respond" : failure}). The rest is available locally across every module.`,
       );
-      window.setTimeout(() => openInsights(parsed.fileName), 300);
+      window.setTimeout(() => openInsights(versionedName), 300);
       return;
     }
 
@@ -534,7 +556,7 @@ function UploadPage() {
     await refreshLists();
     setMappedOpen(false);
     toast.success(`All ${totalRows.toLocaleString("en-IN")} rows synced — every module refreshed`);
-    window.setTimeout(() => openInsights(parsed.fileName), 900);
+    window.setTimeout(() => openInsights(versionedName), 900);
   };
 
 
@@ -781,7 +803,14 @@ function UploadPage() {
                 <TableBody>
                   {(stored.data ?? []).map((ds) => (
                     <TableRow key={ds.id}>
-                      <TableCell className="font-medium">{ds.file_name}</TableCell>
+                      <TableCell className="font-medium">
+                        <span className="flex flex-wrap items-center gap-1.5">
+                          {ds.base_name || ds.file_name}
+                          <Badge variant="secondary" className="text-[11px]">
+                            Version {ds.version ?? 1}
+                          </Badge>
+                        </span>
+                      </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {ds.modules.map((m) => (

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRightLeft, Loader2 } from "lucide-react";
+import { ArrowRightLeft, History as HistoryIcon, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   Bar,
@@ -17,6 +17,8 @@ import {
 
 import { AppShell } from "@/components/finance/AppShell";
 import { KpiCard } from "@/components/finance/KpiCard";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -91,9 +93,18 @@ function useDatasetTotals(sourceFile: string | null) {
 const EMPTY = { revenue: 0, expenses: 0, netProfit: 0, rows: 0 };
 
 function ComparePage() {
-  const { datasets, activeFile } = useActiveDataset();
+  const { datasets, active, activeFile } = useActiveDataset();
   const [left, setLeft] = useState<string | null>(null);
   const [right, setRight] = useState<string | null>(null);
+
+  // Every dated upload of the active file, newest first.
+  const activeBase = active?.base_name || active?.file_name || null;
+  const versions = useMemo(() => {
+    if (!activeBase) return [];
+    return datasets
+      .filter((d) => (d.base_name || d.file_name) === activeBase)
+      .sort((x, y) => (y.version ?? 1) - (x.version ?? 1));
+  }, [datasets, activeBase]);
 
   // Default: the active dataset on the left, the next most recent on the right.
   useEffect(() => {
@@ -211,6 +222,65 @@ function ComparePage() {
           )}
         </CardContent>
       </Card>
+
+      {versions.length > 0 && (
+        <Card className="mt-4 border-border shadow-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <HistoryIcon className="size-4 text-brand" /> Version history — {activeBase}
+            </CardTitle>
+            <CardDescription>
+              Every upload of this file is kept with its date. Pick a past version to compare it against the
+              one you have active.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Version</TableHead>
+                  <TableHead>Uploaded</TableHead>
+                  <TableHead className="text-right">Rows</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {versions.map((v) => (
+                  <TableRow key={v.id}>
+                    <TableCell className="font-medium">
+                      <span className="flex items-center gap-2">
+                        Version {v.version ?? 1}
+                        {v.file_name === activeFile && (
+                          <Badge className="bg-success-soft text-success">Active</Badge>
+                        )}
+                      </span>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {new Date(v.created_at).toLocaleString("en-IN")}
+                    </TableCell>
+                    <TableCell className="text-right font-mono tabular-nums">
+                      {(v.row_count ?? 0).toLocaleString("en-IN")}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={v.file_name === activeFile}
+                        onClick={() => {
+                          setLeft(v.file_name);
+                          setRight(activeFile ?? v.file_name);
+                        }}
+                      >
+                        Compare with active
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
