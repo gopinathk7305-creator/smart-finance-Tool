@@ -1,4 +1,7 @@
 import {
+  Area,
+  AreaChart,
+
   Bar,
   BarChart,
   CartesianGrid,
@@ -41,7 +44,19 @@ const full = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 });
  * entirely from the columns present in the active dataset.
  */
 export function AdaptiveDashboard({ profile }: { profile: Profile }) {
-  const { kpis, trend, trendSeries, trendLabel, trendStacked, breakdown, breakdownLabel, schema } = profile;
+  const {
+    kpis,
+    trend,
+    trendSeries,
+    trendLabel,
+    trendStacked,
+    breakdown,
+    breakdownLabel,
+    schema,
+    cumulative,
+    cumulativeLabel,
+  } = profile;
+
 
   return (
     <div className="space-y-4">
