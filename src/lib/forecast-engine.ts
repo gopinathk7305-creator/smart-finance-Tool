@@ -232,6 +232,11 @@ export function runForecast(
   const lastRev = avg((s) => s.revenue) || 1;
   const lastExp = avg((s) => s.expense) || 1;
 
+  // Learn the trend from the dataset's own history instead of a fixed assumption.
+  const revStats = historyStats(sample.map((s) => s.revenue));
+  const expStats = historyStats(sample.map((s) => s.expense));
+  const profitStats = historyStats(sample.map((s) => s.profit));
+
   // Monthly people cost taken from the user's own payroll categories in the ledger.
   const payrollNames = new Set(payrollCategories.map((c) => c.toLowerCase()));
   const ledgerPayroll =
