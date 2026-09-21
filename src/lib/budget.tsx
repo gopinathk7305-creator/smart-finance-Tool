@@ -53,6 +53,22 @@ export function useBudget(fiscalYear?: string): BudgetApi {
     return map;
   }, [rows]);
 
+  // Month-specific targets (rows tagged with an FY month rather than "Annual").
+  const byMonth = useMemo(() => {
+    const map = new Map<string, number>();
+    rows.forEach((r) => {
+      const m = r.month ?? "Annual";
+      if (m === "Annual") return;
+      map.set(m, (map.get(m) ?? 0) + r.budgeted_amount);
+    });
+    return map;
+  }, [rows]);
+
+  const annualTotal = useMemo(
+    () => rows.filter((r) => (r.month ?? "Annual") === "Annual").reduce((s, r) => s + r.budgeted_amount, 0),
+    [rows],
+  );
+
   const invalidate = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ["dataset"] });
   }, [queryClient]);
