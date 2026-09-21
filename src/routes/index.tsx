@@ -28,7 +28,9 @@ import {
   YAxis,
 } from "recharts";
 
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
+
+import { sumChunked } from "@/lib/aggregate";
 
 import { ActiveDatasetBanner } from "@/components/finance/ActiveDatasetBanner";
 import { AdaptiveDashboard } from "@/components/finance/AdaptiveDashboard";
