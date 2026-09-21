@@ -310,7 +310,9 @@ export function useAdaptiveDashboard(activeDatasetId?: string | null): AdaptiveD
       trendKey,
       trendLabel,
       trendStacked,
-      breakdown,
+      cumulative,
+      cumulativeLabel,
+
       breakdownLabel,
       ready: rowCount > 0 && (trend.length > 0 || breakdown.length > 0),
     };
