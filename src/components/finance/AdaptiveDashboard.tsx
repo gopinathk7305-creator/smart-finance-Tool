@@ -55,6 +55,7 @@ export function AdaptiveDashboard({ profile }: { profile: Profile }) {
     schema,
     cumulative,
     cumulativeLabel,
+    finance,
   } = profile;
 
 
