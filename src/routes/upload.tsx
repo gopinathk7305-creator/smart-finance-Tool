@@ -376,12 +376,30 @@ function UploadPage() {
   const commit = async () => {
     if (!parsed || !detection || !parsed.rows.length || !user) return;
     setCommitting(true);
+
+    // Version history: re-uploading the same file keeps the earlier upload
+    // intact and stores this one as the next version, so past versions can be
+    // compared against the active dataset.
+    const baseName = parsed.fileName;
+    const { data: priorVersions } = await supabase
+      .from("uploaded_datasets")
+      .select("version")
+      .eq("user_id", user.id)
+      .or(`base_name.eq.${baseName},file_name.eq.${baseName}`);
+    const versionNo =
+      (priorVersions ?? []).reduce((max, r) => Math.max(max, Number(r.version) || 1), 0) + 1;
+    const versionedName = versionNo === 1 ? baseName : `${baseName} (v${versionNo})`;
+
     // Files often carry their own "id" column (1, 2, 3…) which the database
     // rejects as a UUID and silently aborts the whole sync. Keep the original
     // value inside raw_data and always store a valid UUID primary key.
     const rowsWithIds = parsed.rows.map((row) => {
       const candidate = String(row["id"] ?? "");
-      return { ...row, id: UUID_RE.test(candidate) ? candidate : crypto.randomUUID() };
+      return {
+        ...row,
+        source_file: versionedName,
+        id: UUID_RE.test(candidate) ? candidate : crypto.randomUUID(),
+      };
     });
 
     const batches: Record<string, unknown>[][] = [];
