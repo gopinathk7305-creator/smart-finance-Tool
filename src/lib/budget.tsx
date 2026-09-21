@@ -67,6 +67,7 @@ export function useBudget(fiscalYear?: string): BudgetApi {
         category: draft.category,
         department: draft.department,
         budgeted_amount: draft.budgeted_amount,
+        month: draft.month ?? "Annual",
         source_file: "manual entry",
       });
       if (error) throw error;
