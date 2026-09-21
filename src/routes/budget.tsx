@@ -158,10 +158,13 @@ function BudgetPage() {
         category,
         department: department || "General",
         budgeted_amount: value,
+        month,
       });
       setAmount("");
       setDepartment("");
-      toast.success(`${category} budget of ${inr(value)} saved`);
+      toast.success(
+        `${category} budget of ${inr(value)} saved${month === "Annual" ? "" : ` for ${month}`}`,
+      );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not save that budget line.");
     }
@@ -268,7 +271,7 @@ function BudgetPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 md:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-5">
             <div className="space-y-1.5">
               <Label htmlFor="budget-category" className="text-xs">
                 Category
@@ -309,6 +312,24 @@ function BudgetPage() {
                 onChange={(e) => setAmount(e.target.value)}
                 className="bg-background"
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="budget-month" className="text-xs">
+                Applies to
+              </Label>
+              <Select value={month} onValueChange={setMonth}>
+                <SelectTrigger id="budget-month" className="bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Annual">Whole year</SelectItem>
+                  {FY_MONTHS.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {m} only
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex items-end">
               <Button className="w-full" disabled={budget.saving} onClick={() => void submit()}>
