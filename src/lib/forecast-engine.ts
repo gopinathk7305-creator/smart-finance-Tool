@@ -203,6 +203,16 @@ export interface ForecastResult {
   netMargin: number;
   payrollImpact: number;
   cashImpact: number;
+  /** statistics learned from the active dataset's historical months */
+  history: {
+    revenue: HistoryStats;
+    expense: HistoryStats;
+    profit: HistoryStats;
+    /** months of actuals the projection learned from */
+    months: number;
+    /** 95% band half-width for the first projected month, as a percentage */
+    band95Pct: number;
+  };
 }
 
 /**
