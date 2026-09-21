@@ -376,7 +376,8 @@ function BudgetPage() {
         <CardHeader>
           <CardTitle className="text-base">Monthly Budget vs Actual</CardTitle>
           <CardDescription>
-            Annual plan spread evenly ({inr(plannedTotal / 12, true)} a month) against real monthly spend
+            Yearly plan spread evenly ({inr(budget.annualTotal / 12, true)} a month), replaced by any
+            month-specific target you set, against real monthly spend
           </CardDescription>
         </CardHeader>
         <CardContent className="h-[320px]">
