@@ -14,7 +14,7 @@ import {
 } from "recharts";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { KpiCard } from "@/components/finance/KpiCard";
+import { AutoDiscoveryKpis } from "@/components/finance/AutoDiscoveryKpis";
 import { compactMoney } from "@/lib/adaptive-dashboard";
 import type { SchemaDiscovery } from "@/lib/schema-discovery";
 
@@ -31,11 +31,7 @@ export function AdaptedDashboard({ profile }: { profile: SchemaDiscovery }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        {kpis.map((k) => (
-          <KpiCard key={k.label} label={k.label} value={k.value} {...(k.hint ? { hint: k.hint } : {})} />
-        ))}
-      </div>
+      <AutoDiscoveryKpis kpis={kpis} />
 
       <div className="grid gap-4 lg:grid-cols-3">
         {monthly.length > 0 && (

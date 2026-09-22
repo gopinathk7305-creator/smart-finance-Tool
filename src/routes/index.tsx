@@ -2,15 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   AlertTriangle,
   CheckCircle2,
-  Columns3,
   Info,
-  Rows3,
-  Landmark,
-  Scale,
-  ShieldAlert,
-  TrendingDown,
-  TrendingUp,
-  Wallet,
 } from "lucide-react";
 import {
   Area,
@@ -32,15 +24,12 @@ import { sumChunked } from "@/lib/aggregate";
 import { useActiveMonthlySeries } from "@/lib/monthly-cache";
 
 import { ActiveDatasetBanner } from "@/components/finance/ActiveDatasetBanner";
-import { AdaptiveDashboard } from "@/components/finance/AdaptiveDashboard";
 import { AdaptedDashboard } from "@/components/finance/AdaptedDashboard";
+import { AutoDiscoveryKpis } from "@/components/finance/AutoDiscoveryKpis";
 import { useSchemaDiscovery } from "@/lib/schema-discovery";
 import { AiReportButton } from "@/components/finance/AiReportButton";
 import { AppShell } from "@/components/finance/AppShell";
-import { KpiCard } from "@/components/finance/KpiCard";
 import { useActiveDataset } from "@/lib/active-dataset";
-import { FISCAL_YEARS, useBudget } from "@/lib/budget";
-import { useAdaptiveDashboard } from "@/lib/adaptive-dashboard";
 import { useActiveDatasetMetrics } from "@/lib/dataset-metrics";
 import { useDynamicDashboard } from "@/lib/dynamic-dashboard";
 import { safeMargin } from "@/lib/column-map";
@@ -86,9 +75,6 @@ function Dashboard() {
   const { txns: mapped, live } = useDataset();
   const { activeId, syncing } = useActiveDataset();
   const dyn = useDynamicDashboard(activeId);
-  // Schema-driven engine: any dataset whose columns aren't recognisable finance
-  // fields still gets KPI cards and charts built from its own schema.
-  const adaptive = useAdaptiveDashboard(activeId);
   // Whenever the active dataset's own rows carry usable money columns we bind the
   // executive dashboard straight to those records; the schema-driven adaptive view
   // is only a fallback for datasets with no recognisable monetary fields.
@@ -97,7 +83,6 @@ function Dashboard() {
   const discovery = useSchemaDiscovery(activeId);
   const adaptedMode = discovery.ready;
   const recordsMode = dyn.usable && dyn.rowCount > 0;
-  const adaptiveMode = adaptive.ready && !recordsMode && !adaptedMode;
 
   // Canonical columns first; if the uploaded file used its own header names the
   // auto-mapper's normalised rows drive every figure instead.
@@ -137,22 +122,6 @@ function Dashboard() {
       .map(([name, value]) => ({ name, value }));
     return canonicalCats.length === 0 ? dyn.topGroups : canonicalCats;
   }, [txns, dyn.topGroups]);
-
-  // Budget variance headline: planned spend for the current fiscal year against
-  // real spend on the same categories (all spend when no category matches).
-  const budget = useBudget(FISCAL_YEARS[0]);
-  const budgetView = useMemo(() => {
-    const planned = budget.plannedTotal;
-    if (planned <= 0) return null;
-    const actualsMap = actualsByCategory(txns);
-    let actual = 0;
-    budget.rows.forEach((b) => {
-      actual += actualsMap.get(b.category) ?? 0;
-    });
-    if (actual === 0) actual = t.expense;
-    const variance = actual - planned;
-    return { planned, actual, variance, pct: planned ? (variance / planned) * 100 : 0 };
-  }, [budget.plannedTotal, budget.rows, txns, t.expense]);
 
   const toneIcon = { danger: AlertTriangle, warning: Info, success: CheckCircle2 };
 
@@ -232,8 +201,6 @@ function Dashboard() {
       )}
       {adaptedMode ? (
         <AdaptedDashboard profile={discovery} />
-      ) : adaptiveMode ? (
-        <AdaptiveDashboard profile={adaptive} />
       ) : (
       <>
       {busy ? (
@@ -243,75 +210,7 @@ function Dashboard() {
           ))}
         </div>
       ) : (
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <KpiCard
-          label="Total Revenue"
-          value={inr(t.revenue, true)}
-          delta={revDelta}
-          hint="H2 vs H1"
-          icon={TrendingUp}
-          tone="success"
-        />
-        <KpiCard
-          label="Total Expenses"
-          value={inr(t.expense, true)}
-          delta={expDelta}
-          hint="H2 vs H1"
-          icon={TrendingDown}
-          tone="danger"
-          invertDelta
-        />
-        <KpiCard
-          label="Net Profit Margin"
-          value={`${margin.toFixed(1)}%`}
-          hint={margin > 10 ? "Healthy" : "Watch closely"}
-          icon={Landmark}
-          tone={margin > 10 ? "success" : "warning"}
-        />
-        <KpiCard
-          label="Cash Runway"
-          value={Number.isFinite(runway) ? `${runway.toFixed(1)} mo` : "Cash positive"}
-          hint="At current burn rate"
-          icon={Wallet}
-          tone="neutral"
-        />
-        <KpiCard
-          label="Audit & Risk Flags"
-          value={`${riskFlags}`}
-          hint="Duplicates & overdue items"
-          icon={ShieldAlert}
-          tone={riskFlags > 0 ? "warning" : "success"}
-        />
-        {budgetView && (
-          <KpiCard
-            label="Budget Variance"
-            value={`${budgetView.variance >= 0 ? "+" : "−"}${inr(Math.abs(budgetView.variance), true)}`}
-            delta={budgetView.pct}
-            invertDelta
-            hint={`plan ${inr(budgetView.planned, true)} · actual ${inr(budgetView.actual, true)}`}
-            icon={Scale}
-            tone={budgetView.variance > 0 ? "danger" : "success"}
-          />
-        )}
-        {recordsMode && (
-          <>
-            <KpiCard
-              label="Records Loaded"
-              value={dyn.rowCount.toLocaleString("en-IN")}
-              hint="Rows in the active dataset"
-              icon={Rows3}
-              tone="neutral"
-            />
-            <KpiCard
-              label="Active Columns"
-              value={`${dyn.columnCount}`}
-              hint="Fields detected in this file"
-              icon={Columns3}
-              tone="neutral"
-            />
-          </>
-        )}
-      </div>
+      <AutoDiscoveryKpis kpis={discovery.kpis} />
       )}
 
 
