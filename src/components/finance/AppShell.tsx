@@ -14,6 +14,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Target,
+  RefreshCw,
   TrendingUp,
   UploadCloud,
   Users,
@@ -83,7 +84,15 @@ export function AppShell({
   const { datasets, activeId, setActiveId, active } = useActiveDataset();
   const { preset, custom, range, setPreset, setCustom, resetRange } = useWorkspace();
   const { outOfRange } = useDatasetPeek();
+  const [refreshing, setRefreshing] = useState(false);
   const fy = fiscalYearStart();
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await queryClient.invalidateQueries();
+    toast.success("Dashboard refreshed with latest dataset metrics.");
+    window.setTimeout(() => setRefreshing(false), 800);
+  };
 
   useEffect(() => {
     if (!loading && !user && !demoMode) void navigate({ to: "/login", replace: true });
@@ -164,6 +173,17 @@ export function AppShell({
           </div>
 
           <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 bg-background font-medium"
+              disabled={refreshing}
+              title="Refresh Page & Recalculate Metrics"
+              onClick={handleRefresh}
+            >
+              <RefreshCw className={cn("size-4 text-primary", refreshing && "animate-spin")} />
+              <span className="hidden lg:inline">Refresh</span>
+            </Button>
             <Select
               value={preset}
               onValueChange={(v) => setPreset(v as RangePreset)}
