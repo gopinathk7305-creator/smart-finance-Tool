@@ -34,6 +34,7 @@ import { useActiveMonthlySeries } from "@/lib/monthly-cache";
 import { ActiveDatasetBanner } from "@/components/finance/ActiveDatasetBanner";
 import { AdaptiveDashboard } from "@/components/finance/AdaptiveDashboard";
 import { AdaptedDashboard } from "@/components/finance/AdaptedDashboard";
+import { AutoDiscoveryKpis } from "@/components/finance/AutoDiscoveryKpis";
 import { useSchemaDiscovery } from "@/lib/schema-discovery";
 import { AiReportButton } from "@/components/finance/AiReportButton";
 import { AppShell } from "@/components/finance/AppShell";
@@ -243,75 +244,7 @@ function Dashboard() {
           ))}
         </div>
       ) : (
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <KpiCard
-          label="Total Revenue"
-          value={inr(t.revenue, true)}
-          delta={revDelta}
-          hint="H2 vs H1"
-          icon={TrendingUp}
-          tone="success"
-        />
-        <KpiCard
-          label="Total Expenses"
-          value={inr(t.expense, true)}
-          delta={expDelta}
-          hint="H2 vs H1"
-          icon={TrendingDown}
-          tone="danger"
-          invertDelta
-        />
-        <KpiCard
-          label="Net Profit Margin"
-          value={`${margin.toFixed(1)}%`}
-          hint={margin > 10 ? "Healthy" : "Watch closely"}
-          icon={Landmark}
-          tone={margin > 10 ? "success" : "warning"}
-        />
-        <KpiCard
-          label="Cash Runway"
-          value={Number.isFinite(runway) ? `${runway.toFixed(1)} mo` : "Cash positive"}
-          hint="At current burn rate"
-          icon={Wallet}
-          tone="neutral"
-        />
-        <KpiCard
-          label="Audit & Risk Flags"
-          value={`${riskFlags}`}
-          hint="Duplicates & overdue items"
-          icon={ShieldAlert}
-          tone={riskFlags > 0 ? "warning" : "success"}
-        />
-        {budgetView && (
-          <KpiCard
-            label="Budget Variance"
-            value={`${budgetView.variance >= 0 ? "+" : "−"}${inr(Math.abs(budgetView.variance), true)}`}
-            delta={budgetView.pct}
-            invertDelta
-            hint={`plan ${inr(budgetView.planned, true)} · actual ${inr(budgetView.actual, true)}`}
-            icon={Scale}
-            tone={budgetView.variance > 0 ? "danger" : "success"}
-          />
-        )}
-        {recordsMode && (
-          <>
-            <KpiCard
-              label="Records Loaded"
-              value={dyn.rowCount.toLocaleString("en-IN")}
-              hint="Rows in the active dataset"
-              icon={Rows3}
-              tone="neutral"
-            />
-            <KpiCard
-              label="Active Columns"
-              value={`${dyn.columnCount}`}
-              hint="Fields detected in this file"
-              icon={Columns3}
-              tone="neutral"
-            />
-          </>
-        )}
-      </div>
+      <AutoDiscoveryKpis kpis={discovery.kpis} />
       )}
 
 

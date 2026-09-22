@@ -7,6 +7,7 @@ import { useMemo } from "react";
 
 import { parseNum } from "@/lib/column-map";
 import { compactMoney, titleCase } from "@/lib/adaptive-dashboard";
+import { parseAnyDate } from "@/lib/clean";
 import { useDatasetRaw } from "@/lib/dataset";
 import { distribution, inspectSchema, type SchemaInspection } from "@/lib/schema-inspector";
 
@@ -46,6 +47,10 @@ const PAYROLL_WORDS = ["salary", "basic", "allowance", "gross_pay", "net_pay", "
 const STATUTORY_WORDS = ["pf", "esi", "tds", "epf", "professional_tax", "statutory", "deduction"];
 const EMPLOYEE_WORDS = ["employee", "emp_id", "emp_no", "staff"];
 const OVERDUE_WORDS = ["overdue", "unpaid", "outstanding", "pending", "late", "defaulted"];
+const CATEGORY_WORDS = ["category", "department", "cost_center", "expense_head", "type"];
+const VENDOR_WORDS = ["vendor", "client", "merchant", "supplier", "party", "customer"];
+const STATUS_WORDS = ["payment_status", "invoice_status", "status", "paid", "state"];
+const TAX_WORDS = ["tax_amount", "gst_amount", "gst", "cgst", "sgst", "igst", "tax", "vat"];
 
 const findCol = (cols: string[], words: string[]) => {
   for (const w of words) {
@@ -58,19 +63,15 @@ const findCols = (cols: string[], words: string[]) =>
   cols.filter((c) => words.some((w) => canon(c).includes(w)));
 
 const monthOf = (val: unknown): string => {
-  if (val === null || val === undefined) return "";
-  const s = String(val).trim();
-  if (!s) return "";
-  const iso = /^(\d{4})-(\d{2})/.exec(s);
-  if (iso) return `${iso[1]}-${iso[2]}`;
-  const dmy = /^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/.exec(s);
-  if (dmy) {
-    const year = dmy[3]!.length === 2 ? `20${dmy[3]}` : dmy[3]!;
-    return `${year}-${dmy[2]!.padStart(2, "0")}`;
-  }
-  const t = Date.parse(s);
-  return Number.isNaN(t) ? "" : new Date(t).toISOString().slice(0, 7);
+  const parsed = parseAnyDate(val);
+  return parsed ? parsed.toISOString().slice(0, 7) : "";
 };
+
+const formatMonth = (date: Date) =>
+  new Intl.DateTimeFormat("en-IN", { month: "short", year: "numeric", timeZone: "UTC" }).format(date);
+
+const validMetric = (metric: DiscoveryKpi & { backing: number }) =>
+  metric.backing > 0 && Number.isFinite(metric.backing) && metric.value.trim().length > 0;
 
 /** Does a type/flag column carry credit/income values? (a ledger with signed rows) */
 function hasIncomeRows(rows: Record<string, unknown>[], schema: SchemaInspection): boolean {
@@ -106,8 +107,17 @@ export function useSchemaDiscovery(activeDatasetId?: string | null): SchemaDisco
     const rowCount = rows.length;
     const columnCount = cols.length;
 
-    const sum = (col?: string) =>
-      col ? rows.reduce((s, r) => s + Math.abs(Number(parseNum(r?.[col])) || 0), 0) : 0;
+    const sum = (col?: string) => {
+      if (!col) return 0;
+      let total = 0;
+      for (let start = 0; start < rows.length; start += 2000) {
+        const end = Math.min(start + 2000, rows.length);
+        for (let i = start; i < end; i += 1) {
+          total += Math.abs(Number(parseNum(rows[i]?.[col])) || 0);
+        }
+      }
+      return total;
+    };
 
     const payrollCols = findCols(numeric, PAYROLL_WORDS);
     const revenueCol = findCol(numeric, REVENUE_WORDS);
@@ -157,57 +167,92 @@ export function useSchemaDiscovery(activeDatasetId?: string | null): SchemaDisco
         : `${titleCase(groupCol)} by record count`
       : "";
 
-    // ---- KPIs per mode ---------------------------------------------------
-    const kpis: DiscoveryKpi[] = [];
+    // ---- ranked autonomous KPI candidates -------------------------------
+    // Every candidate carries a positive numeric backing value. Unsupported,
+    // zero and non-finite metrics are removed before the best five are shown.
+    const candidates: Array<DiscoveryKpi & { backing: number }> = [];
+    const expenseCount = spendCol
+      ? rows.reduce((count, row) => count + (Math.abs(Number(parseNum(row?.[spendCol])) || 0) > 0 ? 1 : 0), 0)
+      : 0;
 
-    if (mode === "payroll") {
-      const employeeCol = findCol(cols, EMPLOYEE_WORDS);
-      const headcount = employeeCol
-        ? new Set(rows.map((r) => String(r?.[employeeCol] ?? "").trim()).filter(Boolean)).size || rowCount
-        : rowCount;
-      const statutoryCols = findCols(numeric, STATUTORY_WORDS);
-      const statutory = statutoryCols.reduce((s, c) => s + sum(c), 0);
-      kpis.push(
-        { label: "Total Payroll Cost", value: compactMoney(spendTotal), hint: spendCol ? `Sum of ${titleCase(spendCol)}` : "No pay column found" },
-        {
-          label: "Average Salary / Employee",
-          value: compactMoney(headcount ? spendTotal / headcount : 0),
-          hint: `Across ${plain.format(headcount)} employees`,
-        },
-        {
-          label: "Statutory Deductions",
-          value: compactMoney(statutory),
-          hint: statutoryCols.length ? statutoryCols.map(titleCase).join(" + ") : "No PF/ESI/TDS columns found",
-        },
-        { label: "Employee Headcount", value: plain.format(headcount), hint: employeeCol ? `Distinct ${titleCase(employeeCol)}` : "Rows in file" },
-        { label: "Payroll Records", value: plain.format(rowCount), hint: `${columnCount} columns detected` },
+    if (spendCol && spendTotal > 0) {
+      candidates.push(
+        { label: mode === "payroll" ? "Total Payroll Cost" : "Total Spend / Outflow", value: compactMoney(spendTotal), hint: `Sum of ${titleCase(spendCol)}`, backing: spendTotal },
+        { label: "Average Transaction Value", value: compactMoney(spendTotal / expenseCount), hint: `Across ${plain.format(expenseCount)} transactions`, backing: spendTotal / expenseCount },
       );
-    } else if (mode === "expense") {
-      const months = monthly.length || 1;
-      const statusCol = findCol(cols, ["status", "payment_status", "state", "paid"]);
-      const overdue = statusCol
-        ? rows.filter((r) => {
-            const v = String(r?.[statusCol] ?? "").trim().toLowerCase();
-            return v && OVERDUE_WORDS.some((w) => v.includes(w));
-          }).length
-        : 0;
-      const top = breakdown[0];
-      kpis.push(
-        { label: "Total Spend / Outflow", value: compactMoney(spendTotal), hint: spendCol ? `Sum of ${titleCase(spendCol)}` : "No amount column found" },
-        { label: "Monthly Average Spend", value: compactMoney(spendTotal / months), hint: `Across ${months} month${months === 1 ? "" : "s"}` },
-        {
-          label: `Top ${groupCol ? titleCase(groupCol) : "Category"}`,
-          value: top ? top.name : "—",
-          hint: top ? `${compactMoney(top.value)} of total spend` : "No categorical column found",
-        },
-        { label: "Total Transactions", value: plain.format(rowCount), hint: `${columnCount} columns detected` },
-        {
-          label: "Overdue Invoices",
-          value: plain.format(overdue),
-          hint: statusCol ? `Flagged in ${titleCase(statusCol)}` : "No status column found",
-        },
-      );
+      const categoryCol = findCol(schema.categorical, CATEGORY_WORDS);
+      const topCategory = categoryCol ? distribution(rows, categoryCol, spendCol, 1)[0] : undefined;
+      if (categoryCol && topCategory && topCategory.value > 0 && topCategory.name.trim()) {
+        candidates.push({
+          label: `Top Spend ${canon(categoryCol).includes("department") ? "Department" : "Category"}`,
+          value: topCategory.name,
+          hint: `${compactMoney(topCategory.value)} of spend`,
+          backing: topCategory.value,
+        });
+      }
     }
+
+    if (dateCol) {
+      const dates = rows.map((row) => parseAnyDate(row?.[dateCol])).filter((date): date is Date => Boolean(date));
+      if (dates.length > 0) {
+        let earliest = dates[0];
+        let latest = dates[0];
+        dates.forEach((date) => {
+          if (date.getTime() < earliest.getTime()) earliest = date;
+          if (date.getTime() > latest.getTime()) latest = date;
+        });
+        candidates.push({
+          label: "Active Date Range",
+          value: earliest.getTime() === latest.getTime() ? formatMonth(earliest) : `${formatMonth(earliest)} – ${formatMonth(latest)}`,
+          hint: `From ${titleCase(dateCol)}`,
+          backing: dates.length,
+        });
+      }
+      if (spendTotal > 0 && monthly.length > 0) {
+        const burn = spendTotal / monthly.length;
+        candidates.push({ label: "Monthly Burn Rate", value: compactMoney(burn), hint: `Average across ${monthly.length} active months`, backing: burn });
+      }
+    }
+
+    const vendorCol = findCol(schema.categorical, VENDOR_WORDS);
+    if (vendorCol) {
+      const vendors = new Set(rows.map((row) => String(row?.[vendorCol] ?? "").trim()).filter(Boolean)).size;
+      candidates.push({ label: "Active Vendors Count", value: plain.format(vendors), hint: `Distinct ${titleCase(vendorCol)}`, backing: vendors });
+    }
+
+    const statusCol = findCol(cols, STATUS_WORDS);
+    if (statusCol) {
+      let pendingCount = 0;
+      let pendingValue = 0;
+      rows.forEach((row) => {
+        const status = String(row?.[statusCol] ?? "").trim().toLowerCase();
+        if (!OVERDUE_WORDS.some((word) => status.includes(word))) return;
+        pendingCount += 1;
+        pendingValue += spendCol ? Math.abs(Number(parseNum(row?.[spendCol])) || 0) : 0;
+      });
+      candidates.push({
+        label: "Pending / Unpaid Volume",
+        value: pendingValue > 0 ? compactMoney(pendingValue) : plain.format(pendingCount),
+        hint: `${plain.format(pendingCount)} records in ${titleCase(statusCol)}`,
+        backing: pendingValue > 0 ? pendingValue : pendingCount,
+      });
+    }
+
+    const taxCols = findCols(numeric, TAX_WORDS);
+    const taxTotal = taxCols.reduce((total, col) => total + sum(col), 0);
+    if (taxCols.length > 0) {
+      candidates.push({ label: "Total Tax / GST Amount", value: compactMoney(taxTotal), hint: taxCols.map(titleCase).join(" + "), backing: taxTotal });
+    }
+
+    if (revenueCol && revenueTotal > 0) {
+      const grossProfit = revenueTotal - spendTotal;
+      const margin = (grossProfit / revenueTotal) * 100;
+      candidates.unshift({ label: "Total Revenue", value: compactMoney(revenueTotal), hint: `Sum of ${titleCase(revenueCol)}`, backing: revenueTotal });
+      if (grossProfit > 0) candidates.push({ label: "Gross Profit", value: compactMoney(grossProfit), hint: "Revenue less detected outflow", backing: grossProfit });
+      if (margin > 0 && Number.isFinite(margin)) candidates.push({ label: "Net Margin", value: `${margin.toFixed(1)}%`, hint: "Based on detected revenue and outflow", backing: margin });
+    }
+
+    const kpis = candidates.filter(validMetric).slice(0, 5).map(({ backing: _backing, ...metric }) => metric);
 
     return {
       mode,
