@@ -28,6 +28,8 @@ import {
 } from "@/components/ui/table";
 import { deriveBalanceSheet, type BalanceLine } from "@/lib/balance-sheet";
 import { useDataset, useDatasetRaw } from "@/lib/dataset";
+import { useActiveDataset } from "@/lib/active-dataset";
+import { ModuleSkeleton } from "@/components/finance/ModuleSkeleton";
 import { formatCompactCurrency, inr, monthlySummary, totals } from "@/lib/finance-data";
 import { useActiveMonthlySeries } from "@/lib/monthly-cache";
 
@@ -100,6 +102,7 @@ function Section({
 
 function BalanceSheetPage() {
   const { txns, araps, live } = useDataset();
+  const { syncing } = useActiveDataset();
   const rawRows = useDatasetRaw();
   const clientSeries = useMemo(() => monthlySummary(txns), [txns]);
   const { series } = useActiveMonthlySeries(clientSeries);
@@ -155,6 +158,13 @@ function BalanceSheetPage() {
     facts: `Total assets ${inr(sheet.totalAssets)}, total liabilities ${inr(sheet.totalLiabilities)}, total equity ${inr(sheet.totalEquity)}, retained earnings (net income) ${inr(sheet.netIncome)}, cash and cash equivalents ${inr(sheet.cash)}. The sheet balances: assets equal liabilities plus equity. Line detail: ${[...sheet.assets, ...sheet.liabilities, ...sheet.equity].map((l) => `${l.label} ${inr(l.amount)} (${l.source})`).join("; ")}. Data source: ${live ? "uploaded dataset" : "demo dataset"}.`,
     chartEl: chartRef.current,
   });
+
+  if (syncing)
+    return (
+      <AppShell title="Balance Sheet" subtitle="Loading the selected dataset…">
+        <ModuleSkeleton />
+      </AppShell>
+    );
 
   return (
     <AppShell

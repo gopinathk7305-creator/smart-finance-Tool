@@ -6,6 +6,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useTransition,
   type ReactNode,
 } from "react";
 
@@ -59,6 +60,7 @@ export function ActiveDatasetProvider({ children }: { children: ReactNode }) {
   const [activeId, setActiveIdState] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [pending, startTransition] = useTransition();
 
   useEffect(() => {
     const saved = window.localStorage.getItem(ACTIVE_KEY);
@@ -87,16 +89,21 @@ export function ActiveDatasetProvider({ children }: { children: ReactNode }) {
     (id: string | null) => {
       // "" records an explicit "all datasets" choice so it survives reloads.
       window.localStorage.setItem(ACTIVE_KEY, id ?? "");
-      setActiveIdState(id);
-      // Only the module currently on screen refetches; every other module
-      // stays stale and reloads lazily when the user opens it. Keeps a 50k-row
-      // switch instant instead of blocking on 11 modules at once.
       setSyncing(true);
-      queryClient.invalidateQueries({ queryKey: ["dataset"], refetchType: "active" });
-      queryClient.invalidateQueries({ queryKey: ["dataset-summary"], refetchType: "active" });
+      // The switch itself is a low-priority update: the dropdown closes and the
+      // skeleton paints immediately while React re-renders the heavy modules in
+      // the background instead of blocking the browser thread.
+      startTransition(() => {
+        setActiveIdState(id);
+        // Only the module currently on screen refetches; every other module
+        // stays stale and reloads lazily when the user opens it. Keeps a 50k-row
+        // switch instant instead of blocking on 11 modules at once.
+        queryClient.invalidateQueries({ queryKey: ["dataset"], refetchType: "active" });
+        queryClient.invalidateQueries({ queryKey: ["dataset-summary"], refetchType: "active" });
+      });
       window.setTimeout(() => setSyncing(false), 300);
     },
-    [queryClient],
+    [queryClient, startTransition],
   );
 
   // Default: the most recently uploaded dataset drives the workspace.
@@ -119,11 +126,11 @@ export function ActiveDatasetProvider({ children }: { children: ReactNode }) {
       active,
       activeFile: active?.file_name ?? null,
       loading: !!user && isLoading,
-      syncing,
+      syncing: syncing || pending,
       setActiveId,
       refreshDatasets,
     };
-  }, [datasets, activeId, user, isLoading, syncing, setActiveId, refreshDatasets]);
+  }, [datasets, activeId, user, isLoading, syncing, pending, setActiveId, refreshDatasets]);
 
   return <ActiveDatasetContext.Provider value={value}>{children}</ActiveDatasetContext.Provider>;
 }
