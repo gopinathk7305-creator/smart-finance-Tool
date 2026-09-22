@@ -92,8 +92,12 @@ function Dashboard() {
   // Whenever the active dataset's own rows carry usable money columns we bind the
   // executive dashboard straight to those records; the schema-driven adaptive view
   // is only a fallback for datasets with no recognisable monetary fields.
+  // Schema discovery: classify the dataset domain (P&L ledger / expense-only
+  // ledger / payroll register) so the widgets match the columns that exist.
+  const discovery = useSchemaDiscovery(activeId);
+  const adaptedMode = discovery.ready;
   const recordsMode = dyn.usable && dyn.rowCount > 0;
-  const adaptiveMode = adaptive.ready && !recordsMode;
+  const adaptiveMode = adaptive.ready && !recordsMode && !adaptedMode;
 
   // Canonical columns first; if the uploaded file used its own header names the
   // auto-mapper's normalised rows drive every figure instead.
