@@ -154,8 +154,10 @@ function Dashboard() {
   const metrics = useActiveDatasetMetrics();
   const riskFlags = metrics.riskFlags || dyn.riskFlags;
   const rawRows = useDatasetRaw();
+  const { settings: alertSettings } = useAlertSettings();
   // Alerts are computed from the active dataset's own rows — status columns,
-  // duplicate amounts, category concentration and the real monthly series.
+  // duplicate amounts, category concentration and the real monthly series —
+  // against the thresholds configured by the user.
   const liveAlerts = useMemo(
     () =>
       deriveAlerts({
@@ -167,9 +169,11 @@ function Dashboard() {
         expense: t.expense,
         netProfit: t.netProfit,
         riskFlags,
+        settings: alertSettings,
       }),
-    [rawRows, txns, series, topCats, t.revenue, t.expense, t.netProfit, riskFlags],
+    [rawRows, txns, series, topCats, t.revenue, t.expense, t.netProfit, riskFlags, alertSettings],
   );
+
 
   // Never show skeletons once the active dataset's rows are in hand — real figures
   // beat placeholders even while the background summary is still refreshing.
