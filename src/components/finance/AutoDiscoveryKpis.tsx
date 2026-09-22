@@ -1,16 +1,15 @@
-import { Info } from "lucide-react";
+import { CircleDollarSign, Info, Landmark, Percent, Rows3, ShieldAlert } from "lucide-react";
 
 import { KpiCard } from "@/components/finance/KpiCard";
 import { Card, CardContent } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
 import type { DiscoveryKpi } from "@/lib/schema-discovery";
 
-const layout: Record<number, string> = {
-  1: "sm:grid-cols-1",
-  2: "sm:grid-cols-2",
-  3: "sm:grid-cols-2 lg:grid-cols-3",
-  4: "sm:grid-cols-2 xl:grid-cols-4",
-  5: "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5",
+const presentation = {
+  "Total Revenue": { icon: CircleDollarSign, tone: "success" as const },
+  "Total Expenses": { icon: Landmark, tone: "danger" as const, invertDelta: true },
+  "Net Profit Margin": { icon: Percent, tone: "neutral" as const },
+  "Active Records": { icon: Rows3, tone: "neutral" as const },
+  "Risk / Audit Flags": { icon: ShieldAlert, tone: "warning" as const, invertDelta: true },
 };
 
 export function AutoDiscoveryKpis({ kpis }: { kpis: DiscoveryKpi[] }) {
@@ -25,10 +24,22 @@ export function AutoDiscoveryKpis({ kpis }: { kpis: DiscoveryKpi[] }) {
         </CardContent>
       </Card>
       {kpis.length > 0 && (
-        <div className={cn("grid gap-4", layout[kpis.length] ?? layout[5])}>
-          {kpis.map((kpi) => (
-            <KpiCard key={kpi.label} label={kpi.label} value={kpi.value} {...(kpi.hint ? { hint: kpi.hint } : {})} />
-          ))}
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {kpis.map((kpi) => {
+            const style = presentation[kpi.label as keyof typeof presentation];
+            return (
+              <KpiCard
+                key={kpi.label}
+                label={kpi.label}
+                value={kpi.value}
+                {...(kpi.hint ? { hint: kpi.hint } : {})}
+                {...(kpi.delta !== undefined ? { delta: kpi.delta } : {})}
+                {...(style?.icon ? { icon: style.icon } : {})}
+                {...(style?.tone ? { tone: style.tone } : {})}
+                {...(style && "invertDelta" in style && style.invertDelta ? { invertDelta: true } : {})}
+              />
+            );
+          })}
         </div>
       )}
     </div>
