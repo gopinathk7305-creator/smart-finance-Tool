@@ -47,6 +47,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useDatasetRaw } from "@/lib/dataset";
 import { deriveAlerts } from "@/lib/live-alerts";
+import { useAlertSettings } from "@/lib/alert-settings";
+import { AlertSettingsDialog } from "@/components/finance/AlertSettingsDialog";
+
 import {
   actualsByCategory,
   cashRunwayMonths,
@@ -151,8 +154,10 @@ function Dashboard() {
   const metrics = useActiveDatasetMetrics();
   const riskFlags = metrics.riskFlags || dyn.riskFlags;
   const rawRows = useDatasetRaw();
+  const { settings: alertSettings } = useAlertSettings();
   // Alerts are computed from the active dataset's own rows — status columns,
-  // duplicate amounts, category concentration and the real monthly series.
+  // duplicate amounts, category concentration and the real monthly series —
+  // against the thresholds configured by the user.
   const liveAlerts = useMemo(
     () =>
       deriveAlerts({
@@ -164,9 +169,11 @@ function Dashboard() {
         expense: t.expense,
         netProfit: t.netProfit,
         riskFlags,
+        settings: alertSettings,
       }),
-    [rawRows, txns, series, topCats, t.revenue, t.expense, t.netProfit, riskFlags],
+    [rawRows, txns, series, topCats, t.revenue, t.expense, t.netProfit, riskFlags, alertSettings],
   );
+
 
   // Never show skeletons once the active dataset's rows are in hand — real figures
   // beat placeholders even while the background summary is still refreshing.
@@ -380,9 +387,13 @@ function Dashboard() {
         </Card>
 
         <Card className="border-border shadow-card">
-          <CardHeader>
-            <CardTitle className="text-base">Live Financial Alerts</CardTitle>
-            <CardDescription>Auto-generated from current data</CardDescription>
+          <CardHeader className="flex-row items-start justify-between gap-3">
+            <div className="space-y-1">
+              <CardTitle className="text-base">Live Financial Alerts</CardTitle>
+              <CardDescription>Auto-generated from current data, using your thresholds</CardDescription>
+            </div>
+            <AlertSettingsDialog />
+
           </CardHeader>
           <CardContent className="space-y-3">
             {liveAlerts.map((a) => {
