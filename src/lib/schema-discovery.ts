@@ -168,7 +168,7 @@ export function useSchemaDiscovery(activeDatasetId?: string | null): SchemaDisco
       const statutoryCols = findCols(numeric, STATUTORY_WORDS);
       const statutory = statutoryCols.reduce((s, c) => s + sum(c), 0);
       kpis.push(
-        { label: "Total Payroll Cost", value: compactMoney(spendTotal), hint: spendCol ? `Sum of ${titleCase(spendCol)}` : undefined },
+        { label: "Total Payroll Cost", value: compactMoney(spendTotal), hint: spendCol ? `Sum of ${titleCase(spendCol)}` : "No pay column found" },
         {
           label: "Average Salary / Employee",
           value: compactMoney(headcount ? spendTotal / headcount : 0),
@@ -193,7 +193,7 @@ export function useSchemaDiscovery(activeDatasetId?: string | null): SchemaDisco
         : 0;
       const top = breakdown[0];
       kpis.push(
-        { label: "Total Spend / Outflow", value: compactMoney(spendTotal), hint: spendCol ? `Sum of ${titleCase(spendCol)}` : undefined },
+        { label: "Total Spend / Outflow", value: compactMoney(spendTotal), hint: spendCol ? `Sum of ${titleCase(spendCol)}` : "No amount column found" },
         { label: "Monthly Average Spend", value: compactMoney(spendTotal / months), hint: `Across ${months} month${months === 1 ? "" : "s"}` },
         {
           label: `Top ${groupCol ? titleCase(groupCol) : "Category"}`,
