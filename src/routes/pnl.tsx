@@ -256,6 +256,7 @@ function PnlPage() {
                   <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
                   <Line type="monotone" dataKey="grossMargin" name="Gross margin" stroke="var(--brand)" strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey="ebitdaMargin" name="EBITDA margin" stroke="var(--success)" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="netMargin" name="Net margin" stroke="var(--warning)" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             )}
@@ -286,8 +287,14 @@ function PnlPage() {
             </div>
             <div className="mt-2 flex justify-between rounded-md bg-primary px-3 py-2 text-sm font-bold text-primary-foreground">
               <span>Net GST payable</span>
-              <span className="tabular">{inr(gst.payable)}</span>
+              <span className="tabular">{inr(gstPayable)}</span>
             </div>
+            {gstCreditAvailable > 0 && (
+              <div className="flex justify-between rounded-md bg-success-soft px-3 py-2 text-sm font-semibold text-success">
+                <span>Tax credit available (carry forward)</span>
+                <span className="tabular">{inr(gstCreditAvailable)}</span>
+              </div>
+            )}
           </CardContent>
         </Card>
 
