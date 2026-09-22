@@ -177,11 +177,11 @@ export function AppShell({
               variant="outline"
               size="sm"
               className="gap-2 bg-background font-medium"
-              disabled={isFetching > 0}
+              disabled={refreshing}
               title="Refresh Page & Recalculate Metrics"
               onClick={handleRefresh}
             >
-              <RefreshCw className={cn("size-4 text-primary", isFetching > 0 && "animate-spin")} />
+              <RefreshCw className={cn("size-4 text-primary", refreshing && "animate-spin")} />
               <span className="hidden lg:inline">Refresh</span>
             </Button>
             <Select
