@@ -43,7 +43,7 @@ const SIGNALS: Record<keyof ColumnMap, string[]> = {
     "cost_of_revenue",
     "material_cost",
   ],
-  expense: ["expense", "cost", "debit", "spending", "spend", "amount_out", "outflow", "payment"],
+  expense: ["expense", "cost", "debit", "payout", "spending", "spend", "amount_out", "outflow", "payment"],
   amount: ["net_amount", "total_amount", "gross_amount", "amount", "value", "total"],
   date: ["txn_date", "transaction_date", "invoice_date", "date", "created", "time", "period", "month"],
   category: ["category", "sub_category", "subcategory", "department", "class", "head", "ledger", "type"],

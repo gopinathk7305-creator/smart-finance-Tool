@@ -5,11 +5,11 @@
 
 import { useMemo } from "react";
 
-import { parseNum } from "@/lib/column-map";
+import { detectColumns, mapRowsToTransactions, parseNum, safeMargin } from "@/lib/column-map";
 import { compactMoney, titleCase } from "@/lib/adaptive-dashboard";
 import { parseAnyDate } from "@/lib/clean";
 import { useDatasetRaw } from "@/lib/dataset";
-import { distribution, inspectSchema, type SchemaInspection } from "@/lib/schema-inspector";
+import { countRiskRows, distribution, inspectSchema, type SchemaInspection } from "@/lib/schema-inspector";
 
 export type DatasetMode = "pnl" | "expense" | "payroll" | "generic";
 
@@ -17,6 +17,7 @@ export interface DiscoveryKpi {
   label: string;
   value: string;
   hint?: string;
+  delta?: number;
 }
 
 export interface SchemaDiscovery {
@@ -70,9 +71,6 @@ const monthOf = (val: unknown): string => {
 const formatMonth = (date: Date) =>
   new Intl.DateTimeFormat("en-IN", { month: "short", year: "numeric", timeZone: "UTC" }).format(date);
 
-const validMetric = (metric: DiscoveryKpi & { backing: number }) =>
-  metric.backing > 0 && Number.isFinite(metric.backing) && metric.value.trim().length > 0;
-
 /** Does a type/flag column carry credit/income values? (a ledger with signed rows) */
 function hasIncomeRows(rows: Record<string, unknown>[], schema: SchemaInspection): boolean {
   const typeCol = findCol(schema.columns, ["txn_type", "transaction_type", "entry_type", "dr_cr", "type", "nature"]);
@@ -106,6 +104,8 @@ export function useSchemaDiscovery(activeDatasetId?: string | null): SchemaDisco
     const numeric = schema.numeric;
     const rowCount = rows.length;
     const columnCount = cols.length;
+    const mapping = detectColumns(rows);
+    const transactions = mapRowsToTransactions(rows, mapping);
 
     const sum = (col?: string) => {
       if (!col) return 0;
@@ -167,18 +167,16 @@ export function useSchemaDiscovery(activeDatasetId?: string | null): SchemaDisco
         : `${titleCase(groupCol)} by record count`
       : "";
 
-    // ---- ranked autonomous KPI candidates -------------------------------
-    // Every candidate carries a positive numeric backing value. Unsupported,
-    // zero and non-finite metrics are removed before the best five are shown.
-    const candidates: Array<DiscoveryKpi & { backing: number }> = [];
+    // ---- contextual KPI candidates for non-transactional datasets --------
+    const candidates: DiscoveryKpi[] = [];
     const expenseCount = spendCol
       ? rows.reduce((count, row) => count + (Math.abs(Number(parseNum(row?.[spendCol])) || 0) > 0 ? 1 : 0), 0)
       : 0;
 
     if (spendCol && spendTotal > 0) {
       candidates.push(
-        { label: mode === "payroll" ? "Total Payroll Cost" : "Total Spend / Outflow", value: compactMoney(spendTotal), hint: `Sum of ${titleCase(spendCol)}`, backing: spendTotal },
-        { label: "Average Transaction Value", value: compactMoney(spendTotal / expenseCount), hint: `Across ${plain.format(expenseCount)} transactions`, backing: spendTotal / expenseCount },
+        { label: mode === "payroll" ? "Total Payroll Cost" : "Total Spend / Outflow", value: compactMoney(spendTotal), hint: `Sum of ${titleCase(spendCol)}` },
+        { label: "Average Transaction Value", value: compactMoney(expenseCount ? spendTotal / expenseCount : 0), hint: `Across ${plain.format(expenseCount)} transactions` },
       );
       const categoryCol = findCol(schema.categorical, CATEGORY_WORDS);
       const topCategory = categoryCol ? distribution(rows, categoryCol, spendCol, 1)[0] : undefined;
@@ -187,7 +185,6 @@ export function useSchemaDiscovery(activeDatasetId?: string | null): SchemaDisco
           label: `Top Spend ${canon(categoryCol).includes("department") ? "Department" : "Category"}`,
           value: topCategory.name,
           hint: `${compactMoney(topCategory.value)} of spend`,
-          backing: topCategory.value,
         });
       }
     }
@@ -207,19 +204,18 @@ export function useSchemaDiscovery(activeDatasetId?: string | null): SchemaDisco
           label: "Active Date Range",
           value: earliest.getTime() === latest.getTime() ? formatMonth(earliest) : `${formatMonth(earliest)} – ${formatMonth(latest)}`,
           hint: `From ${titleCase(dateCol)}`,
-          backing: dates.length,
         });
       }
       if (spendTotal > 0 && monthly.length > 0) {
         const burn = spendTotal / monthly.length;
-        candidates.push({ label: "Monthly Burn Rate", value: compactMoney(burn), hint: `Average across ${monthly.length} active months`, backing: burn });
+        candidates.push({ label: "Monthly Burn Rate", value: compactMoney(burn), hint: `Average across ${monthly.length} active months` });
       }
     }
 
     const vendorCol = findCol(schema.categorical, VENDOR_WORDS);
     if (vendorCol) {
       const vendors = new Set(rows.map((row) => String(row?.[vendorCol] ?? "").trim()).filter(Boolean)).size;
-      candidates.push({ label: "Active Vendors Count", value: plain.format(vendors), hint: `Distinct ${titleCase(vendorCol)}`, backing: vendors });
+      if (vendors > 0) candidates.push({ label: "Active Vendors Count", value: plain.format(vendors), hint: `Distinct ${titleCase(vendorCol)}` });
     }
 
     const statusCol = findCol(cols, STATUS_WORDS);
@@ -236,28 +232,55 @@ export function useSchemaDiscovery(activeDatasetId?: string | null): SchemaDisco
         label: "Pending / Unpaid Volume",
         value: pendingValue > 0 ? compactMoney(pendingValue) : plain.format(pendingCount),
         hint: `${plain.format(pendingCount)} records in ${titleCase(statusCol)}`,
-        backing: pendingValue > 0 ? pendingValue : pendingCount,
       });
     }
 
     const taxCols = findCols(numeric, TAX_WORDS);
     const taxTotal = taxCols.reduce((total, col) => total + sum(col), 0);
     if (taxCols.length > 0) {
-      candidates.push({ label: "Total Tax / GST Amount", value: compactMoney(taxTotal), hint: taxCols.map(titleCase).join(" + "), backing: taxTotal });
+      if (taxTotal > 0) candidates.push({ label: "Total Tax / GST Amount", value: compactMoney(taxTotal), hint: taxCols.map(titleCase).join(" + ") });
     }
 
-    if (revenueCol && revenueTotal > 0) {
-      const grossProfit = revenueTotal - spendTotal;
-      const margin = (grossProfit / revenueTotal) * 100;
-      const revenueMetrics: Array<DiscoveryKpi & { backing: number }> = [
-        { label: "Total Revenue", value: compactMoney(revenueTotal), hint: `Sum of ${titleCase(revenueCol)}`, backing: revenueTotal },
-      ];
-      if (grossProfit > 0) revenueMetrics.push({ label: "Gross Profit", value: compactMoney(grossProfit), hint: "Revenue less detected outflow", backing: grossProfit });
-      if (margin > 0 && Number.isFinite(margin)) revenueMetrics.push({ label: "Net Margin", value: `${margin.toFixed(1)}%`, hint: "Based on detected revenue and outflow", backing: margin });
-      candidates.unshift(...revenueMetrics);
-    }
+    // The charts already use normalized transactions. Reuse that exact source
+    // for core cards so schema sampling can never produce "0 active metrics"
+    // while the charts contain valid values.
+    const financeRevenue = transactions.reduce(
+      (total, transaction) => total + (transaction.type === "income" ? Number(transaction.amount) || 0 : 0),
+      0,
+    );
+    const financeExpenses = transactions.reduce(
+      (total, transaction) => total + (transaction.type === "expense" ? Number(transaction.amount) || 0 : 0),
+      0,
+    );
+    const margin = safeMargin(financeRevenue - financeExpenses, financeRevenue);
+    const seen = new Set<string>();
+    let duplicateCount = 0;
+    transactions.forEach((transaction) => {
+      const signature = `${transaction.date}|${transaction.type}|${transaction.amount}|${transaction.category}|${transaction.vendor_client}`;
+      if (seen.has(signature)) duplicateCount += 1;
+      else seen.add(signature);
+    });
+    const explicitRiskCount = countRiskRows(rows, schema);
+    const riskCount = explicitRiskCount + duplicateCount;
+    const firstHalf = transactions.slice(0, Math.floor(transactions.length / 2));
+    const secondHalf = transactions.slice(Math.floor(transactions.length / 2));
+    const halfTotal = (items: typeof transactions, type: "income" | "expense") =>
+      items.reduce((total, item) => total + (item.type === type ? Number(item.amount) || 0 : 0), 0);
+    const trend = (type: "income" | "expense") => {
+      const before = halfTotal(firstHalf, type);
+      const after = halfTotal(secondHalf, type);
+      return before > 0 ? ((after - before) / before) * 100 : undefined;
+    };
 
-    const kpis = candidates.filter(validMetric).slice(0, 5).map(({ backing: _backing, ...metric }) => metric);
+    const coreKpis: DiscoveryKpi[] = [
+      { label: "Total Revenue", value: compactMoney(financeRevenue), hint: mapping.revenue ? `Detected from ${titleCase(mapping.revenue)}` : "Detected credit and income rows", delta: trend("income") },
+      { label: "Total Expenses", value: compactMoney(financeExpenses), hint: mapping.expense || mapping.cogs ? `Detected from ${titleCase(mapping.expense ?? mapping.cogs ?? "")}` : "Detected debit and outflow rows", delta: trend("expense") },
+      { label: "Net Profit Margin", value: `${Number.isFinite(margin) ? margin.toFixed(1) : "0.0"}%`, hint: "Revenue less expenses" },
+      { label: "Active Records", value: `${plain.format(rowCount)} Rows`, hint: `${plain.format(columnCount)} columns detected` },
+      { label: "Risk / Audit Flags", value: plain.format(riskCount), hint: `${plain.format(explicitRiskCount)} flagged · ${plain.format(duplicateCount)} duplicates` },
+    ];
+    const hasFinanceData = transactions.length > 0 || Boolean(mapping.revenue || mapping.expense || mapping.cogs || mapping.amount);
+    const kpis = hasFinanceData ? coreKpis : candidates.filter((metric) => metric.value.trim() && metric.value !== "₹0").slice(0, 5);
 
     return {
       mode,
