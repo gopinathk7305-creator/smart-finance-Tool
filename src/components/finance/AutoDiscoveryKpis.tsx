@@ -36,7 +36,7 @@ export function AutoDiscoveryKpis({ kpis }: { kpis: DiscoveryKpi[] }) {
                 {...(kpi.delta !== undefined ? { delta: kpi.delta } : {})}
                 {...(style?.icon ? { icon: style.icon } : {})}
                 {...(style?.tone ? { tone: style.tone } : {})}
-                {...(style?.invertDelta ? { invertDelta: true } : {})}
+                {...(style && "invertDelta" in style && style.invertDelta ? { invertDelta: true } : {})}
               />
             );
           })}

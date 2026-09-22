@@ -272,9 +272,11 @@ export function useSchemaDiscovery(activeDatasetId?: string | null): SchemaDisco
       return before > 0 ? ((after - before) / before) * 100 : undefined;
     };
 
+    const revenueTrend = trend("income");
+    const expenseTrend = trend("expense");
     const coreKpis: DiscoveryKpi[] = [
-      { label: "Total Revenue", value: compactMoney(financeRevenue), hint: mapping.revenue ? `Detected from ${titleCase(mapping.revenue)}` : "Detected credit and income rows", delta: trend("income") },
-      { label: "Total Expenses", value: compactMoney(financeExpenses), hint: mapping.expense || mapping.cogs ? `Detected from ${titleCase(mapping.expense ?? mapping.cogs ?? "")}` : "Detected debit and outflow rows", delta: trend("expense") },
+      { label: "Total Revenue", value: compactMoney(financeRevenue), hint: mapping.revenue ? `Detected from ${titleCase(mapping.revenue)}` : "Detected credit and income rows", ...(revenueTrend !== undefined ? { delta: revenueTrend } : {}) },
+      { label: "Total Expenses", value: compactMoney(financeExpenses), hint: mapping.expense || mapping.cogs ? `Detected from ${titleCase(mapping.expense ?? mapping.cogs ?? "")}` : "Detected debit and outflow rows", ...(expenseTrend !== undefined ? { delta: expenseTrend } : {}) },
       { label: "Net Profit Margin", value: `${Number.isFinite(margin) ? margin.toFixed(1) : "0.0"}%`, hint: "Revenue less expenses" },
       { label: "Active Records", value: `${plain.format(rowCount)} Rows`, hint: `${plain.format(columnCount)} columns detected` },
       { label: "Risk / Audit Flags", value: plain.format(riskCount), hint: `${plain.format(explicitRiskCount)} flagged · ${plain.format(duplicateCount)} duplicates` },
