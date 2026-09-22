@@ -220,6 +220,13 @@ function BudgetPage() {
     chartEl: null,
   });
 
+  if (syncing)
+    return (
+      <AppShell title="Budget Planning & Variance" subtitle="Loading the selected dataset…">
+        <ModuleSkeleton />
+      </AppShell>
+    );
+
   return (
     <AppShell
       title="Budget Planning & Variance"

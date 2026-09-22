@@ -156,6 +156,13 @@ function BalanceSheetPage() {
     chartEl: chartRef.current,
   });
 
+  if (syncing)
+    return (
+      <AppShell title="Balance Sheet" subtitle="Loading the selected dataset…">
+        <ModuleSkeleton />
+      </AppShell>
+    );
+
   return (
     <AppShell
       title="Balance Sheet"

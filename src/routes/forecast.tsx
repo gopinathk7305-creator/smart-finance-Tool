@@ -355,6 +355,13 @@ function ForecastPage() {
     toast.success(`Scenario "${trimmed}" saved`);
   };
 
+  if (syncing)
+    return (
+      <AppShell title="Financial Forecasting & Scenario Planning" subtitle="Loading the selected dataset…">
+        <ModuleSkeleton />
+      </AppShell>
+    );
+
   return (
     <AppShell
       title={`Financial Forecasting & Scenario Planning (${inputs.fy})`}
