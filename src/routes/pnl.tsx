@@ -64,6 +64,9 @@ function PnlPage() {
   const marginSeries = monthlyMargins(txns, cogsNames);
   const rawRows = useDatasetRaw();
   const gst = deriveGst(rawRows, t.revenue, t.expense);
+  // Net GST never shows negative: excess input credit is carried forward instead.
+  const gstPayable = Math.max(0, gst.payable);
+  const gstCreditAvailable = gst.payable < 0 ? Math.abs(gst.payable) : 0;
 
 
   // Taxable profit: EBITDA less depreciation & amortisation and finance cost.
@@ -169,6 +172,7 @@ function PnlPage() {
 
   return (
     <AppShell title="Financial Analysis & P&L" subtitle="FY 2026-27 statement of profit and loss">
+      <ActiveDatasetBanner />
       <div className="mb-4 flex justify-end">
         <AiReportButton build={buildReport} />
       </div>
