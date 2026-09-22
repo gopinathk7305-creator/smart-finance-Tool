@@ -84,12 +84,14 @@ export function AppShell({
   const { datasets, activeId, setActiveId, active } = useActiveDataset();
   const { preset, custom, range, setPreset, setCustom, resetRange } = useWorkspace();
   const { outOfRange } = useDatasetPeek();
-  const isFetching = useIsFetching();
+  const [refreshing, setRefreshing] = useState(false);
   const fy = fiscalYearStart();
 
   const handleRefresh = async () => {
+    setRefreshing(true);
     await queryClient.invalidateQueries();
     toast.success("Dashboard refreshed with latest dataset metrics.");
+    window.setTimeout(() => setRefreshing(false), 800);
   };
 
   useEffect(() => {
