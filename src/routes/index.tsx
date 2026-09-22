@@ -387,9 +387,13 @@ function Dashboard() {
         </Card>
 
         <Card className="border-border shadow-card">
-          <CardHeader>
-            <CardTitle className="text-base">Live Financial Alerts</CardTitle>
-            <CardDescription>Auto-generated from current data</CardDescription>
+          <CardHeader className="flex-row items-start justify-between gap-3">
+            <div className="space-y-1">
+              <CardTitle className="text-base">Live Financial Alerts</CardTitle>
+              <CardDescription>Auto-generated from current data, using your thresholds</CardDescription>
+            </div>
+            <AlertSettingsDialog />
+
           </CardHeader>
           <CardContent className="space-y-3">
             {liveAlerts.map((a) => {
