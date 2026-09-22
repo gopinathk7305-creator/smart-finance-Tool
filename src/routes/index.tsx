@@ -221,7 +221,18 @@ function Dashboard() {
       <div className="mb-4 flex justify-end">
         <AiReportButton build={buildReport} />
       </div>
-      {adaptiveMode ? (
+      {(adaptedMode || discovery.mode !== "generic") && (
+        <Card className="mb-4 border-border bg-muted/40 shadow-card">
+          <CardContent className="flex flex-wrap items-center gap-2 py-3 text-sm">
+            <Info className="size-4 text-primary" />
+            <span className="font-semibold">Dataset Mode: {discovery.label}.</span>
+            <span className="text-muted-foreground">{discovery.note}</span>
+          </CardContent>
+        </Card>
+      )}
+      {adaptedMode ? (
+        <AdaptedDashboard profile={discovery} />
+      ) : adaptiveMode ? (
         <AdaptiveDashboard profile={adaptive} />
       ) : (
       <>
