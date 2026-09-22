@@ -153,7 +153,8 @@ function PnlPage() {
         rows: [
           ["Output GST on sales (18%)", inr(gst.outputGst)],
           ["Input tax credit on purchases", `(${inr(gst.inputCredit)})`],
-          ["Net GST payable", inr(gst.payable)],
+          ["Net GST payable", inr(gstPayable)],
+          ["Tax credit available (carry forward)", inr(gstCreditAvailable)],
         ],
       },
       {
