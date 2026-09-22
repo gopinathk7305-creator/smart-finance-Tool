@@ -41,6 +41,8 @@ import {
 import { FISCAL_YEARS, useBudget } from "@/lib/budget";
 import { useCategories } from "@/lib/categories";
 import { useDataset } from "@/lib/dataset";
+import { useActiveDataset } from "@/lib/active-dataset";
+import { ModuleSkeleton } from "@/components/finance/ModuleSkeleton";
 import { actualsByCategory, inr, monthlySummary } from "@/lib/finance-data";
 import { BASE_SCENARIO, FY_MONTHS, runForecast } from "@/lib/forecast-engine";
 
@@ -69,6 +71,7 @@ function BudgetPage() {
   const [fy, setFy] = useState<string>(FISCAL_YEARS[0]);
   const [query, setQuery] = useState("");
   const { txns, pays, live } = useDataset();
+  const { syncing } = useActiveDataset();
   const { categories, payrollNames } = useCategories();
   const budget = useBudget(fy);
 

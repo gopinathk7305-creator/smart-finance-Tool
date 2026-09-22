@@ -28,6 +28,8 @@ import {
 } from "@/components/ui/table";
 import { deriveBalanceSheet, type BalanceLine } from "@/lib/balance-sheet";
 import { useDataset, useDatasetRaw } from "@/lib/dataset";
+import { useActiveDataset } from "@/lib/active-dataset";
+import { ModuleSkeleton } from "@/components/finance/ModuleSkeleton";
 import { formatCompactCurrency, inr, monthlySummary, totals } from "@/lib/finance-data";
 import { useActiveMonthlySeries } from "@/lib/monthly-cache";
 
@@ -100,6 +102,7 @@ function Section({
 
 function BalanceSheetPage() {
   const { txns, araps, live } = useDataset();
+  const { syncing } = useActiveDataset();
   const rawRows = useDatasetRaw();
   const clientSeries = useMemo(() => monthlySummary(txns), [txns]);
   const { series } = useActiveMonthlySeries(clientSeries);

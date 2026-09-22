@@ -75,6 +75,8 @@ import { useBudget } from "@/lib/budget";
 import { useCategories } from "@/lib/categories";
 import { CURRENCIES, useFx } from "@/lib/fx";
 import { useDataset } from "@/lib/dataset";
+import { useActiveDataset } from "@/lib/active-dataset";
+import { ModuleSkeleton } from "@/components/finance/ModuleSkeleton";
 
 import { actualsByCategory, downloadCSV, inr } from "@/lib/finance-data";
 
@@ -127,6 +129,7 @@ const TABS = [
 
 function ForecastPage() {
   const { txns, pays, live } = useDataset();
+  const { syncing } = useActiveDataset();
   const { session } = useAuth();
   const { payrollNames } = useCategories();
 
