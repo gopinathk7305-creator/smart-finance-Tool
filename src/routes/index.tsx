@@ -47,6 +47,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useDatasetRaw } from "@/lib/dataset";
 import { deriveAlerts } from "@/lib/live-alerts";
+import { useAlertSettings } from "@/lib/alert-settings";
+import { AlertSettingsDialog } from "@/components/finance/AlertSettingsDialog";
+
 import {
   actualsByCategory,
   cashRunwayMonths,
