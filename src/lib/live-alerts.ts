@@ -1,10 +1,13 @@
 // Live financial alerts derived entirely from the active dataset's own rows —
 // no hardcoded copy, no demo thresholds. Everything is computed from detected
-// status/flag columns, the monthly series and the category distribution.
+// status/flag columns, the monthly series and the category distribution, using
+// the thresholds the user configured in AlertSettings.
 
+import { DEFAULT_ALERT_SETTINGS, type AlertSettings } from "@/lib/alert-settings";
 import { parseNum } from "@/lib/column-map";
 import { inspectSchema, type SchemaInspection } from "@/lib/schema-inspector";
 import { inr, type Transaction } from "@/lib/finance-data";
+
 
 export interface LiveAlert {
   tone: "danger" | "warning" | "success";
