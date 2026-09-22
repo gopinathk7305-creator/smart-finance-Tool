@@ -33,6 +33,8 @@ import { useActiveMonthlySeries } from "@/lib/monthly-cache";
 
 import { ActiveDatasetBanner } from "@/components/finance/ActiveDatasetBanner";
 import { AdaptiveDashboard } from "@/components/finance/AdaptiveDashboard";
+import { AdaptedDashboard } from "@/components/finance/AdaptedDashboard";
+import { useSchemaDiscovery } from "@/lib/schema-discovery";
 import { AiReportButton } from "@/components/finance/AiReportButton";
 import { AppShell } from "@/components/finance/AppShell";
 import { KpiCard } from "@/components/finance/KpiCard";
@@ -90,8 +92,12 @@ function Dashboard() {
   // Whenever the active dataset's own rows carry usable money columns we bind the
   // executive dashboard straight to those records; the schema-driven adaptive view
   // is only a fallback for datasets with no recognisable monetary fields.
+  // Schema discovery: classify the dataset domain (P&L ledger / expense-only
+  // ledger / payroll register) so the widgets match the columns that exist.
+  const discovery = useSchemaDiscovery(activeId);
+  const adaptedMode = discovery.ready;
   const recordsMode = dyn.usable && dyn.rowCount > 0;
-  const adaptiveMode = adaptive.ready && !recordsMode;
+  const adaptiveMode = adaptive.ready && !recordsMode && !adaptedMode;
 
   // Canonical columns first; if the uploaded file used its own header names the
   // auto-mapper's normalised rows drive every figure instead.
@@ -215,7 +221,18 @@ function Dashboard() {
       <div className="mb-4 flex justify-end">
         <AiReportButton build={buildReport} />
       </div>
-      {adaptiveMode ? (
+      {(adaptedMode || discovery.mode !== "generic") && (
+        <Card className="mb-4 border-border bg-muted/40 shadow-card">
+          <CardContent className="flex flex-wrap items-center gap-2 py-3 text-sm">
+            <Info className="size-4 text-primary" />
+            <span className="font-semibold">Dataset Mode: {discovery.label}.</span>
+            <span className="text-muted-foreground">{discovery.note}</span>
+          </CardContent>
+        </Card>
+      )}
+      {adaptedMode ? (
+        <AdaptedDashboard profile={discovery} />
+      ) : adaptiveMode ? (
         <AdaptiveDashboard profile={adaptive} />
       ) : (
       <>
