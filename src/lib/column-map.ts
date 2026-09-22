@@ -38,6 +38,9 @@ const SIGNALS: Record<keyof ColumnMap, string[]> = {
     "direct_cost",
     "purchase_amount",
     "purchases",
+    "purchase",
+    "vendor_payout",
+    "cost_of_revenue",
     "material_cost",
   ],
   expense: ["expense", "cost", "debit", "spending", "spend", "amount_out", "outflow", "payment"],
@@ -149,7 +152,7 @@ export const safeMargin = (netProfit: number, revenue: number) =>
 export const safePct = (part: number, whole: number) =>
   whole !== 0 && Number.isFinite(part) && Number.isFinite(whole) ? (part / whole) * 100 : 0;
 
-/** Format a percentage for display; non-finite or missing base renders as "N/A". */
+/** Format a percentage for display; non-finite or missing base renders as "—". */
 export const pctLabel = (part: number, whole: number, digits = 1) =>
-  whole > 0 && Number.isFinite(part) ? `${((part / whole) * 100).toFixed(digits)}%` : "N/A";
+  whole > 0 && Number.isFinite(part) ? `${((part / whole) * 100).toFixed(digits)}%` : "—";
 
