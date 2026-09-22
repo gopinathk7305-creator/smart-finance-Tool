@@ -171,6 +171,17 @@ export function AppShell({
           </div>
 
           <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 bg-background font-medium"
+              disabled={isFetching > 0}
+              title="Refresh Page & Recalculate Metrics"
+              onClick={handleRefresh}
+            >
+              <RefreshCw className={cn("size-4 text-primary", isFetching > 0 && "animate-spin")} />
+              <span className="hidden lg:inline">Refresh</span>
+            </Button>
             <Select
               value={preset}
               onValueChange={(v) => setPreset(v as RangePreset)}
