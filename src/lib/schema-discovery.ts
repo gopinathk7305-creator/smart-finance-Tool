@@ -195,8 +195,10 @@ export function useSchemaDiscovery(activeDatasetId?: string | null): SchemaDisco
     if (dateCol) {
       const dates = rows.map((row) => parseAnyDate(row?.[dateCol])).filter((date): date is Date => Boolean(date));
       if (dates.length > 0) {
-        let earliest = dates[0];
-        let latest = dates[0];
+        const firstDate = dates[0];
+        if (!firstDate) throw new Error("A non-empty date collection must have a first item");
+        let earliest = firstDate;
+        let latest = firstDate;
         dates.forEach((date) => {
           if (date.getTime() < earliest.getTime()) earliest = date;
           if (date.getTime() > latest.getTime()) latest = date;
