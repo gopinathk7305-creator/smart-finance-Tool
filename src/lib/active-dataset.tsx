@@ -6,6 +6,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useTransition,
   type ReactNode,
 } from "react";
 
@@ -59,6 +60,7 @@ export function ActiveDatasetProvider({ children }: { children: ReactNode }) {
   const [activeId, setActiveIdState] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [pending, startTransition] = useTransition();
 
   useEffect(() => {
     const saved = window.localStorage.getItem(ACTIVE_KEY);
