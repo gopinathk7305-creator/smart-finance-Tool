@@ -153,129 +153,138 @@ function useDatasetInternal(fetchEnabled: boolean): Dataset {
   }, [user, refresh, fetchEnabled]);
 
   const fallback = user ? localFallbacks.get(user.id) : undefined;
-  const combinedRaw = data
-    ? {
-        t: mergeRows(data.t, fallback?.t),
-        p: mergeRows(data.p, fallback?.p),
-        b: mergeRows(data.b, fallback?.b),
-        a: mergeRows(data.a, fallback?.a),
-      }
-    : fallback
-      ? { t: fallback.t ?? [], p: fallback.p ?? [], b: fallback.b ?? [], a: fallback.a ?? [] }
+
+  // All row-level mapping, derivation and date filtering for 15k–50k rows runs
+  // inside one memo keyed on the fetched rows + active dataset + filters, so
+  // unrelated re-renders never re-walk the dataset (and every downstream memo
+  // in the modules stays valid because these arrays keep their identity).
+  return useMemo<Dataset>(() => {
+    const combinedRaw = data
+      ? {
+          t: mergeRows(data.t, fallback?.t),
+          p: mergeRows(data.p, fallback?.p),
+          b: mergeRows(data.b, fallback?.b),
+          a: mergeRows(data.a, fallback?.a),
+        }
+      : fallback
+        ? { t: fallback.t ?? [], p: fallback.p ?? [], b: fallback.b ?? [], a: fallback.a ?? [] }
+        : undefined;
+    const onlyActive = <T,>(rows: T[]) =>
+      activeFile
+        ? rows.filter((r) => (r as { source_file?: string | null }).source_file === activeFile)
+        : rows;
+
+    const combined = combinedRaw
+      ? {
+          t: onlyActive(combinedRaw.t),
+          p: onlyActive(combinedRaw.p),
+          b: onlyActive(combinedRaw.b),
+          a: onlyActive(combinedRaw.a),
+        }
       : undefined;
-  const onlyActive = <T,>(rows: T[]) =>
-    activeFile
-      ? rows.filter((r) => (r as { source_file?: string | null }).source_file === activeFile)
-      : rows;
 
-  const combined = combinedRaw
-    ? {
-        t: onlyActive(combinedRaw.t),
-        p: onlyActive(combinedRaw.p),
-        b: onlyActive(combinedRaw.b),
-        a: onlyActive(combinedRaw.a),
-      }
-    : undefined;
+    const rowCount = combined
+      ? combined.t.length + combined.p.length + combined.b.length + combined.a.length
+      : 0;
 
-  const rowCount = combined ? combined.t.length + combined.p.length + combined.b.length + combined.a.length : 0;
+    if (!combined || rowCount === 0) {
+      const demo = demoDatasetFor(orgId);
+      const vendors = uniqueVendors(demo.txns, demo.araps);
+      const demoTxns = demo.txns.filter((r) => inRange(r.date, range));
+      const demoAraps = demo.araps.filter((r) => inRange(r.invoice_date, range));
+      return {
+        txns: byVendor(demoTxns, vendor, (r) => r.vendor_client),
+        pays: demo.pays.filter((r) => inRange(r.month_year, range)),
+        buds: demo.buds,
+        araps: byVendor(demoAraps, vendor, (r) => r.party_name),
+        vendors,
+        live: false,
+        loading: !!user && isLoading,
+        outOfRange: demo.txns.length > 0 && demoTxns.length === 0,
+        refresh,
+      };
+    }
 
-  if (!combined || rowCount === 0) {
-    const demo = demoDatasetFor(orgId);
-    const vendors = uniqueVendors(demo.txns, demo.araps);
-    const demoTxns = demo.txns.filter((r) => inRange(r.date, range));
-    const demoAraps = demo.araps.filter((r) => inRange(r.invoice_date, range));
+    const inOrg = <T extends { org_id?: string | null }>(rows: T[]) =>
+      orgId === ALL ? rows : rows.filter((r) => r.org_id === orgId);
+
+    const txns: Transaction[] = inOrg(combined.t).map((r) => ({
+      id: r.id,
+      date: r.txn_date ?? "",
+      category: r.category ?? "Uncategorised",
+      subcategory: r.subcategory ?? "",
+      type: r.type === "income" ? "income" : "expense",
+      amount: parseNum(r.amount),
+      vendor_client: r.vendor_client ?? "",
+      status: r.status === "pending" ? "pending" : "paid",
+    }));
+
+    const pays: PayrollRecord[] = inOrg(combined.p).map((r) => ({
+      id: r.id,
+      month_year: r.month_year ?? "",
+      employee_id: r.employee_id ?? "",
+      name: r.name ?? "",
+      department: r.department ?? "",
+      basic_pay: parseNum(r.basic_pay),
+      allowances: parseNum(r.allowances),
+      deductions: parseNum(r.deductions),
+      pf_deduction: parseNum(r.pf_deduction),
+      tds_deduction: parseNum(r.tds_deduction),
+    }));
+
+    const buds: BudgetTarget[] = inOrg(combined.b).map((r) => ({
+      id: r.id,
+      fiscal_year: r.fiscal_year ?? "",
+      category: r.category ?? "",
+      department: r.department ?? "",
+      budgeted_amount: parseNum(r.budgeted_amount),
+      month: (r as { month?: string }).month ?? "Annual",
+    }));
+
+    const araps: ArApRecord[] = inOrg(combined.a).map((r) => ({
+      id: r.id,
+      type: r.type === "AP" ? "AP" : "AR",
+      party_name: r.party_name ?? "",
+      invoice_date: r.invoice_date ?? "",
+      due_date: r.due_date ?? "",
+      amount: parseNum(r.amount),
+      status: r.status === "settled" ? "settled" : "outstanding",
+    }));
+
+    // Cross-module fuzzy derivation: an uploaded file usually lands in one table
+    // only, so modules whose canonical table is empty map their metrics from the
+    // active dataset's own columns instead of showing ₹0.
+    const rawBucket = [combined.t, combined.p, combined.b, combined.a].find((rows) => rows.length) ?? [];
+    const rawRows = (inOrg(rawBucket as { org_id?: string | null }[]) as Record<string, unknown>[]).map((r) =>
+      withRawColumns(r),
+    );
+
+    const canonicalTotal = txns.reduce((s, t) => s + t.amount, 0);
+    const effectiveTxns = canonicalTotal > 0 ? txns : mapRowsToTransactions(rawRows);
+    const effectivePays = pays.length ? pays : derivePayroll(rawRows, effectiveTxns);
+    const effectiveBuds = buds.length ? buds : deriveBudget(rawRows);
+    const effectiveAraps = araps.length ? araps : deriveArAp(rawRows);
+
+    // Global date-range filter: every module reads this dataset, so scoping here
+    // syncs all pages to the header selection at once.
+    const txnsInRange = effectiveTxns.filter((r) => inRange(r.date, range));
+    const arapsInRange = effectiveAraps.filter((r) => inRange(r.invoice_date || r.due_date, range));
+    const paysInRange = effectivePays.filter((r) => inRange(r.month_year, range));
+
     return {
-      txns: byVendor(demoTxns, vendor, (r) => r.vendor_client),
-      pays: demo.pays.filter((r) => inRange(r.month_year, range)),
-      buds: demo.buds,
-      araps: byVendor(demoAraps, vendor, (r) => r.party_name),
-      vendors,
-      live: false,
-      loading: !!user && isLoading,
-      outOfRange: demo.txns.length > 0 && demoTxns.length === 0,
+      txns: byVendor(txnsInRange, vendor, (r) => r.vendor_client),
+      pays: paysInRange,
+      buds: buds.length ? buds : effectiveBuds,
+      araps: byVendor(arapsInRange, vendor, (r) => r.party_name),
+      vendors: uniqueVendors(txns, araps),
+      live: true,
+      loading: false,
+      outOfRange:
+        txns.length + araps.length + pays.length > 0 &&
+        txnsInRange.length + arapsInRange.length + paysInRange.length === 0,
       refresh,
     };
-  }
-
-  const inOrg = <T extends { org_id?: string | null }>(rows: T[]) =>
-    orgId === ALL ? rows : rows.filter((r) => r.org_id === orgId);
-
-  const txns: Transaction[] = inOrg(combined.t).map((r) => ({
-    id: r.id,
-    date: r.txn_date ?? "",
-    category: r.category ?? "Uncategorised",
-    subcategory: r.subcategory ?? "",
-    type: r.type === "income" ? "income" : "expense",
-    amount: parseNum(r.amount),
-    vendor_client: r.vendor_client ?? "",
-    status: r.status === "pending" ? "pending" : "paid",
-  }));
-
-  const pays: PayrollRecord[] = inOrg(combined.p).map((r) => ({
-    id: r.id,
-    month_year: r.month_year ?? "",
-    employee_id: r.employee_id ?? "",
-    name: r.name ?? "",
-    department: r.department ?? "",
-    basic_pay: parseNum(r.basic_pay),
-    allowances: parseNum(r.allowances),
-    deductions: parseNum(r.deductions),
-    pf_deduction: parseNum(r.pf_deduction),
-    tds_deduction: parseNum(r.tds_deduction),
-  }));
-
-  const buds: BudgetTarget[] = inOrg(combined.b).map((r) => ({
-    id: r.id,
-    fiscal_year: r.fiscal_year ?? "",
-    category: r.category ?? "",
-    department: r.department ?? "",
-    budgeted_amount: parseNum(r.budgeted_amount),
-    month: (r as { month?: string }).month ?? "Annual",
-  }));
-
-  const araps: ArApRecord[] = inOrg(combined.a).map((r) => ({
-    id: r.id,
-    type: r.type === "AP" ? "AP" : "AR",
-    party_name: r.party_name ?? "",
-    invoice_date: r.invoice_date ?? "",
-    due_date: r.due_date ?? "",
-    amount: parseNum(r.amount),
-    status: r.status === "settled" ? "settled" : "outstanding",
-  }));
-
-  // Cross-module fuzzy derivation: an uploaded file usually lands in one table
-  // only, so modules whose canonical table is empty map their metrics from the
-  // active dataset's own columns instead of showing ₹0.
-  const rawBucket = [combined.t, combined.p, combined.b, combined.a].find((rows) => rows.length) ?? [];
-  const rawRows = (inOrg(rawBucket as { org_id?: string | null }[]) as Record<string, unknown>[]).map((r) =>
-    withRawColumns(r),
-  );
-
-  const canonicalTotal = txns.reduce((s, t) => s + t.amount, 0);
-  const effectiveTxns = canonicalTotal > 0 ? txns : mapRowsToTransactions(rawRows);
-  const effectivePays = pays.length ? pays : derivePayroll(rawRows, effectiveTxns);
-  const effectiveBuds = buds.length ? buds : deriveBudget(rawRows);
-  const effectiveAraps = araps.length ? araps : deriveArAp(rawRows);
-
-  // Global date-range filter: every module reads this dataset, so scoping here
-  // syncs all pages to the header selection at once.
-  const txnsInRange = effectiveTxns.filter((r) => inRange(r.date, range));
-  const arapsInRange = effectiveAraps.filter((r) => inRange(r.invoice_date || r.due_date, range));
-  const paysInRange = effectivePays.filter((r) => inRange(r.month_year, range));
-
-  return {
-    txns: byVendor(txnsInRange, vendor, (r) => r.vendor_client),
-    pays: paysInRange,
-    buds,
-    araps: byVendor(arapsInRange, vendor, (r) => r.party_name),
-    vendors: uniqueVendors(txns, araps),
-    live: true,
-    loading: false,
-    outOfRange:
-      txns.length + araps.length + pays.length > 0 &&
-      txnsInRange.length + arapsInRange.length + paysInRange.length === 0,
-    refresh,
-  };
+  }, [data, fallback, activeFile, orgId, vendor, range, user, isLoading, refresh]);
 }
 
 /**
