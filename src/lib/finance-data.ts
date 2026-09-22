@@ -336,6 +336,7 @@ export interface MonthlyMargin {
   ebitda: number;
   grossMargin: number;
   ebitdaMargin: number;
+  netIncome: number;
   netMargin: number;
 }
 
@@ -358,6 +359,8 @@ export function monthlyMargins(
       .reduce((s, r) => s + (Number(r.amount) || 0), 0);
     const grossProfit = revenue - cogs;
     const ebitda = revenue - expense;
+    // Net income after a notional 26% corporate tax (base + cess) on profit.
+    const netIncome = ebitda > 0 ? ebitda * 0.74 : ebitda;
     return {
       month: month.slice(0, 3),
       revenue,
@@ -367,7 +370,8 @@ export function monthlyMargins(
       ebitda,
       grossMargin: safeMargin(grossProfit, revenue),
       ebitdaMargin: safeMargin(ebitda, revenue),
-      netMargin: safeMargin(ebitda, revenue),
+      netIncome,
+      netMargin: safeMargin(netIncome, revenue),
       rows: rows.length,
     };
   }).filter((m) => m.rows > 0 || m.revenue > 0) as MonthlyMargin[];

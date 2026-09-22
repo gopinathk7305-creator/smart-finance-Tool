@@ -12,6 +12,7 @@ import {
   Legend,
 } from "recharts";
 
+import { ActiveDatasetBanner } from "@/components/finance/ActiveDatasetBanner";
 import { AiReportButton } from "@/components/finance/AiReportButton";
 import { AppShell } from "@/components/finance/AppShell";
 import { KpiCard } from "@/components/finance/KpiCard";
@@ -64,6 +65,9 @@ function PnlPage() {
   const marginSeries = monthlyMargins(txns, cogsNames);
   const rawRows = useDatasetRaw();
   const gst = deriveGst(rawRows, t.revenue, t.expense);
+  // Net GST never shows negative: excess input credit is carried forward instead.
+  const gstPayable = Math.max(0, gst.payable);
+  const gstCreditAvailable = gst.payable < 0 ? Math.abs(gst.payable) : 0;
 
 
   // Taxable profit: EBITDA less depreciation & amortisation and finance cost.
@@ -149,7 +153,8 @@ function PnlPage() {
         rows: [
           ["Output GST on sales (18%)", inr(gst.outputGst)],
           ["Input tax credit on purchases", `(${inr(gst.inputCredit)})`],
-          ["Net GST payable", inr(gst.payable)],
+          ["Net GST payable", inr(gstPayable)],
+          ["Tax credit available (carry forward)", inr(gstCreditAvailable)],
         ],
       },
       {
@@ -169,6 +174,7 @@ function PnlPage() {
 
   return (
     <AppShell title="Financial Analysis & P&L" subtitle="FY 2026-27 statement of profit and loss">
+      <ActiveDatasetBanner />
       <div className="mb-4 flex justify-end">
         <AiReportButton build={buildReport} />
       </div>
@@ -251,6 +257,7 @@ function PnlPage() {
                   <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
                   <Line type="monotone" dataKey="grossMargin" name="Gross margin" stroke="var(--brand)" strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey="ebitdaMargin" name="EBITDA margin" stroke="var(--success)" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="netMargin" name="Net margin" stroke="var(--warning)" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             )}
@@ -281,8 +288,14 @@ function PnlPage() {
             </div>
             <div className="mt-2 flex justify-between rounded-md bg-primary px-3 py-2 text-sm font-bold text-primary-foreground">
               <span>Net GST payable</span>
-              <span className="tabular">{inr(gst.payable)}</span>
+              <span className="tabular">{inr(gstPayable)}</span>
             </div>
+            {gstCreditAvailable > 0 && (
+              <div className="flex justify-between rounded-md bg-success-soft px-3 py-2 text-sm font-semibold text-success">
+                <span>Tax credit available (carry forward)</span>
+                <span className="tabular">{inr(gstCreditAvailable)}</span>
+              </div>
+            )}
           </CardContent>
         </Card>
 
