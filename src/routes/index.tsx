@@ -80,7 +80,7 @@ function Dashboard() {
   // is only a fallback for datasets with no recognisable monetary fields.
   // Schema discovery: classify the dataset domain (P&L ledger / expense-only
   // ledger / payroll register) so the widgets match the columns that exist.
-  const discovery = useSchemaDiscovery(activeId);
+  const discovery = useSchemaDiscovery(activeId, mapped);
   const adaptedMode = discovery.ready;
   const recordsMode = dyn.usable && dyn.rowCount > 0;
 

@@ -9,6 +9,7 @@ import { detectColumns, mapRowsToTransactions, parseNum, safeMargin } from "@/li
 import { compactMoney, titleCase } from "@/lib/adaptive-dashboard";
 import { parseAnyDate } from "@/lib/clean";
 import { useDatasetRaw } from "@/lib/dataset";
+import type { Transaction } from "@/lib/finance-data";
 import { countRiskRows, distribution, inspectSchema, type SchemaInspection } from "@/lib/schema-inspector";
 
 export type DatasetMode = "pnl" | "expense" | "payroll" | "generic";
@@ -94,7 +95,7 @@ const MODE_LABEL: Record<DatasetMode, string> = {
  * Classify the active dataset and build the adapted KPI/chart configuration.
  * Runs in memory on the rows the page already holds.
  */
-export function useSchemaDiscovery(activeDatasetId?: string | null): SchemaDiscovery {
+export function useSchemaDiscovery(activeDatasetId?: string | null, fallbackTransactions: Transaction[] = []): SchemaDiscovery {
   const rows = useDatasetRaw();
 
   return useMemo(() => {
@@ -102,10 +103,11 @@ export function useSchemaDiscovery(activeDatasetId?: string | null): SchemaDisco
     const schema = inspectSchema(rows);
     const cols = schema.columns;
     const numeric = schema.numeric;
-    const rowCount = rows.length;
+    const rowCount = rows.length || fallbackTransactions.length;
     const columnCount = cols.length;
     const mapping = detectColumns(rows);
-    const transactions = mapRowsToTransactions(rows, mapping);
+    const mappedTransactions = mapRowsToTransactions(rows, mapping);
+    const transactions = mappedTransactions.length > 0 ? mappedTransactions : fallbackTransactions;
 
     const sum = (col?: string) => {
       if (!col) return 0;
@@ -303,5 +305,5 @@ export function useSchemaDiscovery(activeDatasetId?: string | null): SchemaDisco
       columnCount,
       ready: rowCount > 0 && (mode === "expense" || mode === "payroll") && kpis.length > 0,
     };
-  }, [rows, activeDatasetId]);
+  }, [rows, activeDatasetId, fallbackTransactions]);
 }
