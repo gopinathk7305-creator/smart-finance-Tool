@@ -137,12 +137,15 @@ function RootComponent() {
         <OrgProvider>
           <ActiveDatasetProvider>
           <WorkspaceProvider>
+          <AlertSettingsProvider>
           <InsightsProvider>
             {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
             <Outlet />
             <Toaster position="top-right" richColors />
           </InsightsProvider>
+          </AlertSettingsProvider>
           </WorkspaceProvider>
+
           </ActiveDatasetProvider>
         </OrgProvider>
       </AuthProvider>
