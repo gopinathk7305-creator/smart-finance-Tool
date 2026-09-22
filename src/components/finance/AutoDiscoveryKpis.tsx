@@ -14,8 +14,6 @@ const layout: Record<number, string> = {
 };
 
 export function AutoDiscoveryKpis({ kpis }: { kpis: DiscoveryKpi[] }) {
-  if (kpis.length === 0) return null;
-
   return (
     <div className="space-y-3">
       <Card className="border-border bg-muted/40 shadow-card">
@@ -26,11 +24,13 @@ export function AutoDiscoveryKpis({ kpis }: { kpis: DiscoveryKpi[] }) {
           </span>
         </CardContent>
       </Card>
-      <div className={cn("grid gap-4", layout[kpis.length] ?? layout[5])}>
-        {kpis.map((kpi) => (
-          <KpiCard key={kpi.label} label={kpi.label} value={kpi.value} {...(kpi.hint ? { hint: kpi.hint } : {})} />
-        ))}
-      </div>
+      {kpis.length > 0 && (
+        <div className={cn("grid gap-4", layout[kpis.length] ?? layout[5])}>
+          {kpis.map((kpi) => (
+            <KpiCard key={kpi.label} label={kpi.label} value={kpi.value} {...(kpi.hint ? { hint: kpi.hint } : {})} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

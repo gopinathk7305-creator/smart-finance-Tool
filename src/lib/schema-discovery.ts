@@ -276,7 +276,7 @@ export function useSchemaDiscovery(activeDatasetId?: string | null): SchemaDisco
       hasRevenue,
       rowCount,
       columnCount,
-      ready: rowCount > 0 && kpis.length > 0,
+      ready: rowCount > 0 && (mode === "expense" || mode === "payroll") && kpis.length > 0,
     };
   }, [rows, activeDatasetId]);
 }
