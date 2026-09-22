@@ -24,14 +24,12 @@ import { sumChunked } from "@/lib/aggregate";
 import { useActiveMonthlySeries } from "@/lib/monthly-cache";
 
 import { ActiveDatasetBanner } from "@/components/finance/ActiveDatasetBanner";
-import { AdaptiveDashboard } from "@/components/finance/AdaptiveDashboard";
 import { AdaptedDashboard } from "@/components/finance/AdaptedDashboard";
 import { AutoDiscoveryKpis } from "@/components/finance/AutoDiscoveryKpis";
 import { useSchemaDiscovery } from "@/lib/schema-discovery";
 import { AiReportButton } from "@/components/finance/AiReportButton";
 import { AppShell } from "@/components/finance/AppShell";
 import { useActiveDataset } from "@/lib/active-dataset";
-import { useAdaptiveDashboard } from "@/lib/adaptive-dashboard";
 import { useActiveDatasetMetrics } from "@/lib/dataset-metrics";
 import { useDynamicDashboard } from "@/lib/dynamic-dashboard";
 import { safeMargin } from "@/lib/column-map";
@@ -77,9 +75,6 @@ function Dashboard() {
   const { txns: mapped, live } = useDataset();
   const { activeId, syncing } = useActiveDataset();
   const dyn = useDynamicDashboard(activeId);
-  // Schema-driven engine: any dataset whose columns aren't recognisable finance
-  // fields still gets KPI cards and charts built from its own schema.
-  const adaptive = useAdaptiveDashboard(activeId);
   // Whenever the active dataset's own rows carry usable money columns we bind the
   // executive dashboard straight to those records; the schema-driven adaptive view
   // is only a fallback for datasets with no recognisable monetary fields.
@@ -88,7 +83,6 @@ function Dashboard() {
   const discovery = useSchemaDiscovery(activeId);
   const adaptedMode = discovery.ready;
   const recordsMode = dyn.usable && dyn.rowCount > 0;
-  const adaptiveMode = adaptive.ready && !recordsMode && !adaptedMode;
 
   // Canonical columns first; if the uploaded file used its own header names the
   // auto-mapper's normalised rows drive every figure instead.
@@ -207,8 +201,6 @@ function Dashboard() {
       )}
       {adaptedMode ? (
         <AdaptedDashboard profile={discovery} />
-      ) : adaptiveMode ? (
-        <AdaptiveDashboard profile={adaptive} />
       ) : (
       <>
       {busy ? (
