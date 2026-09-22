@@ -249,9 +249,12 @@ export function useSchemaDiscovery(activeDatasetId?: string | null): SchemaDisco
     if (revenueCol && revenueTotal > 0) {
       const grossProfit = revenueTotal - spendTotal;
       const margin = (grossProfit / revenueTotal) * 100;
-      candidates.unshift({ label: "Total Revenue", value: compactMoney(revenueTotal), hint: `Sum of ${titleCase(revenueCol)}`, backing: revenueTotal });
-      if (grossProfit > 0) candidates.push({ label: "Gross Profit", value: compactMoney(grossProfit), hint: "Revenue less detected outflow", backing: grossProfit });
-      if (margin > 0 && Number.isFinite(margin)) candidates.push({ label: "Net Margin", value: `${margin.toFixed(1)}%`, hint: "Based on detected revenue and outflow", backing: margin });
+      const revenueMetrics: Array<DiscoveryKpi & { backing: number }> = [
+        { label: "Total Revenue", value: compactMoney(revenueTotal), hint: `Sum of ${titleCase(revenueCol)}`, backing: revenueTotal },
+      ];
+      if (grossProfit > 0) revenueMetrics.push({ label: "Gross Profit", value: compactMoney(grossProfit), hint: "Revenue less detected outflow", backing: grossProfit });
+      if (margin > 0 && Number.isFinite(margin)) revenueMetrics.push({ label: "Net Margin", value: `${margin.toFixed(1)}%`, hint: "Based on detected revenue and outflow", backing: margin });
+      candidates.unshift(...revenueMetrics);
     }
 
     const kpis = candidates.filter(validMetric).slice(0, 5).map(({ backing: _backing, ...metric }) => metric);
