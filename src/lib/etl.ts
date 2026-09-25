@@ -395,10 +395,21 @@ function normaliseRows(rows: Record<string, unknown>[]): Record<string, string>[
  * CSV input; each callback is split into small row blocks and explicitly yields
  * so React can paint progress. Excel worksheets are mapped in bounded ranges.
  */
+export const isWorkbook = (name: string) => /\.xlsx?$/i.test(name);
+
+/** Sheet names of an Excel workbook (empty for CSV). */
+export async function listSheets(file: File): Promise<string[]> {
+  if (!isWorkbook(file.name)) return [];
+  const XLSX = await import("xlsx");
+  const wb = XLSX.read(await file.arrayBuffer(), { type: "array", bookSheets: true });
+  return wb.SheetNames;
+}
+
 export async function streamTabular(
   file: File,
   onProgress: (p: StreamProgress) => void,
   chunkSize = 1000,
+  sheetName?: string,
 ): Promise<Record<string, string>[]> {
   if (!/\.csv$/i.test(file.name)) {
     if (!/\.xlsx?$/i.test(file.name)) throw new Error("Unsupported file — upload .csv, .xls or .xlsx");
@@ -406,8 +417,8 @@ export async function streamTabular(
     const started = Date.now();
     const buffer = await file.arrayBuffer();
     await yieldToBrowser();
-    const wb = XLSX.read(buffer, { type: "array", cellDates: true });
-    const sheet = wb.Sheets[wb.SheetNames[0] ?? ""];
+    const wb = XLSX.read(buffer, { type: "array", cellDates: true, sheets: sheetName ? [sheetName] : 0 });
+    const sheet = wb.Sheets[sheetName ?? wb.SheetNames[0] ?? ""];
     if (!sheet || !sheet["!ref"]) return [];
     const range = XLSX.utils.decode_range(sheet["!ref"]);
     const headerRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {

@@ -6,6 +6,7 @@ import {
   CloudUpload,
   Database,
   Eye,
+  FileSpreadsheet,
   FolderOpen,
   Loader2,
   Sparkles,
@@ -39,6 +40,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -52,10 +54,10 @@ import { logActivity, useAuth } from "@/lib/auth";
 import { ALL, useOrg } from "@/lib/orgs";
 import { cacheLocalDatasetRows, clearLocalDatasetRows, useDataset } from "@/lib/dataset";
 import { useInsights } from "@/lib/insights";
-import { useActiveDataset } from "@/lib/active-dataset";
+import { sheetDatasetName, splitSheet, useActiveDataset } from "@/lib/active-dataset";
 import { VirtualTable } from "@/components/finance/VirtualTable";
 import { collectColumns, DataGrid, labelFor, numericColumns } from "@/components/finance/DataGrid";
-import { type EtlResult, issueTone, runEtlChunked, streamTabular } from "@/lib/etl";
+import { type EtlResult, isWorkbook, issueTone, listSheets, runEtlChunked, streamTabular } from "@/lib/etl";
 import { detectSchema, type Detection } from "@/lib/schema-detect";
 import { fetchAllRows, withRawColumns } from "@/lib/fetch-all";
 import { DATE_KEY_RE, defaultFor, isBlank, parseAnyDate, toISODateSafe } from "@/lib/clean";
@@ -195,6 +197,11 @@ function UploadPage() {
   const [confirmDelete, setConfirmDelete] = useState<StoredDataset | null>(null);
   const [deleting, setDeleting] = useState<{ id: string; removed: number } | null>(null);
 
+  const [workbook, setWorkbook] = useState<File | null>(null);
+  const [sheetNames, setSheetNames] = useState<string[]>([]);
+  const [activeSheet, setActiveSheet] = useState<string | null>(null);
+  const [sheetPickerOpen, setSheetPickerOpen] = useState(false);
+
   const [search, setSearch] = useState("");
   const [hiddenViewerCols, setHiddenViewerCols] = useState<Set<string>>(new Set());
   const [fixedRows, setFixedRows] = useState<Record<string, unknown>[] | null>(null);
@@ -288,6 +295,42 @@ function UploadPage() {
     );
   }, [viewerBase, search, allViewerCols]);
 
+  const pickSheet = (name: string) => {
+    if (!workbook) return;
+    setSheetPickerOpen(false);
+    setActiveSheet(name);
+    void ingest(workbook, name, sheetNames.length);
+  };
+
+  // Sheets of the workbook the open dataset came from, for the inspector switcher.
+  const viewerBook = viewer ? splitSheet(viewer.file_name) : null;
+  const viewerSheets = useMemo(() => {
+    if (!viewerBook?.sheet) return [] as { name: string; dataset: StoredDataset | null }[];
+    const stored_ = (stored.data ?? []).filter((d) => {
+      const s = splitSheet(d.file_name);
+      return s.workbook === viewerBook.workbook && s.sheet;
+    });
+    const list = stored_.map((d) => ({ name: splitSheet(d.file_name).sheet!, dataset: d as StoredDataset | null }));
+    // Sheets of the workbook still in memory that were not imported yet.
+    if (workbook?.name === viewerBook.workbook)
+      sheetNames.forEach((n) => {
+        if (!list.some((x) => x.name === n)) list.push({ name: n, dataset: null });
+      });
+    return list.filter((x, i) => list.findIndex((y) => y.name === x.name) === i);
+  }, [viewerBook?.workbook, viewerBook?.sheet, stored.data, workbook, sheetNames]);
+
+  const switchViewerSheet = (name: string) => {
+    const hit = viewerSheets.find((x) => x.name === name);
+    if (hit?.dataset) {
+      setFixedRows(null);
+      setHiddenViewerCols(new Set());
+      setViewer(hit.dataset);
+    } else if (workbook) {
+      setViewer(null);
+      pickSheet(name);
+    }
+  };
+
   /* ------------------------------------------------ ingestion */
 
   const runPipeline = async (
@@ -326,8 +369,35 @@ function UploadPage() {
       toast.error("Sign in to upload your own data.");
       return;
     }
+    if (isWorkbook(file.name)) {
+      let names: string[] = [];
+      try {
+        names = await listSheets(file);
+      } catch {
+        toast.error("Could not read that workbook.");
+        return;
+      }
+      setWorkbook(file);
+      setSheetNames(names);
+      if (names.length > 1) {
+        setSheetPickerOpen(true);
+        return;
+      }
+      setActiveSheet(names[0] ?? null);
+      return ingest(file, names[0], names.length);
+    }
+    setWorkbook(null);
+    setSheetNames([]);
+    setActiveSheet(null);
+    return ingest(file);
+  };
+
+  /** Parses one file (or one sheet of a workbook) and opens the review step. */
+  const ingest = async (file: File, sheet?: string, sheetCount = 1) => {
+    if (!user) return;
+    const datasetName = sheet && sheetCount > 1 ? sheetDatasetName(file.name, sheet) : file.name;
     let raw: Record<string, string>[];
-    setProgress({ label: `Parsing ${file.name}…`, pct: 2, eta: "" });
+    setProgress({ label: `Parsing ${sheet ? `sheet "${sheet}" of ` : ""}${file.name}…`, pct: 2, eta: "" });
     try {
       raw = await streamTabular(
         file,
@@ -340,6 +410,7 @@ function UploadPage() {
           });
         },
         BATCH_SIZE,
+        sheet,
       );
     } catch (e) {
       setProgress(null);
@@ -348,7 +419,7 @@ function UploadPage() {
     }
     if (!raw.length) {
       setProgress(null);
-      toast.error("That file has no data rows.");
+      toast.error(sheet ? `Sheet "${sheet}" has no data rows.` : "That file has no data rows.");
       return;
     }
 
@@ -362,7 +433,7 @@ function UploadPage() {
     setDetection(det);
     setRawCache(raw);
     setFixed(false);
-    await runPipeline(det, raw, file.name, false);
+    await runPipeline(det, raw, datasetName, false);
     setProgress(null);
     setMappedOpen(true);
   };
@@ -955,6 +1026,20 @@ function UploadPage() {
             </DialogDescription>
           </DialogHeader>
 
+          {workbook && sheetNames.length > 1 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 p-2">
+              <FileSpreadsheet className="size-4 text-brand" />
+              <span className="text-sm font-medium">Active Sheet:</span>
+              <Select value={activeSheet ?? ""} onValueChange={pickSheet}>
+                <SelectTrigger className="h-8 w-56"><SelectValue placeholder="Choose a sheet" /></SelectTrigger>
+                <SelectContent>
+                  {sheetNames.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <span className="text-xs text-muted-foreground">{sheetNames.length} sheets in this workbook — switching re-reads that sheet.</span>
+            </div>
+          )}
+
           {parsed && detection && (
             <div className="space-y-4">
               <div className="flex flex-wrap gap-2">
@@ -1063,6 +1148,25 @@ function UploadPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={sheetPickerOpen} onOpenChange={setSheetPickerOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Select Active Sheet</DialogTitle>
+            <DialogDescription>
+              {workbook?.name} has {sheetNames.length} sheets. Pick the one to import — you can switch sheets later
+              without uploading again.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2">
+            {sheetNames.map((n) => (
+              <Button key={n} variant="outline" className="justify-start" onClick={() => pickSheet(n)}>
+                <FileSpreadsheet className="size-4 text-brand" /> {n}
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Stored dataset viewer */}
       <Dialog open={!!viewer} onOpenChange={(o) => !o && setViewer(null)}>
         <DialogContent className="max-w-[95vw] sm:max-w-[95vw]">
@@ -1082,6 +1186,21 @@ function UploadPage() {
               onChange={(e) => setSearch(e.target.value)}
               className="max-w-sm"
             />
+            {viewerSheets.length > 0 && viewerBook?.sheet && (
+              <Select value={viewerBook.sheet} onValueChange={switchViewerSheet}>
+                <SelectTrigger className="h-8 w-auto gap-2">
+                  <FileSpreadsheet className="size-4" />
+                  <span className="text-sm">Active Sheet: {viewerBook.sheet}</span>
+                </SelectTrigger>
+                <SelectContent>
+                  {viewerSheets.map((x) => (
+                    <SelectItem key={x.name} value={x.name}>
+                      {x.name}{x.dataset ? "" : " (not imported — import now)"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm">

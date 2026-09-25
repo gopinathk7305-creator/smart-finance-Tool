@@ -15,6 +15,16 @@ import { useAuth } from "@/lib/auth";
 
 const ACTIVE_KEY = "financeiq.active-dataset";
 
+/** Each Excel sheet is stored as its own dataset named "Book.xlsx › Sheet". */
+export const SHEET_SEP = " › ";
+export const sheetDatasetName = (file: string, sheet?: string | null) =>
+  sheet ? `${file}${SHEET_SEP}${sheet}` : file;
+export function splitSheet(name: string): { workbook: string; sheet: string | null } {
+  const clean = name.replace(/ \(v\d+\)$/, "");
+  const i = clean.lastIndexOf(SHEET_SEP);
+  return i < 0 ? { workbook: clean, sheet: null } : { workbook: clean.slice(0, i), sheet: clean.slice(i + SHEET_SEP.length) };
+}
+
 export interface DatasetSummary {
   id: string;
   file_name: string;
