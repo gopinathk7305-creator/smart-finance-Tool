@@ -7,7 +7,7 @@ const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "
 const monthIndex = (key: string) => {
   const k = key.trim().toLowerCase().replace(/[^a-z]/g, "");
   if (k.length < 3) return -1;
-  return MONTHS.findIndex((m) => k === m || (k.startsWith(m) && MONTHS.some((x) => x.length && k.length <= 9)));
+  return MONTHS.findIndex((m) => k === m || (k.startsWith(m) && k.length <= 9));
 };
 
 export function monthColumns(rows: Record<string, unknown>[]): { col: string; idx: number }[] {
