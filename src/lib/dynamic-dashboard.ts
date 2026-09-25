@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { sumChunked } from "@/lib/aggregate";
 import { detectColumns, mapRowsToTransactions, type ColumnMap } from "@/lib/column-map";
 import { useDatasetRaw } from "@/lib/dataset";
+import { unpivotMonthColumns } from "@/lib/wide-months";
 import {
   countRiskRows,
   distribution,
@@ -40,7 +41,8 @@ export interface DynamicDashboard {
  * uploaded file happens to have.
  */
 export function useDynamicDashboard(activeDatasetId?: string | null): DynamicDashboard {
-  const rows = useDatasetRaw();
+  const rawRows = useDatasetRaw();
+  const rows = useMemo(() => unpivotMonthColumns(rawRows), [rawRows]);
 
   return useMemo(() => {
     void activeDatasetId; // recompute marker: rows change with the active dataset

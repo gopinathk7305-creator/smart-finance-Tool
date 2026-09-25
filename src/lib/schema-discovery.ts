@@ -9,6 +9,7 @@ import { detectColumns, mapRowsToTransactions, parseNum, safeMargin } from "@/li
 import { compactMoney, titleCase } from "@/lib/adaptive-dashboard";
 import { parseAnyDate } from "@/lib/clean";
 import { useDatasetRaw } from "@/lib/dataset";
+import { unpivotMonthColumns } from "@/lib/wide-months";
 import type { Transaction } from "@/lib/finance-data";
 import { countRiskRows, distribution, inspectSchema, type SchemaInspection } from "@/lib/schema-inspector";
 
@@ -96,7 +97,8 @@ const MODE_LABEL: Record<DatasetMode, string> = {
  * Runs in memory on the rows the page already holds.
  */
 export function useSchemaDiscovery(activeDatasetId?: string | null, fallbackTransactions: Transaction[] = []): SchemaDiscovery {
-  const rows = useDatasetRaw();
+  const rawRows = useDatasetRaw();
+  const rows = useMemo(() => unpivotMonthColumns(rawRows), [rawRows]);
 
   return useMemo(() => {
     void activeDatasetId; // recompute marker
@@ -284,7 +286,7 @@ export function useSchemaDiscovery(activeDatasetId?: string | null, fallbackTran
       { label: "Risk / Audit Flags", value: plain.format(riskCount), hint: `${plain.format(explicitRiskCount)} flagged · ${plain.format(duplicateCount)} duplicates` },
     ];
     const hasFinanceData = transactions.length > 0 || Boolean(mapping.revenue || mapping.expense || mapping.cogs || mapping.amount);
-    const kpis = hasFinanceData ? coreKpis : candidates.filter((metric) => metric.value.trim() && metric.value !== "₹0").slice(0, 5);
+    const kpis = hasFinanceData && mode !== "expense" && mode !== "payroll" ? coreKpis : candidates.filter((metric) => metric.value.trim() && metric.value !== "₹0").slice(0, 5);
 
     return {
       mode,
