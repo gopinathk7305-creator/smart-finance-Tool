@@ -501,6 +501,8 @@ export async function streamTabular(
     Papa.parse<Record<string, string>>(file, {
       header: true,
       skipEmptyLines: true,
+      delimiter: "",
+      delimitersToGuess: [",", "\t", ";", "|"],
       worker: false,
       chunkSize: 256 * 1024,
       chunk: (results, parser) => {
