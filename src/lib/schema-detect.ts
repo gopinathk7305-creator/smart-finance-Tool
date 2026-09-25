@@ -95,7 +95,17 @@ export function detectSchema(headers: string[]): Detection {
     if (!best || score > best.score) best = { rule, score, matched };
   }
 
-  const picked = best!;
+  // Only claim payroll / budget when a genuinely specific column exists; otherwise
+  // keep the file as generic records so its own headers are preserved as-is.
+  const PAYROLL_REQ = ["basic_pay", "salary", "gross_pay", "net_pay", "pf_deduction", "tds_deduction", "ctc"];
+  const BUDGET_REQ = ["budget", "budgeted_amount", "planned_amount", "target"];
+  if (best && best.rule.key === "payroll" && !PAYROLL_REQ.some(has)) best = null;
+  if (best && best.rule.key === "budget" && !BUDGET_REQ.some(has)) best = null;
+  if (!best) {
+    const rule = RULES.find((r) => r.key === "transactions")!;
+    best = { rule, score: 1, matched: [] };
+  }
+  const picked = best;
   const modules = [...picked.rule.modules];
   if (AUDIT_SIGNALS.some(has)) modules.push("Audit & Fraud Risk");
   if (has("gstin") || has("gst")) modules.push("GST & Compliance");

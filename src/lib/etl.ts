@@ -395,6 +395,28 @@ function normaliseRows(rows: Record<string, unknown>[]): Record<string, string>[
  * CSV input; each callback is split into small row blocks and explicitly yields
  * so React can paint progress. Excel worksheets are mapped in bounded ranges.
  */
+/** Index (0-9) of the first row that looks like a real header: several text labels, not a title banner. */
+export function detectHeaderRow(rows: unknown[][]): number {
+  const filled = rows.map((r) => (r ?? []).filter((v) => String(v ?? "").trim() !== "").length);
+  const widest = Math.max(0, ...filled);
+  for (let i = 0; i < rows.length; i++) {
+    const cells = (rows[i] ?? []).map((v) => String(v ?? "").trim()).filter(Boolean);
+    const labels = cells.filter((c) => !/^[-\d.,₹$%()\s/]+$/.test(c));
+    if (labels.length >= 2 && cells.length >= Math.max(2, widest * 0.5) && labels.length >= cells.length * 0.6) return i;
+  }
+  return 0;
+}
+
+const SUMMARY_RE = /^(grand\s*total|sub\s*-?\s*total|total|totals|net\s*total|overall\s*total)\b/i;
+/** True for "TOTAL" / "Grand Total" style summary lines in any of the first text cells. */
+export function isSummaryRow(row: Record<string, string>): boolean {
+  return Object.values(row)
+    .map((v) => String(v ?? "").trim())
+    .filter((v) => v && !/^[-\d.,₹$%()\s]+$/.test(v))
+    .slice(0, 3)
+    .some((v) => SUMMARY_RE.test(v));
+}
+
 export const isWorkbook = (name: string) => /\.xlsx?$/i.test(name);
 
 /** Sheet names of an Excel workbook (empty for CSV). */
@@ -421,15 +443,24 @@ export async function streamTabular(
     const sheet = wb.Sheets[sheetName ?? wb.SheetNames[0] ?? ""];
     if (!sheet || !sheet["!ref"]) return [];
     const range = XLSX.utils.decode_range(sheet["!ref"]);
-    const headerRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+    const top = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
       header: 1,
-      range: { s: { r: range.s.r, c: range.s.c }, e: { r: range.s.r, c: range.e.c } },
-      blankrows: false,
+      range: { s: { r: range.s.r, c: range.s.c }, e: { r: Math.min(range.e.r, range.s.r + 9), c: range.e.c } },
+      blankrows: true,
       defval: "",
+      raw: false,
     });
-    const headers = (headerRows[0] ?? []).map((h) => normaliseHeader(String(h ?? "")));
+    const headerOffset = detectHeaderRow(top);
+    const headerRow = range.s.r + headerOffset;
+    const seenHeaders = new Map<string, number>();
+    const headers = (top[headerOffset] ?? []).map((h, i) => {
+      const base = normaliseHeader(String(h ?? "")) || `column_${i + 1}`;
+      const n = seenHeaders.get(base) ?? 0;
+      seenHeaders.set(base, n + 1);
+      return n ? `${base}_${n + 1}` : base;
+    });
     const all: Record<string, string>[] = [];
-    const dataStart = range.s.r + 1;
+    const dataStart = headerRow + 1;
     const totalRows = Math.max(0, range.e.r - range.s.r);
     for (let start = dataStart; start <= range.e.r; start += chunkSize) {
       const end = Math.min(range.e.r, start + chunkSize - 1);
@@ -445,7 +476,7 @@ export async function streamTabular(
         headers.forEach((header, index) => {
           if (header) row[header] = String(valuesRow[index] ?? "");
         });
-        if (Object.values(row).some((value) => value !== "")) all.push(row);
+        if (Object.values(row).some((value) => value !== "") && !isSummaryRow(row)) all.push(row);
       }
       const elapsed = (Date.now() - started) / 1000;
       const done = Math.min(totalRows, end - range.s.r);
