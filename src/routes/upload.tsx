@@ -1030,7 +1030,7 @@ function UploadPage() {
             <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 p-2">
               <FileSpreadsheet className="size-4 text-brand" />
               <span className="text-sm font-medium">Active Sheet:</span>
-              <Select value={activeSheet ?? undefined} onValueChange={pickSheet}>
+              <Select value={activeSheet ?? ""} onValueChange={pickSheet}>
                 <SelectTrigger className="h-8 w-56"><SelectValue placeholder="Choose a sheet" /></SelectTrigger>
                 <SelectContent>
                   {sheetNames.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
