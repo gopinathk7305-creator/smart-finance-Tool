@@ -6,6 +6,7 @@ import {
   CloudUpload,
   Database,
   Eye,
+  FileSpreadsheet,
   FolderOpen,
   Loader2,
   Sparkles,
@@ -39,6 +40,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -52,10 +54,10 @@ import { logActivity, useAuth } from "@/lib/auth";
 import { ALL, useOrg } from "@/lib/orgs";
 import { cacheLocalDatasetRows, clearLocalDatasetRows, useDataset } from "@/lib/dataset";
 import { useInsights } from "@/lib/insights";
-import { useActiveDataset } from "@/lib/active-dataset";
+import { sheetDatasetName, splitSheet, useActiveDataset } from "@/lib/active-dataset";
 import { VirtualTable } from "@/components/finance/VirtualTable";
 import { collectColumns, DataGrid, labelFor, numericColumns } from "@/components/finance/DataGrid";
-import { type EtlResult, issueTone, runEtlChunked, streamTabular } from "@/lib/etl";
+import { type EtlResult, isWorkbook, issueTone, listSheets, runEtlChunked, streamTabular } from "@/lib/etl";
 import { detectSchema, type Detection } from "@/lib/schema-detect";
 import { fetchAllRows, withRawColumns } from "@/lib/fetch-all";
 import { DATE_KEY_RE, defaultFor, isBlank, parseAnyDate, toISODateSafe } from "@/lib/clean";
@@ -195,6 +197,11 @@ function UploadPage() {
   const [confirmDelete, setConfirmDelete] = useState<StoredDataset | null>(null);
   const [deleting, setDeleting] = useState<{ id: string; removed: number } | null>(null);
 
+  const [workbook, setWorkbook] = useState<File | null>(null);
+  const [sheetNames, setSheetNames] = useState<string[]>([]);
+  const [activeSheet, setActiveSheet] = useState<string | null>(null);
+  const [sheetPickerOpen, setSheetPickerOpen] = useState(false);
+
   const [search, setSearch] = useState("");
   const [hiddenViewerCols, setHiddenViewerCols] = useState<Set<string>>(new Set());
   const [fixedRows, setFixedRows] = useState<Record<string, unknown>[] | null>(null);
@@ -326,8 +333,36 @@ function UploadPage() {
       toast.error("Sign in to upload your own data.");
       return;
     }
+    if (isWorkbook(file.name)) {
+      let names: string[] = [];
+      try {
+        names = await listSheets(file);
+      } catch {
+        toast.error("Could not read that workbook.");
+        return;
+      }
+      setWorkbook(file);
+      setSheetNames(names);
+      if (names.length > 1) {
+        setSheetPickerOpen(true);
+        return;
+      }
+      setActiveSheet(names[0] ?? null);
+      return ingest(file, names[0]);
+    }
+    setWorkbook(null);
+    setSheetNames([]);
+    setActiveSheet(null);
+    return ingest(file);
+  };
+
+  /** Parses one file (or one sheet of a workbook) and opens the review step. */
+  const ingest = async (file: File, sheet?: string) => {
+    if (!user) return;
+    const multi = sheet != null && sheetNames.length + (isWorkbook(file.name) ? 1 : 0) > 1;
+    const datasetName = sheet && (multi || sheetNames.length > 1) ? sheetDatasetName(file.name, sheet) : file.name;
     let raw: Record<string, string>[];
-    setProgress({ label: `Parsing ${file.name}…`, pct: 2, eta: "" });
+    setProgress({ label: `Parsing ${sheet ? `sheet "${sheet}" of ` : ""}${file.name}…`, pct: 2, eta: "" });
     try {
       raw = await streamTabular(
         file,
@@ -340,6 +375,7 @@ function UploadPage() {
           });
         },
         BATCH_SIZE,
+        sheet,
       );
     } catch (e) {
       setProgress(null);
@@ -348,7 +384,7 @@ function UploadPage() {
     }
     if (!raw.length) {
       setProgress(null);
-      toast.error("That file has no data rows.");
+      toast.error(sheet ? `Sheet "${sheet}" has no data rows.` : "That file has no data rows.");
       return;
     }
 
@@ -362,7 +398,7 @@ function UploadPage() {
     setDetection(det);
     setRawCache(raw);
     setFixed(false);
-    await runPipeline(det, raw, file.name, false);
+    await runPipeline(det, raw, datasetName, false);
     setProgress(null);
     setMappedOpen(true);
   };
