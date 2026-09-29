@@ -20,6 +20,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  LabelList,
   Legend,
   ComposedChart,
   Line,
@@ -33,6 +34,7 @@ import {
 import { toast } from "sonner";
 
 import { AiReportButton } from "@/components/finance/AiReportButton";
+import { chartLabelProps, moneyDataLabel, monthsDataLabel } from "@/components/finance/ChartDataLabels";
 import { ActiveDatasetBanner } from "@/components/finance/ActiveDatasetBanner";
 import { AppShell } from "@/components/finance/AppShell";
 import { KpiCard } from "@/components/finance/KpiCard";
@@ -719,7 +721,7 @@ function ForecastPage() {
             <CardContent className="h-[340px]">
               <ResponsiveContainer width="100%" height="100%">
                 {tab === "revopex" ? (
-                  <BarChart data={rows}>
+                  <BarChart data={rows} margin={{ top: 26 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                     <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
                     <YAxis
@@ -731,11 +733,15 @@ function ForecastPage() {
                     />
                     <Tooltip formatter={(v) => inr(Number(v))} />
                     <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                    <Bar dataKey="scenRevenue" name="Revenue" fill="#0284c7" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="scenExpense" name="Opex" fill="#334155" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="scenRevenue" name="Revenue" fill="#0284c7" radius={[4, 4, 0, 0]}>
+                      <LabelList dataKey="scenRevenue" position="top" {...chartLabelProps} formatter={moneyDataLabel} />
+                    </Bar>
+                    <Bar dataKey="scenExpense" name="Opex" fill="#334155" radius={[4, 4, 0, 0]}>
+                      <LabelList dataKey="scenExpense" position="top" {...chartLabelProps} formatter={moneyDataLabel} />
+                    </Bar>
                   </BarChart>
                 ) : tab === "runway" ? (
-                  <LineChart data={rows}>
+                  <LineChart data={rows} margin={{ top: 26, right: 16 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                     <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
                     <YAxis
@@ -753,11 +759,13 @@ function ForecastPage() {
                       name="Runway"
                       stroke="#0284c7"
                       strokeWidth={2}
-                      dot={false}
-                    />
+                      dot={{ r: 3 }}
+                    >
+                      <LabelList dataKey="runway" position="top" {...chartLabelProps} formatter={monthsDataLabel} />
+                    </Line>
                   </LineChart>
                 ) : tab === "cumulative" ? (
-                  <ComposedChart data={rows}>
+                  <ComposedChart data={rows} margin={{ top: 26, right: 16 }}>
 
                     <defs>
                       <linearGradient id="cum" x1="0" y1="0" x2="0" y2="1">
@@ -783,7 +791,10 @@ function ForecastPage() {
                       stroke="#0284c7"
                       strokeWidth={2}
                       fill="url(#cum)"
-                    />
+                      dot={{ r: 3 }}
+                    >
+                      <LabelList dataKey="cumulative" position="top" {...chartLabelProps} formatter={moneyDataLabel} />
+                    </Area>
                     <Line
                       type="monotone"
                       dataKey="advanceTax"
@@ -792,11 +803,13 @@ function ForecastPage() {
                       strokeWidth={0}
                       dot={{ r: 4, fill: "#dc2626" }}
                       activeDot={{ r: 6 }}
-                    />
+                    >
+                      <LabelList dataKey="advanceTax" position="bottom" {...chartLabelProps} formatter={moneyDataLabel} />
+                    </Line>
                   </ComposedChart>
 
                 ) : (
-                  <AreaChart data={rows}>
+                  <AreaChart data={rows} margin={{ top: 26, right: 16 }}>
                     <defs>
                       <linearGradient id="scen" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#0284c7" stopOpacity={0.35} />
@@ -822,7 +835,9 @@ function ForecastPage() {
                         stroke="transparent"
                         fill="#0284c7"
                         fillOpacity={0.12}
-                      />
+                      >
+                        <LabelList dataKey="upper" position="top" {...chartLabelProps} formatter={moneyDataLabel} />
+                      </Area>
                     )}
                     {band && (
                       <Area
@@ -832,7 +847,9 @@ function ForecastPage() {
                         stroke="transparent"
                         fill="#0284c7"
                         fillOpacity={0.2}
-                      />
+                      >
+                        <LabelList dataKey="upper80" position="top" {...chartLabelProps} formatter={moneyDataLabel} />
+                      </Area>
                     )}
                     {band && (
                       <Area
@@ -845,7 +862,9 @@ function ForecastPage() {
                         fill="transparent"
                         legendType="none"
                         tooltipType="none"
-                      />
+                      >
+                        <LabelList dataKey="lower80" position="bottom" {...chartLabelProps} formatter={moneyDataLabel} />
+                      </Area>
                     )}
                     {band && (
                       <Area
@@ -858,7 +877,9 @@ function ForecastPage() {
                         fill="transparent"
                         legendType="none"
                         tooltipType="none"
-                      />
+                      >
+                        <LabelList dataKey="lower" position="bottom" {...chartLabelProps} formatter={moneyDataLabel} />
+                      </Area>
                     )}
                     <Area
                       type="monotone"
@@ -868,7 +889,10 @@ function ForecastPage() {
                       strokeDasharray="5 4"
                       strokeWidth={2}
                       fill="transparent"
-                    />
+                      dot={{ r: 3 }}
+                    >
+                      <LabelList dataKey="baseProfit" position="top" {...chartLabelProps} formatter={moneyDataLabel} />
+                    </Area>
                     <Area
                       type="monotone"
                       dataKey="scenProfit"
@@ -876,7 +900,10 @@ function ForecastPage() {
                       stroke="#0284c7"
                       strokeWidth={2}
                       fill="url(#scen)"
-                    />
+                      dot={{ r: 3 }}
+                    >
+                      <LabelList dataKey="scenProfit" position="bottom" {...chartLabelProps} formatter={moneyDataLabel} />
+                    </Area>
                   </AreaChart>
                 )}
               </ResponsiveContainer>

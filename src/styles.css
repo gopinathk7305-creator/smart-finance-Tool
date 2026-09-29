@@ -71,6 +71,7 @@
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
   --color-brand-soft: var(--brand-soft);
+  --color-chart-label: var(--chart-label);
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
   --shadow-card: 0 1px 2px 0 oklch(0.129 0.042 264.695 / 0.06), 0 1px 3px 0 oklch(0.129 0.042 264.695 / 0.05);
@@ -122,6 +123,7 @@
   --brand: oklch(0.511 0.226 277.1);
   --brand-foreground: oklch(0.985 0 0);
   --brand-soft: oklch(0.958 0.024 277.1);
+  --chart-label: #0f172a;
 }
 
 .dark {
@@ -157,6 +159,7 @@
   --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.551 0.027 264.364);
+  --chart-label: #f8fafc;
 }
 
 @layer base {
@@ -184,6 +187,19 @@
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     letter-spacing: 0;
+  }
+
+  .chart-data-label {
+    fill: var(--chart-label);
+    stroke: var(--card);
+    stroke-width: 3px;
+    paint-order: stroke fill;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
+    pointer-events: none;
   }
 }
 

@@ -15,6 +15,7 @@ import {
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AutoDiscoveryKpis } from "@/components/finance/AutoDiscoveryKpis";
+import { chartLabelProps, DonutValueLabel } from "@/components/finance/ChartDataLabels";
 import { compactMoney } from "@/lib/adaptive-dashboard";
 import type { SchemaDiscovery } from "@/lib/schema-discovery";
 
@@ -42,7 +43,7 @@ export function AdaptedDashboard({ profile }: { profile: SchemaDiscovery }) {
             </CardHeader>
             <CardContent className="h-[320px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthly}>
+                <BarChart data={monthly} margin={{ top: 24 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={11} />
                   <YAxis
@@ -58,7 +59,7 @@ export function AdaptedDashboard({ profile }: { profile: SchemaDiscovery }) {
                     <LabelList
                       dataKey="spend"
                       position="top"
-                      style={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                      {...chartLabelProps}
                       formatter={(val: number) => compactMoney(Number(val))}
                     />
                   </Bar>
@@ -76,8 +77,8 @@ export function AdaptedDashboard({ profile }: { profile: SchemaDiscovery }) {
             </CardHeader>
             <CardContent className="h-[320px]">
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={breakdown} dataKey="value" nameKey="name" cx="50%" cy="45%" innerRadius={44} outerRadius={70}>
+                <PieChart margin={{ top: 20, right: 74, bottom: 28, left: 74 }}>
+                  <Pie data={breakdown} dataKey="value" nameKey="name" cx="50%" cy="45%" innerRadius={40} outerRadius={62} labelLine={{ stroke: "var(--muted-foreground)" }} label={DonutValueLabel}>
                     {breakdown.map((_, i) => (
                       <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                     ))}

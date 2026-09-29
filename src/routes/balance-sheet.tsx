@@ -13,6 +13,7 @@ import {
 } from "recharts";
 
 import { ActiveDatasetBanner } from "@/components/finance/ActiveDatasetBanner";
+import { chartLabelProps, moneyDataLabel } from "@/components/finance/ChartDataLabels";
 import { AiReportButton } from "@/components/finance/AiReportButton";
 import { AppShell } from "@/components/finance/AppShell";
 import { KpiCard } from "@/components/finance/KpiCard";
@@ -245,7 +246,7 @@ function BalanceSheetPage() {
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={series} margin={{ right: 36 }}>
+              <AreaChart data={series} margin={{ top: 24, right: 36 }}>
                 <defs>
                   <linearGradient id="bsCashFill" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="var(--brand)" stopOpacity={0.35} />
@@ -273,8 +274,8 @@ function BalanceSheetPage() {
                   <LabelList
                     dataKey="cash"
                     position="top"
-                    style={{ fontSize: 9, fill: "var(--muted-foreground)" }}
-                    formatter={(val: number) => formatCompactCurrency(Number(val))}
+                     {...chartLabelProps}
+                     formatter={moneyDataLabel}
                   />
                 </Area>
               </AreaChart>
