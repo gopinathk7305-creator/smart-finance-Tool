@@ -6,6 +6,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { fetchAllRows, withRawColumns } from "@/lib/fetch-all";
 import { mapRowsToTransactions, parseNum } from "@/lib/column-map";
 import { deriveArAp, deriveBudget, derivePayroll } from "@/lib/module-derive";
+import { unpivotMonthColumns } from "@/lib/wide-months";
 import { useAuth } from "@/lib/auth";
 import { ALL, demoDatasetFor, useOrg } from "@/lib/orgs";
 import { useActiveDataset } from "@/lib/active-dataset";
@@ -272,9 +273,10 @@ function useDatasetInternal(fetchEnabled: boolean): Dataset {
     const rawRows = (inOrg(rawBucket as { org_id?: string | null }[]) as Record<string, unknown>[]).map((r) =>
       withRawColumns(r),
     );
+    const transactionRows = unpivotMonthColumns(rawRows);
 
     const canonicalTotal = txns.reduce((s, t) => s + t.amount, 0);
-    const effectiveTxns = canonicalTotal > 0 ? txns : mapRowsToTransactions(rawRows);
+    const effectiveTxns = canonicalTotal > 0 ? txns : mapRowsToTransactions(transactionRows);
     const effectivePays = pays.length ? pays : derivePayroll(rawRows, effectiveTxns);
     const effectiveBuds = buds.length ? buds : deriveBudget(rawRows);
     const effectiveAraps = araps.length ? araps : deriveArAp(rawRows);

@@ -663,7 +663,7 @@ function ReportsPage() {
             >
               <FileSpreadsheet className="mt-0.5 size-5 text-brand" />
               <span>
-                <span className="block text-sm font-semibold">CSV / Excel Spreadsheet</span>
+                <span className="block text-sm font-semibold">Quick CSV</span>
                 <span className="block text-xs text-muted-foreground">
                   Raw data format for financial analysis.
                 </span>

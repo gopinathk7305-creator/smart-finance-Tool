@@ -38,7 +38,7 @@ export function KpiCard({
           </span>
         )}
       </div>
-      <p className="tabular mt-3 text-2xl font-bold tracking-tight">{value}</p>
+      <p className="mt-3 text-2xl font-bold tracking-tight" data-financial-value>{value}</p>
       <div className="mt-2 flex items-center gap-2 text-xs">
         {delta !== undefined && (
           <span
