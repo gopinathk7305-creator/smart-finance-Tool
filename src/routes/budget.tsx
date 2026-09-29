@@ -44,7 +44,7 @@ import { useCategories } from "@/lib/categories";
 import { useDataset } from "@/lib/dataset";
 import { useActiveDataset } from "@/lib/active-dataset";
 import { ModuleSkeleton } from "@/components/finance/ModuleSkeleton";
-import { actualsByCategory, inr, monthlySummary } from "@/lib/finance-data";
+import { actualsByCategory, inr, monthlySummary, monthIndexOf } from "@/lib/finance-data";
 import { BASE_SCENARIO, FY_MONTHS, runForecast } from "@/lib/forecast-engine";
 
 export const Route = createFileRoute("/budget")({
@@ -145,6 +145,29 @@ function BudgetPage() {
       };
     });
   }, [txns, budget.annualTotal, budget.byMonth]);
+
+  const categoryMonthRows = useMemo(() => {
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const required = ["Team Lunch", "Travel", "Festival", "Logistics"];
+    const names = [...new Set([...required, ...budget.rows.map((r) => r.category), ...txns.filter((t) => t.type === "expense").map((t) => t.category)])];
+    return names.flatMap((name) =>
+      monthNames.map((monthName, monthIndex) => {
+        const categoryBudget = budget.rows.filter((r) => r.category.toLowerCase() === name.toLowerCase());
+        const monthSpecific = categoryBudget
+          .filter((r) => (r.month ?? "Annual").slice(0, 3).toLowerCase() === monthName.toLowerCase())
+          .reduce((sum, r) => sum + r.budgeted_amount, 0);
+        const annual = categoryBudget
+          .filter((r) => (r.month ?? "Annual") === "Annual")
+          .reduce((sum, r) => sum + r.budgeted_amount, 0);
+        const plan = monthSpecific || annual / 12;
+        const spent = txns
+          .filter((t) => t.type === "expense" && t.category.toLowerCase() === name.toLowerCase() && monthIndexOf(t.date) === monthIndex)
+          .reduce((sum, t) => sum + t.amount, 0);
+        const variance = spent - plan;
+        return { category: name, month: monthName, plan, spent, variance, variancePct: plan ? (variance / plan) * 100 : 0 };
+      }),
+    ).filter((row) => row.plan || row.spent);
+  }, [budget.rows, txns]);
 
   const submit = async () => {
     const value = Number(amount.replace(/[^0-9.]/g, ""));
@@ -471,6 +494,57 @@ function BudgetPage() {
       )}
 
       <Card className="mt-4 border-border shadow-card">
+        <CardHeader>
+          <CardTitle className="text-base">Category × Month Variance Register</CardTitle>
+          <CardDescription>Jan–Dec budgeted versus spent, with rupee and percentage variance</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="max-h-[520px] overflow-auto">
+            <Table>
+              <TableHeader className="sticky top-0 z-10 bg-card">
+                <TableRow>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Month</TableHead>
+                  <TableHead className="text-right">Budgeted</TableHead>
+                  <TableHead className="text-right">Spent</TableHead>
+                  <TableHead className="text-right">₹ Variance</TableHead>
+                  <TableHead className="text-right">Variance %</TableHead>
+                  <TableHead className="text-right">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {categoryMonthRows.map((row) => {
+                  const over = row.variance > 0;
+                  return (
+                    <TableRow key={`${row.category}-${row.month}`}>
+                      <TableCell className="font-medium">{row.category}</TableCell>
+                      <TableCell>{row.month}</TableCell>
+                      <TableCell className="text-right" data-financial-value>{inr(row.plan)}</TableCell>
+                      <TableCell className="text-right" data-financial-value>{inr(row.spent)}</TableCell>
+                      <TableCell className={over ? "text-right text-danger" : "text-right text-success"} data-financial-value>
+                        {row.variance > 0 ? "+" : row.variance < 0 ? "−" : ""}{inr(Math.abs(row.variance))}
+                      </TableCell>
+                      <TableCell className={over ? "text-right text-danger" : "text-right text-success"} data-financial-value>
+                        {row.plan ? `${row.variancePct.toFixed(1)}%` : "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant={over ? "danger" : row.variance < 0 ? "success" : "secondary"}>
+                          {over ? "Over" : row.variance < 0 ? "Under" : "On plan"}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {categoryMonthRows.length === 0 && (
+                  <TableRow><TableCell colSpan={7} className="py-10 text-center text-muted-foreground">No category-level budget or spend rows are available.</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mt-4 border-border shadow-card">
         <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
           <div>
             <CardTitle className="text-base">Variance Detail</CardTitle>
@@ -515,13 +589,7 @@ function BudgetPage() {
                         {r.variancePct.toFixed(1)}%
                       </TableCell>
                       <TableCell className="text-right">
-                        <Badge
-                          className={
-                            over
-                              ? "bg-danger-soft text-danger hover:bg-danger-soft"
-                              : "bg-success-soft text-success hover:bg-success-soft"
-                          }
-                        >
+                        <Badge variant={over ? "danger" : "success"}>
                           {over ? "Over budget" : "Under budget"}
                         </Badge>
                       </TableCell>

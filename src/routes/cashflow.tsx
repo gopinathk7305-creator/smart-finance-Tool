@@ -1,11 +1,14 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { ArrowDownCircle, ArrowUpCircle, Banknote, Building2 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
+  Legend,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -13,7 +16,9 @@ import {
 } from "recharts";
 
 import { AppShell } from "@/components/finance/AppShell";
+import { ActiveDatasetBanner } from "@/components/finance/ActiveDatasetBanner";
 import { KpiCard } from "@/components/finance/KpiCard";
+import { ModuleSkeleton } from "@/components/finance/ModuleSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -34,6 +39,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AGING_BUCKETS, agingBucket, inr, monthlySummary } from "@/lib/finance-data";
 import { useDataset } from "@/lib/dataset";
+import { useActiveDataset } from "@/lib/active-dataset";
 
 export const Route = createFileRoute("/cashflow")({
   head: () => ({
@@ -49,6 +55,8 @@ export const Route = createFileRoute("/cashflow")({
         property: "og:description",
         content: "Aging analysis for receivables and payables with cash flow summary.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: CashFlowPage,
@@ -56,12 +64,30 @@ export const Route = createFileRoute("/cashflow")({
 
 function CashFlowPage() {
   const [status, setStatus] = useState("all");
-  const { txns, araps: arApRecords } = useDataset();
-  const series = monthlySummary(txns);
-  const operating = series.reduce((s, m) => s + m.profit, 0);
-  const investing = -6_400_000;
-  const financing = 3_200_000;
+  const { txns, araps: arApRecords, live } = useDataset();
+  const { syncing } = useActiveDataset();
+  const series = useMemo(() => monthlySummary(txns), [txns]);
+  const flow = useMemo(() => {
+    const investingWords = /capex|asset|equipment|machinery|property|investment|acquisition/i;
+    const financingWords = /loan|equity|capital|funding|borrow|dividend|interest/i;
+    return txns.reduce(
+      (acc, txn) => {
+        const label = `${txn.category} ${txn.subcategory}`;
+        const signed = txn.type === "income" ? txn.amount : -txn.amount;
+        if (investingWords.test(label)) acc.investing += signed;
+        else if (financingWords.test(label)) acc.financing += signed;
+        else acc.operating += signed;
+        return acc;
+      },
+      { operating: 0, investing: 0, financing: 0 },
+    );
+  }, [txns]);
+  const { operating, investing, financing } = flow;
   const net = operating + investing + financing;
+  const recent = series.filter((m) => m.revenue || m.expense).slice(-3);
+  const monthlyBurn = recent.length
+    ? recent.reduce((s, m) => s + Math.max(0, m.expense - m.revenue), 0) / recent.length
+    : 0;
 
   const bucketData = (type: "AR" | "AP") =>
     AGING_BUCKETS.map((bucket) => ({
@@ -74,8 +100,16 @@ function CashFlowPage() {
   const rowsFor = (type: "AR" | "AP") =>
     arApRecords.filter((r) => r.type === type && (status === "all" || r.status === status));
 
+  if (syncing)
+    return (
+      <AppShell title="Cash Flow & AR/AP" subtitle="Loading the selected dataset…">
+        <ModuleSkeleton />
+      </AppShell>
+    );
+
   return (
-    <AppShell title="Cash Flow & AR/AP" subtitle="Liquidity, receivables and payables">
+    <AppShell title="Cash Flow & AR/AP" subtitle={`Liquidity, receivables and payables · ${live ? "live workspace" : "demo data"}`}>
+      <ActiveDatasetBanner />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard label="Operating Cash Flow" value={inr(operating, true)} icon={ArrowUpCircle} tone="success" />
         <KpiCard label="Investing Cash Flow" value={inr(investing, true)} icon={Building2} tone="warning" />
@@ -87,6 +121,34 @@ function CashFlowPage() {
           tone={net >= 0 ? "success" : "danger"}
         />
       </div>
+
+      <Card className="mt-4 border-border shadow-card">
+        <CardHeader>
+          <CardTitle className="text-base">Monthly Cash Outflow & Burn</CardTitle>
+          <CardDescription>
+            Active ledger inflows and outflows · recent average burn {inr(monthlyBurn, true)}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="h-[300px]">
+          {series.some((m) => m.revenue || m.expense) ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={series}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
+                <YAxis tickFormatter={(v) => inr(Number(v), true)} tickLine={false} axisLine={false} fontSize={12} width={70} />
+                <Tooltip formatter={(v) => inr(Number(v))} />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                <Line type="monotone" dataKey="revenue" name="Cash inflow" stroke="var(--success)" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="expense" name="Cash outflow" stroke="var(--danger)" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              No dated cash movements are available in this sheet.
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {arApRecords.length === 0 && (
         <Card className="mt-4 border-warning/30 bg-warning-soft shadow-card">
@@ -198,7 +260,7 @@ function CashFlowPage() {
                             <TableCell className="tabular text-muted-foreground">{r.invoice_date}</TableCell>
                             <TableCell className="tabular text-muted-foreground">{r.due_date}</TableCell>
                             <TableCell>
-                              <Badge className={`${tone} hover:${tone}`}>{bucket} days</Badge>
+                              <Badge variant={bucket === "0-30" ? "success" : bucket === "31-60" ? "brand" : bucket === "61-90" ? "warning" : "danger"}>{bucket} days</Badge>
                             </TableCell>
                             <TableCell className="tabular text-right font-semibold">{inr(r.amount)}</TableCell>
                             <TableCell className="text-right text-xs text-muted-foreground capitalize">
