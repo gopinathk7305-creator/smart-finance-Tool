@@ -4,4 +4,5 @@
 - [x] Build Jan–Dec category budget variance matrix
 - [x] Upgrade payroll, P&L, cash flow, balance sheet, and forecast presentation
 - [x] Add one-click active-data PDF and Excel summary exports
-- [ ] Apply the shared CFO design system and validate all requested pages- [ ] Add permanent value and percentage labels to all financial charts
+- [ ] Apply the shared CFO design system and validate all requested pages
+- [ ] Add permanent value and percentage labels to all financial charts
