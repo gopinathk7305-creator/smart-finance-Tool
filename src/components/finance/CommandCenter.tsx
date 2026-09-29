@@ -111,7 +111,7 @@ function MetricCard({
           <Icon className="size-3.5" />
         </span>
       </div>
-      <p className="mt-2 truncate font-mono text-2xl font-bold tracking-tight tabular-nums">{value}</p>
+      <p className="mt-2 whitespace-nowrap font-mono text-xl font-bold tracking-tight tabular-nums xl:text-2xl">{value}</p>
       <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-[11px]">
         {delta !== undefined && <Pill delta={delta} />}
         <span className="truncate text-muted-foreground">{sub}</span>
@@ -133,9 +133,7 @@ function MetricCard({
                   <stop offset="100%" stopColor={t.stroke} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <Area type="monotone" dataKey="v" stroke={t.stroke} strokeWidth={1.5} fill={`url(#${id})`} dot={{ r: 2 }} isAnimationActive={false}>
-                <LabelList dataKey="v" position="top" offset={3} {...chartLabelProps} formatter={moneyDataLabel} />
-              </Area>
+              <Area type="monotone" dataKey="v" stroke={t.stroke} strokeWidth={1.5} fill={`url(#${id})`} dot={false} activeDot={false} isAnimationActive={false} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
