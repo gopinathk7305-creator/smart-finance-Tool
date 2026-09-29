@@ -19,6 +19,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { KpiCard } from "@/components/finance/KpiCard";
+import { chartLabelProps, DonutValueLabel } from "@/components/finance/ChartDataLabels";
 import { compactMoney, titleCase, type AdaptiveDashboard as Profile } from "@/lib/adaptive-dashboard";
 
 const SERIES_COLORS = [
@@ -107,7 +108,7 @@ export function AdaptiveDashboard({ profile }: { profile: Profile }) {
           </CardHeader>
           <CardContent className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={finance.monthly} barGap={4}>
+              <BarChart data={finance.monthly} barGap={4} margin={{ top: 24 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={11} />
                 <YAxis
@@ -123,7 +124,7 @@ export function AdaptiveDashboard({ profile }: { profile: Profile }) {
                   <LabelList
                     dataKey="revenue"
                     position="top"
-                    style={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                    {...chartLabelProps}
                     formatter={(val: number) => compactMoney(Number(val))}
                   />
                 </Bar>
@@ -131,7 +132,7 @@ export function AdaptiveDashboard({ profile }: { profile: Profile }) {
                   <LabelList
                     dataKey="expenses"
                     position="top"
-                    style={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                    {...chartLabelProps}
                     formatter={(val: number) => compactMoney(Number(val))}
                   />
                 </Bar>
@@ -157,7 +158,7 @@ export function AdaptiveDashboard({ profile }: { profile: Profile }) {
             </CardHeader>
             <CardContent className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={trend} barGap={4}>
+                <BarChart data={trend} barGap={4} margin={{ top: 24 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis dataKey="bucket" tickLine={false} axisLine={false} fontSize={11} />
                   <YAxis
@@ -182,7 +183,7 @@ export function AdaptiveDashboard({ profile }: { profile: Profile }) {
                         <LabelList
                           dataKey={col}
                           position="top"
-                          style={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                          {...chartLabelProps}
                           formatter={(val: number) => compactMoney(Number(val))}
                         />
                       )}
@@ -211,26 +212,8 @@ export function AdaptiveDashboard({ profile }: { profile: Profile }) {
                     cy="50%"
                     innerRadius={42}
                     outerRadius={68}
-                    labelLine={{ stroke: "var(--border)" }}
-                    label={({ cx, cy, midAngle, outerRadius, name, percent }) => {
-                      const rad = Math.PI / 180;
-                      const r = (outerRadius ?? 0) + 10;
-                      const x = (cx ?? 0) + r * Math.cos(-(midAngle ?? 0) * rad);
-                      const y = (cy ?? 0) + r * Math.sin(-(midAngle ?? 0) * rad);
-                      const short = name && name.length > 10 ? `${name.slice(0, 9)}…` : name;
-                      return (
-                        <text
-                          x={x}
-                          y={y}
-                          fill="var(--foreground)"
-                          fontSize={10}
-                          textAnchor={x > (cx ?? 0) ? "start" : "end"}
-                          dominantBaseline="central"
-                        >
-                          {`${short} (${Math.round((percent ?? 0) * 100)}%)`}
-                        </text>
-                      );
-                    }}
+                    labelLine={{ stroke: "var(--muted-foreground)" }}
+                    label={DonutValueLabel}
                   >
                     {breakdown.map((_, i) => (
                       <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
@@ -253,7 +236,7 @@ export function AdaptiveDashboard({ profile }: { profile: Profile }) {
           </CardHeader>
           <CardContent className="h-[260px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={cumulative}>
+              <AreaChart data={cumulative} margin={{ top: 24, right: 16 }}>
                 <defs>
                   <linearGradient id="adaptiveCumulative" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="var(--brand)" stopOpacity={0.45} />
@@ -281,7 +264,7 @@ export function AdaptiveDashboard({ profile }: { profile: Profile }) {
                   <LabelList
                     dataKey="value"
                     position="top"
-                    style={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                    {...chartLabelProps}
                     formatter={(val: number) => compactMoney(Number(val))}
                   />
                 </Area>

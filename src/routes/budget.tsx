@@ -6,6 +6,7 @@ import {
   BarChart,
   CartesianGrid,
   ComposedChart,
+  LabelList,
   Legend,
   Line,
   ResponsiveContainer,
@@ -16,6 +17,7 @@ import {
 import { toast } from "sonner";
 
 import { AiReportButton } from "@/components/finance/AiReportButton";
+import { chartLabelProps, moneyDataLabel } from "@/components/finance/ChartDataLabels";
 import { ActiveDatasetBanner } from "@/components/finance/ActiveDatasetBanner";
 import { AppShell } from "@/components/finance/AppShell";
 import { KpiCard } from "@/components/finance/KpiCard";
@@ -387,7 +389,7 @@ function BudgetPage() {
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={rows} layout="vertical" margin={{ left: 40 }}>
+              <BarChart data={rows} layout="vertical" margin={{ left: 40, right: 72 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
                 <XAxis
                   type="number"
@@ -399,8 +401,12 @@ function BudgetPage() {
                 <YAxis type="category" dataKey="category" width={140} tickLine={false} axisLine={false} fontSize={12} />
                 <Tooltip formatter={(v) => inr(Number(v))} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="budgeted_amount" name="Planned" fill="var(--primary)" radius={[0, 4, 4, 0]} />
-                <Bar dataKey="actual" name="Actual" fill="var(--brand)" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="budgeted_amount" name="Planned" fill="var(--primary)" radius={[0, 4, 4, 0]}>
+                  <LabelList dataKey="budgeted_amount" position="right" offset={6} {...chartLabelProps} formatter={moneyDataLabel} />
+                </Bar>
+                <Bar dataKey="actual" name="Actual" fill="var(--brand)" radius={[0, 4, 4, 0]}>
+                  <LabelList dataKey="actual" position="right" offset={6} {...chartLabelProps} formatter={moneyDataLabel} />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -422,7 +428,7 @@ function BudgetPage() {
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={monthlyPlan}>
+              <ComposedChart data={monthlyPlan} margin={{ top: 26, right: 12 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
                 <YAxis
@@ -434,15 +440,19 @@ function BudgetPage() {
                 />
                 <Tooltip formatter={(v) => inr(Number(v))} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="actual" name="Actual spend" fill="var(--brand)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="actual" name="Actual spend" fill="var(--brand)" radius={[4, 4, 0, 0]}>
+                  <LabelList dataKey="actual" position="top" offset={5} {...chartLabelProps} formatter={moneyDataLabel} />
+                </Bar>
                 <Line
                   type="monotone"
                   dataKey="plan"
                   name="Monthly plan"
                   stroke="var(--primary)"
                   strokeWidth={2}
-                  dot={false}
-                />
+                  dot={{ r: 3 }}
+                >
+                  <LabelList dataKey="plan" position="top" offset={16} {...chartLabelProps} formatter={moneyDataLabel} />
+                </Line>
               </ComposedChart>
             </ResponsiveContainer>
           )}

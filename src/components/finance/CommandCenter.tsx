@@ -19,6 +19,7 @@ import {
   CartesianGrid,
   Cell,
   ComposedChart,
+  LabelList,
   Legend,
 
   Pie,
@@ -30,6 +31,7 @@ import {
 } from "recharts";
 
 import { AlertSettingsDialog } from "@/components/finance/AlertSettingsDialog";
+import { chartLabelProps, DonutValueLabel, moneyDataLabel } from "@/components/finance/ChartDataLabels";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useBudget } from "@/lib/budget";
 import type { MonthlySummary, Transaction } from "@/lib/finance-data";
@@ -303,9 +305,9 @@ export function CommandCenter({
             <CardTitle className="text-base">Budgeted Allocation vs Actual Spend</CardTitle>
             <CardDescription>Monthly actuals (left axis) against budget line (right axis)</CardDescription>
           </CardHeader>
-          <CardContent className="h-[320px]">
+          <CardContent className="h-[350px]">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={m.monthly}>
+              <ComposedChart data={m.monthly} margin={{ top: 28, right: 8, left: 4 }}>
                 <defs>
                   <linearGradient id="ccActual" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="var(--danger)" stopOpacity={0.9} />
@@ -329,8 +331,12 @@ export function CommandCenter({
                   }}
                 />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Area yAxisId="r" type="monotone" dataKey="budget" name="Budgeted" stroke="var(--brand)" strokeDasharray="4 3" fill="url(#ccBudget)" />
-                <Bar yAxisId="l" dataKey="actual" name="Actual spend" fill="url(#ccActual)" radius={[4, 4, 0, 0]} />
+                <Area yAxisId="r" type="monotone" dataKey="budget" name="Budgeted" stroke="var(--brand)" strokeDasharray="4 3" fill="url(#ccBudget)" dot={{ r: 3 }}>
+                  <LabelList dataKey="budget" position="top" offset={16} {...chartLabelProps} formatter={moneyDataLabel} />
+                </Area>
+                <Bar yAxisId="l" dataKey="actual" name="Actual spend" fill="url(#ccActual)" radius={[4, 4, 0, 0]}>
+                  <LabelList dataKey="actual" position="top" offset={4} {...chartLabelProps} formatter={moneyDataLabel} />
+                </Bar>
               </ComposedChart>
             </ResponsiveContainer>
           </CardContent>
@@ -341,10 +347,10 @@ export function CommandCenter({
             <CardTitle className="text-base">Category Distribution</CardTitle>
             <CardDescription>Share of total expenditure</CardDescription>
           </CardHeader>
-          <CardContent className="h-[320px]">
+          <CardContent className="h-[350px] overflow-visible">
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={donut} dataKey="value" nameKey="name" innerRadius={58} outerRadius={88} paddingAngle={2}>
+              <PieChart margin={{ top: 24, right: 84, bottom: 28, left: 84 }}>
+                <Pie data={donut} dataKey="value" nameKey="name" innerRadius={52} outerRadius={76} paddingAngle={2} labelLine={{ stroke: "var(--muted-foreground)" }} label={DonutValueLabel}>
                   {donut.map((_, i) => (
                     <Cell key={i} fill={DONUT[i % DONUT.length]} stroke="var(--card)" />
                   ))}
@@ -366,9 +372,9 @@ export function CommandCenter({
             <CardTitle className="text-base">Cumulative Outflow & Budget Depletion</CardTitle>
             <CardDescription>Running spend vs cumulative allocation</CardDescription>
           </CardHeader>
-          <CardContent className="h-[260px]">
+          <CardContent className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={m.cumulative}>
+              <AreaChart data={m.cumulative} margin={{ top: 28, right: 20, left: 4 }}>
                 <defs>
                   <linearGradient id="ccSpent" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="var(--danger)" stopOpacity={0.4} />
@@ -387,9 +393,13 @@ export function CommandCenter({
                   formatter={(v, n) => [exact(Number(v)), n]}
                 />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Area type="monotone" dataKey="spent" name="Cumulative spend" stroke="var(--danger)" strokeWidth={2} fill="url(#ccSpent)" />
+                <Area type="monotone" dataKey="spent" name="Cumulative spend" stroke="var(--danger)" strokeWidth={2} fill="url(#ccSpent)" dot={{ r: 3 }}>
+                  <LabelList dataKey="spent" position="top" offset={8} {...chartLabelProps} formatter={moneyDataLabel} />
+                </Area>
                 {m.planned > 0 && (
-                  <Area type="monotone" dataKey="remaining" name="Budget remaining" stroke="var(--success)" strokeWidth={2} fill="url(#ccLeft)" />
+                  <Area type="monotone" dataKey="remaining" name="Budget remaining" stroke="var(--success)" strokeWidth={2} fill="url(#ccLeft)" dot={{ r: 3 }}>
+                    <LabelList dataKey="remaining" position="bottom" offset={8} {...chartLabelProps} formatter={moneyDataLabel} />
+                  </Area>
                 )}
               </AreaChart>
             </ResponsiveContainer>

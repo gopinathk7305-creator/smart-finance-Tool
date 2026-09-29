@@ -6,6 +6,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  LabelList,
   Legend,
   Line,
   LineChart,
@@ -16,6 +17,7 @@ import {
 } from "recharts";
 
 import { AppShell } from "@/components/finance/AppShell";
+import { chartLabelProps, moneyDataLabel } from "@/components/finance/ChartDataLabels";
 import { ActiveDatasetBanner } from "@/components/finance/ActiveDatasetBanner";
 import { KpiCard } from "@/components/finance/KpiCard";
 import { ModuleSkeleton } from "@/components/finance/ModuleSkeleton";
@@ -132,14 +134,18 @@ function CashFlowPage() {
         <CardContent className="h-[300px]">
           {series.some((m) => m.revenue || m.expense) ? (
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={series}>
+              <LineChart data={series} margin={{ top: 26, right: 14 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
                 <YAxis tickFormatter={(v) => inr(Number(v), true)} tickLine={false} axisLine={false} fontSize={12} width={70} />
                 <Tooltip formatter={(v) => inr(Number(v))} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Line type="monotone" dataKey="revenue" name="Cash inflow" stroke="var(--success)" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="expense" name="Cash outflow" stroke="var(--danger)" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="revenue" name="Cash inflow" stroke="var(--success)" strokeWidth={2} dot={{ r: 3 }}>
+                  <LabelList dataKey="revenue" position="top" offset={8} {...chartLabelProps} formatter={moneyDataLabel} />
+                </Line>
+                <Line type="monotone" dataKey="expense" name="Cash outflow" stroke="var(--danger)" strokeWidth={2} dot={{ r: 3 }}>
+                  <LabelList dataKey="expense" position="bottom" offset={8} {...chartLabelProps} formatter={moneyDataLabel} />
+                </Line>
               </LineChart>
             </ResponsiveContainer>
           ) : (
@@ -178,12 +184,13 @@ function CashFlowPage() {
             </CardHeader>
             <CardContent className="h-[260px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={bucketData(type)}>
+                <BarChart data={bucketData(type)} margin={{ top: 24 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis dataKey="bucket" tickLine={false} axisLine={false} fontSize={12} />
                   <YAxis tickFormatter={(v) => inr(Number(v), true)} tickLine={false} axisLine={false} fontSize={12} width={70} />
                   <Tooltip formatter={(v) => inr(Number(v))} />
                   <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
+                    <LabelList dataKey="amount" position="top" offset={5} {...chartLabelProps} formatter={moneyDataLabel} />
                     {bucketData(type).map((_, i) => (
                       <Cell
                         key={i}

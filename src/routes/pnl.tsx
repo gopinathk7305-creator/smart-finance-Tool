@@ -5,6 +5,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  LabelList,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -15,6 +16,7 @@ import {
 } from "recharts";
 
 import { ActiveDatasetBanner } from "@/components/finance/ActiveDatasetBanner";
+import { chartLabelProps, moneyDataLabel, percentDataLabel } from "@/components/finance/ChartDataLabels";
 import { AiReportButton } from "@/components/finance/AiReportButton";
 import { AppShell } from "@/components/finance/AppShell";
 import { KpiCard } from "@/components/finance/KpiCard";
@@ -272,15 +274,21 @@ function PnlPage() {
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={marginSeries}>
+                <LineChart data={marginSeries} margin={{ top: 24, right: 18 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
                   <YAxis tickFormatter={(v) => `${Number(v).toFixed(0)}%`} tickLine={false} axisLine={false} fontSize={12} width={44} />
                   <Tooltip formatter={(v) => `${Number(v).toFixed(1)}%`} />
                   <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                  <Line type="monotone" dataKey="grossMargin" name="Gross margin" stroke="var(--brand)" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="ebitdaMargin" name="EBITDA margin" stroke="var(--success)" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="netMargin" name="Net margin" stroke="var(--warning)" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="grossMargin" name="Gross margin" stroke="var(--brand)" strokeWidth={2} dot={{ r: 3 }}>
+                    <LabelList dataKey="grossMargin" position="top" offset={8} {...chartLabelProps} formatter={percentDataLabel} />
+                  </Line>
+                  <Line type="monotone" dataKey="ebitdaMargin" name="EBITDA margin" stroke="var(--success)" strokeWidth={2} dot={{ r: 3 }}>
+                    <LabelList dataKey="ebitdaMargin" position="right" offset={8} {...chartLabelProps} formatter={percentDataLabel} />
+                  </Line>
+                  <Line type="monotone" dataKey="netMargin" name="Net margin" stroke="var(--warning)" strokeWidth={2} dot={{ r: 3 }}>
+                    <LabelList dataKey="netMargin" position="bottom" offset={8} {...chartLabelProps} formatter={percentDataLabel} />
+                  </Line>
                 </LineChart>
               </ResponsiveContainer>
             )}
@@ -296,12 +304,14 @@ function PnlPage() {
         </CardHeader>
         <CardContent className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={bridge}>
+            <BarChart data={bridge} margin={{ top: 24 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
               <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
               <YAxis tickFormatter={(v) => inr(Number(v), true)} tickLine={false} axisLine={false} fontSize={12} width={72} />
               <Tooltip formatter={(v) => inr(Number(v))} />
-              <Bar dataKey="value" name="Contribution" fill="var(--brand)" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="value" name="Contribution" fill="var(--brand)" radius={[4, 4, 0, 0]}>
+                <LabelList dataKey="value" position="top" offset={5} {...chartLabelProps} formatter={moneyDataLabel} />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </CardContent>

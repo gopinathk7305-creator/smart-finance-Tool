@@ -6,6 +6,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  LabelList,
   Legend,
   Line,
   LineChart,
@@ -16,6 +17,7 @@ import {
 } from "recharts";
 
 import { AppShell } from "@/components/finance/AppShell";
+import { chartLabelProps, moneyDataLabel } from "@/components/finance/ChartDataLabels";
 import { KpiCard } from "@/components/finance/KpiCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -342,7 +344,7 @@ function ComparePage() {
           </CardHeader>
           <CardContent className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthly} barGap={4}>
+              <BarChart data={monthly} barGap={4} margin={{ top: 24 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={11} />
                 <YAxis
@@ -354,8 +356,8 @@ function ComparePage() {
                 />
                 <Tooltip formatter={(v) => inr(Number(v))} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="revenueA" name={shortA} fill="var(--brand)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="revenueB" name={shortB} fill="var(--primary)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="revenueA" name={shortA} fill="var(--brand)" radius={[4, 4, 0, 0]}><LabelList dataKey="revenueA" position="top" {...chartLabelProps} formatter={moneyDataLabel} /></Bar>
+                <Bar dataKey="revenueB" name={shortB} fill="var(--primary)" radius={[4, 4, 0, 0]}><LabelList dataKey="revenueB" position="top" {...chartLabelProps} formatter={moneyDataLabel} /></Bar>
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -368,7 +370,7 @@ function ComparePage() {
           </CardHeader>
           <CardContent className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthly} barGap={4}>
+              <BarChart data={monthly} barGap={4} margin={{ top: 24 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={11} />
                 <YAxis
@@ -380,8 +382,8 @@ function ComparePage() {
                 />
                 <Tooltip formatter={(v) => inr(Number(v))} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="expenseA" name={shortA} fill="var(--danger)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="expenseB" name={shortB} fill="var(--warning)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="expenseA" name={shortA} fill="var(--danger)" radius={[4, 4, 0, 0]}><LabelList dataKey="expenseA" position="top" {...chartLabelProps} formatter={moneyDataLabel} /></Bar>
+                <Bar dataKey="expenseB" name={shortB} fill="var(--warning)" radius={[4, 4, 0, 0]}><LabelList dataKey="expenseB" position="top" {...chartLabelProps} formatter={moneyDataLabel} /></Bar>
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -395,7 +397,7 @@ function ComparePage() {
         </CardHeader>
         <CardContent className="h-[280px]">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={monthly}>
+            <LineChart data={monthly} margin={{ top: 24, right: 16 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
               <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={11} />
               <YAxis
@@ -407,8 +409,8 @@ function ComparePage() {
               />
               <Tooltip formatter={(v) => inr(Number(v))} />
               <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
-              <Line type="monotone" dataKey="cashA" name={shortA} stroke="var(--brand)" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="cashB" name={shortB} stroke="var(--primary)" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="cashA" name={shortA} stroke="var(--brand)" strokeWidth={2} dot={{ r: 3 }}><LabelList dataKey="cashA" position="top" {...chartLabelProps} formatter={moneyDataLabel} /></Line>
+              <Line type="monotone" dataKey="cashB" name={shortB} stroke="var(--primary)" strokeWidth={2} dot={{ r: 3 }}><LabelList dataKey="cashB" position="bottom" {...chartLabelProps} formatter={moneyDataLabel} /></Line>
             </LineChart>
           </ResponsiveContainer>
         </CardContent>

@@ -6,6 +6,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  LabelList,
   Legend,
   ResponsiveContainer,
   Tooltip,
@@ -14,6 +15,7 @@ import {
 } from "recharts";
 
 import { AiReportButton } from "@/components/finance/AiReportButton";
+import { chartLabelProps, moneyDataLabel } from "@/components/finance/ChartDataLabels";
 import { ActiveDatasetBanner } from "@/components/finance/ActiveDatasetBanner";
 import { AppShell } from "@/components/finance/AppShell";
 import { KpiCard } from "@/components/finance/KpiCard";
@@ -200,15 +202,21 @@ function PayrollPage() {
           </CardHeader>
           <CardContent className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={byDept}>
+              <BarChart data={byDept} margin={{ top: 24 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="department" tickLine={false} axisLine={false} fontSize={12} />
                 <YAxis tickFormatter={(v) => inr(Number(v), true)} tickLine={false} axisLine={false} fontSize={12} width={70} />
                 <Tooltip formatter={(v) => inr(Number(v))} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="basic" stackId="a" name="Basic" fill="var(--primary)" />
-                <Bar dataKey="allowances" stackId="a" name="Allowances" fill="var(--brand)" />
-                <Bar dataKey="deductions" stackId="a" name="Deductions" fill="var(--warning)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="basic" stackId="a" name="Basic" fill="var(--primary)">
+                  <LabelList dataKey="basic" position="center" {...chartLabelProps} formatter={moneyDataLabel} />
+                </Bar>
+                <Bar dataKey="allowances" stackId="a" name="Allowances" fill="var(--brand)">
+                  <LabelList dataKey="allowances" position="center" {...chartLabelProps} formatter={moneyDataLabel} />
+                </Bar>
+                <Bar dataKey="deductions" stackId="a" name="Deductions" fill="var(--warning)" radius={[4, 4, 0, 0]}>
+                  <LabelList dataKey="deductions" position="top" offset={5} {...chartLabelProps} formatter={moneyDataLabel} />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -222,6 +230,7 @@ function PayrollPage() {
           <CardContent className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
+                margin={{ top: 24 }}
                 data={byDept.map((d) => ({
                   department: d.department,
                   gross: d.basic + d.allowances,
@@ -233,8 +242,12 @@ function PayrollPage() {
                 <YAxis tickFormatter={(v) => inr(Number(v), true)} tickLine={false} axisLine={false} fontSize={12} width={70} />
                 <Tooltip formatter={(v) => inr(Number(v))} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="gross" name="Gross" fill="var(--brand)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="net" name="Net" fill="var(--success)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="gross" name="Gross" fill="var(--brand)" radius={[4, 4, 0, 0]}>
+                  <LabelList dataKey="gross" position="top" offset={5} {...chartLabelProps} formatter={moneyDataLabel} />
+                </Bar>
+                <Bar dataKey="net" name="Net" fill="var(--success)" radius={[4, 4, 0, 0]}>
+                  <LabelList dataKey="net" position="top" offset={5} {...chartLabelProps} formatter={moneyDataLabel} />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
