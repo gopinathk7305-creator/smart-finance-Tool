@@ -20,7 +20,7 @@ import {
   Cell,
   ComposedChart,
   Legend,
-  Line,
+
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -331,7 +331,6 @@ export function CommandCenter({
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
                 <Area yAxisId="r" type="monotone" dataKey="budget" name="Budgeted" stroke="var(--brand)" strokeDasharray="4 3" fill="url(#ccBudget)" />
                 <Bar yAxisId="l" dataKey="actual" name="Actual spend" fill="url(#ccActual)" radius={[4, 4, 0, 0]} />
-                <Line yAxisId="l" type="monotone" dataKey="actual" stroke="var(--danger)" dot={false} strokeWidth={1} legendType="none" />
               </ComposedChart>
             </ResponsiveContainer>
           </CardContent>
