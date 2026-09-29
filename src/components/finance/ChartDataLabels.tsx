@@ -30,8 +30,8 @@ export function DonutValueLabel({
 
   return (
     <text x={x} y={y} textAnchor={anchor} dominantBaseline="central" className="chart-data-label">
-      <tspan x={x} dy="-0.35em">{`${label}: ${(Number(percent) * 100).toFixed(0)}%`}</tspan>
-      <tspan x={x} dy="1.25em">{`(${formatCompactCurrency(Number(value) || 0)})`}</tspan>
+      <tspan x={x} dy="-0.35em">{label}</tspan>
+      <tspan x={x} dy="1.25em">{`${(Number(percent) * 100).toFixed(0)}% • ${formatCompactCurrency(Number(value) || 0)}`}</tspan>
     </text>
   );
 }

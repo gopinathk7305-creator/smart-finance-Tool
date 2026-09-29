@@ -133,7 +133,9 @@ function MetricCard({
                   <stop offset="100%" stopColor={t.stroke} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <Area type="monotone" dataKey="v" stroke={t.stroke} strokeWidth={1.5} fill={`url(#${id})`} isAnimationActive={false} />
+              <Area type="monotone" dataKey="v" stroke={t.stroke} strokeWidth={1.5} fill={`url(#${id})`} dot={{ r: 2 }} isAnimationActive={false}>
+                <LabelList dataKey="v" position="top" offset={3} {...chartLabelProps} formatter={moneyDataLabel} />
+              </Area>
             </AreaChart>
           </ResponsiveContainer>
         </div>
