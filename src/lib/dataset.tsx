@@ -6,6 +6,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { fetchAllRows, withRawColumns } from "@/lib/fetch-all";
 import { mapRowsToTransactions, parseNum } from "@/lib/column-map";
 import { deriveArAp, deriveBudget, derivePayroll } from "@/lib/module-derive";
+import { unpivotMonthColumns } from "@/lib/wide-months";
 import { useAuth } from "@/lib/auth";
 import { ALL, demoDatasetFor, useOrg } from "@/lib/orgs";
 import { useActiveDataset } from "@/lib/active-dataset";
@@ -187,7 +188,7 @@ function useDatasetInternal(fetchEnabled: boolean): Dataset {
       ? combined.t.length + combined.p.length + combined.b.length + combined.a.length
       : 0;
 
-    if (!combined || rowCount === 0) {
+    if ((!combined || rowCount === 0) && !activeFile) {
       const demo = demoDatasetFor(orgId);
       const vendors = uniqueVendors(demo.txns, demo.araps);
       const demoTxns = demo.txns.filter((r) => inRange(r.date, range));
@@ -201,6 +202,20 @@ function useDatasetInternal(fetchEnabled: boolean): Dataset {
         live: false,
         loading: !!user && isLoading,
         outOfRange: demo.txns.length > 0 && demoTxns.length === 0,
+        refresh,
+      };
+    }
+
+    if (!combined || rowCount === 0) {
+      return {
+        txns: [],
+        pays: [],
+        buds: [],
+        araps: [],
+        vendors: [],
+        live: true,
+        loading: !!user && isLoading,
+        outOfRange: false,
         refresh,
       };
     }
@@ -258,9 +273,10 @@ function useDatasetInternal(fetchEnabled: boolean): Dataset {
     const rawRows = (inOrg(rawBucket as { org_id?: string | null }[]) as Record<string, unknown>[]).map((r) =>
       withRawColumns(r),
     );
+    const transactionRows = unpivotMonthColumns(rawRows);
 
     const canonicalTotal = txns.reduce((s, t) => s + t.amount, 0);
-    const effectiveTxns = canonicalTotal > 0 ? txns : mapRowsToTransactions(rawRows);
+    const effectiveTxns = canonicalTotal > 0 ? txns : mapRowsToTransactions(transactionRows);
     const effectivePays = pays.length ? pays : derivePayroll(rawRows, effectiveTxns);
     const effectiveBuds = buds.length ? buds : deriveBudget(rawRows);
     const effectiveAraps = araps.length ? araps : deriveArAp(rawRows);

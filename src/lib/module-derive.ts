@@ -8,6 +8,7 @@
 
 import { detectColumns, parseNum } from "@/lib/column-map";
 import type { ArApRecord, BudgetTarget, PayrollRecord, Transaction } from "@/lib/finance-data";
+import { monthColumns } from "@/lib/wide-months";
 
 const canon = (k: string) => k.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
 
@@ -163,10 +164,30 @@ export function deriveArAp(rows: Record<string, unknown>[]): ArApRecord[] {
 export function deriveBudget(rows: Record<string, unknown>[]): BudgetTarget[] {
   if (!rows.length) return [];
   const budget = pickColumn(rows, ["budgeted_amount", "budget_amount", "budget", "target", "planned", "forecast", "plan"]);
-  if (!budget) return [];
   const category = pickColumn(rows, ["category", "head", "account", "expense_type", "class"]);
   const dept = pickColumn(rows, ["department", "dept", "division", "team"]);
   const fy = pickColumn(rows, ["fiscal_year", "fy", "financial_year", "year"]);
+
+  if (!budget) {
+    const months = monthColumns(rows);
+    if (!months.length) return [];
+    return rows.flatMap((row, rowIndex) => {
+      const name = str(row, category) || str(row, dept) || Object.values(row).map(String).find((value) => value.trim() && !parseNum(value)) || `Category ${rowIndex + 1}`;
+      return months.flatMap(({ col, idx }) => {
+        const amount = Math.abs(parseNum(row[col]));
+        if (!amount) return [];
+        const month = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][idx] ?? "Annual";
+        return [{
+          id: `d-bud-${rowIndex}-${idx}`,
+          fiscal_year: str(row, fy),
+          category: name,
+          department: str(row, dept) || "All",
+          budgeted_amount: amount,
+          month,
+        } satisfies BudgetTarget];
+      });
+    });
+  }
 
   const acc = new Map<string, { amount: number; dept: string; fy: string }>();
   rows.forEach((row) => {

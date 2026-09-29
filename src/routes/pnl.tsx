@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Activity, Percent, PiggyBank, TrendingUp } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
+  Bar,
+  BarChart,
   CartesianGrid,
   Line,
   LineChart,
@@ -16,6 +18,7 @@ import { ActiveDatasetBanner } from "@/components/finance/ActiveDatasetBanner";
 import { AiReportButton } from "@/components/finance/AiReportButton";
 import { AppShell } from "@/components/finance/AppShell";
 import { KpiCard } from "@/components/finance/KpiCard";
+import { ModuleSkeleton } from "@/components/finance/ModuleSkeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
@@ -31,6 +34,7 @@ import { pctLabel, safeMargin } from "@/lib/column-map";
 import { deriveGst } from "@/lib/module-derive";
 import { useCategories } from "@/lib/categories";
 import { useDataset, useDatasetRaw } from "@/lib/dataset";
+import { useActiveDataset } from "@/lib/active-dataset";
 import { corporateTax, type CorporateRate, type SurchargeBand } from "@/lib/tax";
 import { cn } from "@/lib/utils";
 
@@ -49,6 +53,8 @@ export const Route = createFileRoute("/pnl")({
         property: "og:description",
         content: "Revenue to net profit walk-down with surcharge, cess and Sec 115BAA options.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: PnlPage,
@@ -59,6 +65,7 @@ function PnlPage() {
   const [rate, setRate] = useState<CorporateRate>(0.25);
   const [band, setBand] = useState<SurchargeBand>("auto");
   const { txns } = useDataset();
+  const { syncing } = useActiveDataset();
   const { categories, cogsNames, live: liveCats } = useCategories();
   const t = totals(txns, cogsNames);
   const cats = actualsByCategory(txns);
@@ -100,6 +107,15 @@ function PnlPage() {
     { label: `Corporate tax @ ${(rate * 100).toFixed(0)}% + surcharge + cess`, value: -tx.total, kind: "sub" },
     { label: "Net Profit After Tax", value: tx.netProfit, kind: "grand" },
   ];
+  const bridge = useMemo(() => [
+    { label: "Revenue", value: t.revenue },
+    { label: "COGS", value: -t.cogs },
+    { label: "Opex", value: -t.opex },
+    { label: "D&A", value: -t.depreciation },
+    { label: "Interest", value: -t.interest },
+    { label: "Tax", value: -tx.total },
+    { label: "Net profit", value: tx.netProfit },
+  ], [t.revenue, t.cogs, t.opex, t.depreciation, t.interest, tx.total, tx.netProfit]);
 
 
   const taxRows: [string, string][] = [
@@ -171,6 +187,13 @@ function PnlPage() {
     facts: `Revenue ${inr(t.revenue)}, COGS ${inr(t.cogs)}, gross profit ${inr(t.grossProfit)}, opex ${inr(t.opex)}, EBITDA ${inr(t.ebitda)}, depreciation ${inr(t.depreciation)}, finance cost ${inr(t.interest)}, EBIT ${inr(ebit)}. Corporate tax base ${inr(tx.base)} at ${(rate * 100).toFixed(0)}%, surcharge ${tx.surchargePct}% ${inr(tx.surcharge)}, cess 4% ${inr(tx.cess)}, total tax ${inr(tx.total)} at an effective rate of ${tx.effectiveRate.toFixed(2)}%, net profit after tax ${inr(tx.netProfit)}. Output GST ${inr(gst.outputGst)}, input credit ${inr(gst.inputCredit)}, net GST payable ${inr(gst.payable)}.`,
     chartEl: null,
   });
+
+  if (syncing)
+    return (
+      <AppShell title="Financial Analysis & P&L" subtitle="Loading the selected dataset…">
+        <ModuleSkeleton />
+      </AppShell>
+    );
 
   return (
     <AppShell title="Financial Analysis & P&L" subtitle="FY 2026-27 statement of profit and loss">
@@ -265,6 +288,24 @@ function PnlPage() {
 
         </Card>
       </div>
+
+      <Card className="mt-4 border-border shadow-card">
+        <CardHeader>
+          <CardTitle className="text-base">Profit Bridge</CardTitle>
+          <CardDescription>Revenue through operating costs, finance charges and tax to net profit</CardDescription>
+        </CardHeader>
+        <CardContent className="h-[300px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={bridge}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
+              <YAxis tickFormatter={(v) => inr(Number(v), true)} tickLine={false} axisLine={false} fontSize={12} width={72} />
+              <Tooltip formatter={(v) => inr(Number(v))} />
+              <Bar dataKey="value" name="Contribution" fill="var(--brand)" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <Card className="border-border shadow-card">

@@ -45,7 +45,7 @@ export function useBudget(fiscalYear?: string): BudgetApi {
   const queryClient = useQueryClient();
 
   const rows = useMemo(
-    () => (fiscalYear ? buds.filter((b) => b.fiscal_year === fiscalYear) : buds),
+    () => (fiscalYear ? buds.filter((b) => !b.fiscal_year || b.fiscal_year === fiscalYear) : buds),
     [buds, fiscalYear],
   );
 

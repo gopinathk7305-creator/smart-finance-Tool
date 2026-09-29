@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/finance/AppShell";
+import { ActiveDatasetBanner } from "@/components/finance/ActiveDatasetBanner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -44,6 +45,9 @@ import {
 import { auditFindings, computeTax, gstSummary } from "@/lib/enterprise-data";
 import { useAuth } from "@/lib/auth";
 import { useDataset } from "@/lib/dataset";
+import { useActiveDataset } from "@/lib/active-dataset";
+import { ModuleSkeleton } from "@/components/finance/ModuleSkeleton";
+import { downloadReportWorkbook } from "@/lib/excel-export";
 import { ALL, useOrg } from "@/lib/orgs";
 import { corporateTax } from "@/lib/tax";
 import { generateReportNarrative } from "@/lib/report-ai.functions";
@@ -242,7 +246,8 @@ function ReportsPage() {
   const [range, setRange] = useState<RangeKey>("ytd");
   const [from, setFrom] = useState("2026-04-01");
   const [to, setTo] = useState("2027-03-31");
-  const [busy, setBusy] = useState<null | "csv" | "snapshot" | "formal">(null);
+  const [busy, setBusy] = useState<null | "csv" | "xlsx" | "snapshot" | "formal">(null);
+  const { syncing } = useActiveDataset();
   const [modal, setModal] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
 
@@ -407,6 +412,19 @@ function ReportsPage() {
     setModal(false);
   };
 
+  const exportExcel = async () => {
+    setBusy("xlsx");
+    try {
+      await downloadReportWorkbook(fullSpec(report));
+      toast.success(`${REPORTS[report]} Excel workbook downloaded`);
+      setModal(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Excel export failed");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const exportSnapshot = async () => {
     const el = previewRef.current;
     if (!el) return;
@@ -453,8 +471,16 @@ function ReportsPage() {
     }
   };
 
+  if (syncing)
+    return (
+      <AppShell title="Report Builder" subtitle="Loading the selected dataset…">
+        <ModuleSkeleton />
+      </AppShell>
+    );
+
   return (
     <AppShell title="Report Builder" subtitle="Slice, preview and export board-ready reports">
+      <ActiveDatasetBanner />
       <div className="grid gap-4 lg:grid-cols-10">
         {/* Left: slicers */}
         <Card className="border-border shadow-card lg:col-span-3">
@@ -523,6 +549,10 @@ function ReportsPage() {
               <Label>Quick download</Label>
               <Button variant="outline" className="w-full justify-start" onClick={exportCsv}>
                 <FileSpreadsheet className="size-4" /> Export CSV
+              </Button>
+              <Button variant="outline" className="w-full justify-start" disabled={busy !== null} onClick={() => void exportExcel()}>
+                {busy === "xlsx" ? <Loader2 className="size-4 animate-spin" /> : <FileSpreadsheet className="size-4" />}
+                Export Financial Summary Excel
               </Button>
               <Button
                 className="w-full justify-start"
@@ -626,24 +656,36 @@ function ReportsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <button
-              type="button"
+            <Button
+              variant="outline"
               onClick={exportCsv}
-              className="flex w-full items-start gap-3 rounded-xl border border-border p-3 text-left transition-colors hover:border-brand hover:bg-brand-soft"
+              className="h-auto w-full justify-start gap-3 p-3 text-left"
             >
               <FileSpreadsheet className="mt-0.5 size-5 text-brand" />
               <span>
-                <span className="block text-sm font-semibold">CSV / Excel Spreadsheet</span>
+                <span className="block text-sm font-semibold">Quick CSV</span>
                 <span className="block text-xs text-muted-foreground">
                   Raw data format for financial analysis.
                 </span>
               </span>
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="outline"
+              disabled={busy !== null}
+              onClick={() => void exportExcel()}
+              className="h-auto w-full justify-start gap-3 p-3 text-left"
+            >
+              {busy === "xlsx" ? <Loader2 className="mt-0.5 size-5 animate-spin text-brand" /> : <FileSpreadsheet className="mt-0.5 size-5 text-brand" />}
+              <span>
+                <span className="block text-sm font-semibold">Financial Summary Workbook (Excel)</span>
+                <span className="block text-xs text-muted-foreground">Formatted summary and complete detail worksheets.</span>
+              </span>
+            </Button>
+            <Button
+              variant="outline"
               disabled={busy !== null}
               onClick={() => void exportSnapshot()}
-              className="flex w-full items-start gap-3 rounded-xl border border-border p-3 text-left transition-colors hover:border-brand hover:bg-brand-soft disabled:opacity-60"
+              className="h-auto w-full justify-start gap-3 p-3 text-left"
             >
               {busy === "snapshot" ? (
                 <Loader2 className="mt-0.5 size-5 animate-spin text-brand" />
@@ -656,12 +698,12 @@ function ReportsPage() {
                   Includes the live preview styling exactly as shown.
                 </span>
               </span>
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="outline"
               disabled={busy !== null}
               onClick={() => void exportFormal()}
-              className="flex w-full items-start gap-3 rounded-xl border border-border p-3 text-left transition-colors hover:border-brand hover:bg-brand-soft disabled:opacity-60"
+              className="h-auto w-full justify-start gap-3 p-3 text-left"
             >
               {busy === "formal" ? (
                 <Loader2 className="mt-0.5 size-5 animate-spin text-brand" />
@@ -676,7 +718,7 @@ function ReportsPage() {
                   Multi-page letterhead report with AI insights and audit notes.
                 </span>
               </span>
-            </button>
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
