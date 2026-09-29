@@ -176,7 +176,7 @@ export function deriveBudget(rows: Record<string, unknown>[]): BudgetTarget[] {
       return months.flatMap(({ col, idx }) => {
         const amount = Math.abs(parseNum(row[col]));
         if (!amount) return [];
-        const month = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][idx];
+        const month = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][idx] ?? "Annual";
         return [{
           id: `d-bud-${rowIndex}-${idx}`,
           fiscal_year: str(row, fy),
