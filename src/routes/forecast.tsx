@@ -836,7 +836,7 @@ function ForecastPage() {
                         fill="#0284c7"
                         fillOpacity={0.12}
                       >
-                        <LabelList dataKey="upper" position="top" {...chartLabelProps} formatter={moneyDataLabel} />
+                        <LabelList dataKey="upper" position="top" offset={20} {...chartLabelProps} formatter={moneyDataLabel} />
                       </Area>
                     )}
                     {band && (
@@ -848,7 +848,7 @@ function ForecastPage() {
                         fill="#0284c7"
                         fillOpacity={0.2}
                       >
-                        <LabelList dataKey="upper80" position="top" {...chartLabelProps} formatter={moneyDataLabel} />
+                        <LabelList dataKey="upper80" position="top" offset={6} {...chartLabelProps} formatter={moneyDataLabel} />
                       </Area>
                     )}
                     {band && (
@@ -863,7 +863,7 @@ function ForecastPage() {
                         legendType="none"
                         tooltipType="none"
                       >
-                        <LabelList dataKey="lower80" position="bottom" {...chartLabelProps} formatter={moneyDataLabel} />
+                        <LabelList dataKey="lower80" position="bottom" offset={6} {...chartLabelProps} formatter={moneyDataLabel} />
                       </Area>
                     )}
                     {band && (
@@ -878,7 +878,7 @@ function ForecastPage() {
                         legendType="none"
                         tooltipType="none"
                       >
-                        <LabelList dataKey="lower" position="bottom" {...chartLabelProps} formatter={moneyDataLabel} />
+                        <LabelList dataKey="lower" position="bottom" offset={20} {...chartLabelProps} formatter={moneyDataLabel} />
                       </Area>
                     )}
                     <Area

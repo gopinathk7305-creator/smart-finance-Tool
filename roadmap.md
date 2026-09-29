@@ -6,4 +6,3 @@
 - [x] Add one-click active-data PDF and Excel summary exports
 - [x] Apply the shared CFO design system and validate all requested pages
 - [x] Add permanent Indian-value and percentage labels across financial charts
-- [ ] Add permanent value and percentage labels to all financial charts
