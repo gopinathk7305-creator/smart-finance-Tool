@@ -25,7 +25,7 @@ import { useActiveMonthlySeries } from "@/lib/monthly-cache";
 
 import { ActiveDatasetBanner } from "@/components/finance/ActiveDatasetBanner";
 import { AdaptedDashboard } from "@/components/finance/AdaptedDashboard";
-import { AutoDiscoveryKpis } from "@/components/finance/AutoDiscoveryKpis";
+import { CommandCenter } from "@/components/finance/CommandCenter";
 import { useSchemaDiscovery } from "@/lib/schema-discovery";
 import { AiReportButton } from "@/components/finance/AiReportButton";
 import { AppShell } from "@/components/finance/AppShell";
@@ -185,7 +185,7 @@ function Dashboard() {
   });
 
   return (
-    <AppShell title="Executive Dashboard" subtitle={live ? "Live view of your uploaded data" : "Sample data · upload your files to see real numbers"}>
+    <AppShell title="CFO Command Center" subtitle={live ? "Live view of your uploaded data" : "Sample data · upload your files to see real numbers"}>
       <ActiveDatasetBanner />
       <div className="mb-4 flex justify-end">
         <AiReportButton build={buildReport} />
@@ -199,144 +199,18 @@ function Dashboard() {
           </CardContent>
         </Card>
       )}
-      {adaptedMode ? (
+      {adaptedMode && t.expense === 0 ? (
         <AdaptedDashboard profile={discovery} />
-      ) : (
-      <>
-      {busy ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      ) : busy ? (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-[104px] rounded-xl" />
+            <Skeleton key={i} className="h-[132px] rounded-xl" />
           ))}
         </div>
       ) : (
-      <AutoDiscoveryKpis kpis={discovery.kpis} />
-      )}
-
-
-      <div ref={chartsRef}>
-      <div className="mt-4 grid gap-4">
-        <Card className="border-border shadow-card">
-          <CardHeader>
-            <CardTitle className="text-base">Monthly Revenue vs Expense</CardTitle>
-            <CardDescription>Twelve month actuals, FY2026</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[320px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={series} barGap={4}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
-                <YAxis
-                  tickFormatter={(v) => inr(Number(v), true)}
-                  tickLine={false}
-                  axisLine={false}
-                  fontSize={12}
-                  width={70}
-                />
-                <Tooltip formatter={(v) => inr(Number(v))} />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="revenue" name="Revenue" fill="var(--brand)" radius={[4, 4, 0, 0]}>
-                  <LabelList
-                    dataKey="revenue"
-                    position="top"
-                    style={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                    formatter={(val: number) => formatCompactCurrency(Number(val))}
-                  />
-                </Bar>
-                <Bar dataKey="expense" name="Expense" fill="var(--danger)" radius={[4, 4, 0, 0]}>
-                  <LabelList
-                    dataKey="expense"
-                    position="top"
-                    style={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                    formatter={(val: number) => formatCompactCurrency(Number(val))}
-                  />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <Card className="border-border shadow-card lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-base">Cash Balance Trend</CardTitle>
-            <CardDescription>Closing balance per month</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[260px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={series} margin={{ right: 36 }}>
-                <defs>
-                  <linearGradient id="cashFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--brand)" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="var(--brand)" stopOpacity={0.02} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
-                <YAxis
-                  tickFormatter={(v) => inr(Number(v), true)}
-                  tickLine={false}
-                  axisLine={false}
-                  fontSize={12}
-                  width={70}
-                />
-                <Tooltip formatter={(v) => inr(Number(v))} />
-                <Area
-                  type="monotone"
-                  dataKey="cash"
-                  name="Cash balance"
-                  stroke="var(--brand)"
-                  strokeWidth={2}
-                  fill="url(#cashFill)"
-                >
-                  <LabelList
-                    dataKey="cash"
-                    position="top"
-                    style={{ fontSize: 9, fill: "var(--muted-foreground)" }}
-                    formatter={(val: number) => formatCompactCurrency(Number(val))}
-                  />
-                </Area>
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border shadow-card">
-          <CardHeader className="flex-row items-start justify-between gap-3">
-            <div className="space-y-1">
-              <CardTitle className="text-base">Live Financial Alerts</CardTitle>
-              <CardDescription>Auto-generated from current data, using your thresholds</CardDescription>
-            </div>
-            <AlertSettingsDialog />
-
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {liveAlerts.map((a) => {
-              const Icon = toneIcon[a.tone];
-              const tone =
-                a.tone === "danger"
-                  ? "bg-danger-soft text-danger"
-                  : a.tone === "warning"
-                    ? "bg-warning-soft text-warning"
-                    : "bg-success-soft text-success";
-              return (
-                <div key={a.title} className="flex gap-3 rounded-lg border border-border p-3">
-                  <span className={`flex size-8 shrink-0 items-center justify-center rounded-md ${tone}`}>
-                    <Icon className="size-4" />
-                  </span>
-                  <div>
-                    <p className="text-sm font-semibold">{a.title}</p>
-                    <p className="text-xs text-muted-foreground">{a.body}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      </div>
-      </div>
-      </>
+        <div ref={chartsRef}>
+          <CommandCenter txns={txns} series={series} alerts={liveAlerts} />
+        </div>
       )}
 
       <Card className="mt-4 border-border shadow-card">
