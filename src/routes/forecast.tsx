@@ -33,6 +33,7 @@ import {
 import { toast } from "sonner";
 
 import { AiReportButton } from "@/components/finance/AiReportButton";
+import { ActiveDatasetBanner } from "@/components/finance/ActiveDatasetBanner";
 import { AppShell } from "@/components/finance/AppShell";
 import { KpiCard } from "@/components/finance/KpiCard";
 import {
@@ -370,6 +371,7 @@ function ForecastPage() {
       title={`Financial Forecasting & Scenario Planning (${inputs.fy})`}
       subtitle={`12-Month Rolling Indian Corporate Outlook & Runway Stress Testing · ${live ? "live data" : "demo data"}`}
     >
+      <ActiveDatasetBanner />
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Button variant="outline" size="sm" onClick={() => applyPreset("base")}>
           Base Case

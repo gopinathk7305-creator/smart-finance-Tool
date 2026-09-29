@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 
 import { AiReportButton } from "@/components/finance/AiReportButton";
+import { ActiveDatasetBanner } from "@/components/finance/ActiveDatasetBanner";
 import { AppShell } from "@/components/finance/AppShell";
 import { KpiCard } from "@/components/finance/KpiCard";
 import { Badge } from "@/components/ui/badge";
@@ -235,6 +236,7 @@ function BudgetPage() {
       title="Budget Planning & Variance"
       subtitle={`${fy} · ${live ? "your saved plan and uploaded ledger" : "sample plan — sign in to enter your own"}`}
     >
+      <ActiveDatasetBanner />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard label="Planned Budget" value={inr(plannedTotal, true)} icon={Target} hint={`${rows.length} lines`} />
         <KpiCard label="Actual Spend" value={inr(actualTotal, true)} icon={Wallet} tone="warning" hint="ledger to date" />

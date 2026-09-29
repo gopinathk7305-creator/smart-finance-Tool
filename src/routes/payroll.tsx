@@ -14,8 +14,10 @@ import {
 } from "recharts";
 
 import { AiReportButton } from "@/components/finance/AiReportButton";
+import { ActiveDatasetBanner } from "@/components/finance/ActiveDatasetBanner";
 import { AppShell } from "@/components/finance/AppShell";
 import { KpiCard } from "@/components/finance/KpiCard";
+import { ModuleSkeleton } from "@/components/finance/ModuleSkeleton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -37,6 +39,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { downloadCSV, grossPay, inr, netPay, type PayrollRecord } from "@/lib/finance-data";
 import { useDataset } from "@/lib/dataset";
+import { useActiveDataset } from "@/lib/active-dataset";
 import { computeTax, type TaxComputation } from "@/lib/enterprise-data";
 import { explainPayroll } from "@/lib/ai.functions";
 import { Sparkles } from "lucide-react";
@@ -62,6 +65,7 @@ export const Route = createFileRoute("/payroll")({
 
 function PayrollPage() {
   const { pays: payroll } = useDataset();
+  const { syncing } = useActiveDataset();
   const [query, setQuery] = useState("");
   const [taxFor, setTaxFor] = useState<PayrollRecord | null>(null);
   const [regime, setRegime] = useState<"new" | "old">("new");
@@ -77,7 +81,7 @@ function PayrollPage() {
   const totalCost = payroll.reduce((s, p) => s + grossPay(p), 0);
   const totalPf = payroll.reduce((s, p) => s + p.pf_deduction, 0);
   const totalTds = payroll.reduce((s, p) => s + p.tds_deduction, 0);
-  const avgSalary = totalCost / payroll.length;
+  const avgSalary = payroll.length ? totalCost / payroll.length : 0;
 
   const byDept = Object.values(
     payroll.reduce<Record<string, { department: string; basic: number; allowances: number; deductions: number }>>(
@@ -162,6 +166,13 @@ function PayrollPage() {
     chartEl: chartsRef.current,
   });
 
+  if (syncing)
+    return (
+      <AppShell title="Payroll Analytics" subtitle="Loading the selected dataset…">
+        <ModuleSkeleton />
+      </AppShell>
+    );
+
   return (
     <AppShell
       title="Payroll Analytics"
@@ -171,6 +182,7 @@ function PayrollPage() {
           : "No payroll records yet — upload a payroll CSV from Data Upload"
       }
     >
+      <ActiveDatasetBanner />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard label="Total Payroll Cost" value={inr(totalCost, true)} icon={Banknote} tone="neutral" hint="Gross monthly" />
         <KpiCard label="Average Salary" value={inr(avgSalary, true)} icon={Users} hint="Per employee" />

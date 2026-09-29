@@ -187,7 +187,7 @@ function useDatasetInternal(fetchEnabled: boolean): Dataset {
       ? combined.t.length + combined.p.length + combined.b.length + combined.a.length
       : 0;
 
-    if (!combined || rowCount === 0) {
+    if ((!combined || rowCount === 0) && !activeFile) {
       const demo = demoDatasetFor(orgId);
       const vendors = uniqueVendors(demo.txns, demo.araps);
       const demoTxns = demo.txns.filter((r) => inRange(r.date, range));
@@ -201,6 +201,20 @@ function useDatasetInternal(fetchEnabled: boolean): Dataset {
         live: false,
         loading: !!user && isLoading,
         outOfRange: demo.txns.length > 0 && demoTxns.length === 0,
+        refresh,
+      };
+    }
+
+    if (!combined || rowCount === 0) {
+      return {
+        txns: [],
+        pays: [],
+        buds: [],
+        araps: [],
+        vendors: [],
+        live: true,
+        loading: !!user && isLoading,
+        outOfRange: false,
         refresh,
       };
     }
