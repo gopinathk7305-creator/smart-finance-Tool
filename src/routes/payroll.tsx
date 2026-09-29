@@ -58,6 +58,8 @@ export const Route = createFileRoute("/payroll")({
         property: "og:description",
         content: "Employee-level payroll ledger with statutory deductions and department analytics.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: PayrollPage,

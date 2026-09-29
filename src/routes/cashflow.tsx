@@ -246,14 +246,6 @@ function CashFlowPage() {
                     <TableBody>
                       {rowsFor(type).map((r) => {
                         const bucket = agingBucket(r.due_date);
-                        const tone =
-                          bucket === "0-30"
-                            ? "bg-success-soft text-success"
-                            : bucket === "31-60"
-                              ? "bg-brand-soft text-brand"
-                              : bucket === "61-90"
-                                ? "bg-warning-soft text-warning"
-                                : "bg-danger-soft text-danger";
                         return (
                           <TableRow key={r.id}>
                             <TableCell className="font-medium">{r.party_name}</TableCell>
