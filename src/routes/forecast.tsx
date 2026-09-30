@@ -64,6 +64,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -81,7 +82,7 @@ import { useDataset } from "@/lib/dataset";
 import { useActiveDataset } from "@/lib/active-dataset";
 import { ModuleSkeleton } from "@/components/finance/ModuleSkeleton";
 
-import { actualsByCategory, downloadCSV, inr } from "@/lib/finance-data";
+import { actualsByCategory, downloadCSV, formatCompactCurrency, inr } from "@/lib/finance-data";
 
 import {
   BASE_SCENARIO,
@@ -91,6 +92,7 @@ import {
   runForecast,
   saveScenarios,
   type FinancialYear,
+  type ForecastRow,
   type SavedScenario,
   type ScenarioInputs,
 } from "@/lib/forecast-engine";
@@ -129,6 +131,66 @@ const TABS = [
   { id: "cumulative", label: "Cumulative Cash Flow" },
 ] as const;
 
+function milestoneIndices(rows: ForecastRow[], key: "baseProfit" | "scenProfit") {
+  if (!rows.length) return new Set<number>();
+  const first = 0;
+  const last = rows.length - 1;
+  const values = rows.map((row) => row[key]);
+  const peak = values.indexOf(Math.max(...values));
+  const low = values.indexOf(Math.min(...values));
+  const indices = new Set([first, last]);
+  // Skip extrema next to an endpoint or each other; the endpoint badge already explains that area.
+  if (peak > first + 1 && peak < last - 1) indices.add(peak);
+  if (low > first + 1 && low < last - 1 && Math.abs(low - peak) > 1) indices.add(low);
+  return indices;
+}
+
+function milestoneBadge(rows: ForecastRow[], key: "baseProfit" | "scenProfit", above: boolean) {
+  const visible = milestoneIndices(rows, key);
+  return (props: { x?: number | string | undefined; y?: number | string | undefined; index?: number | undefined; value?: number | string | undefined }) => {
+    const index = Number(props.index);
+    const x = Number(props.x);
+    const y = Number(props.y);
+    if (!visible.has(index) || !Number.isFinite(x) || !Number.isFinite(y)) return null;
+    const value = Number(props.value);
+    if (!Number.isFinite(value)) return null;
+    const text = formatCompactCurrency(value);
+    const width = Math.max(48, text.length * 7 + 16);
+    // Keep the first/last badges inside the plot instead of clipping at either edge.
+    const left = index === 0 ? x - 4 : index === rows.length - 1 ? x - width + 4 : x - width / 2;
+    const top = above ? y - 32 : y + 12;
+    return (
+      <g className="forecast-milestone" aria-label={`${rows[index]?.month} ${key === "baseProfit" ? "baseline" : "scenario"}: ${inr(value)}`}>
+        <rect x={left} y={top} width={width} height={23} rx={4} />
+        <text x={left + width / 2} y={top + 15} textAnchor="middle">{text}</text>
+      </g>
+    );
+  };
+}
+
+function ForecastComparisonTooltip({ active, payload, label }: {
+  active?: boolean;
+  payload?: Array<{ payload?: ForecastRow }>;
+  label?: string;
+}) {
+  if (!active || !payload?.length) return null;
+  const row = payload.find((entry) => entry.payload?.month === label)?.payload;
+  if (!row) return null;
+  const difference = row.scenProfit - row.baseProfit;
+  const percent = pctChange(row.scenProfit, row.baseProfit);
+  return (
+    <div className="rounded-md border border-border bg-popover p-3 text-xs text-popover-foreground shadow-card">
+      <p className="mb-2 font-semibold">{row.month} · Net profit</p>
+      <div className="grid grid-cols-[auto_auto] gap-x-6 gap-y-1.5">
+        <span>Baseline Value</span><span className="tabular text-right font-semibold">{inr(row.baseProfit)}</span>
+        <span>Scenario Value</span><span className="tabular text-right font-semibold">{inr(row.scenProfit)}</span>
+        <span className="border-t border-border pt-2">Variance Difference</span>
+        <span className="tabular border-t border-border pt-2 text-right font-semibold">{difference >= 0 ? "+" : "−"}{inr(Math.abs(difference))} ({percent >= 0 ? "+" : ""}{percent.toFixed(1)}%)</span>
+      </div>
+    </div>
+  );
+}
+
 
 function ForecastPage() {
   const { txns, pays, live } = useDataset();
@@ -141,7 +203,8 @@ function ForecastPage() {
   const [rateDraft, setRateDraft] = useState("");
   const [inputs, setInputs] = useState<ScenarioInputs>(BASE_SCENARIO);
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("profit");
-  const [band, setBand] = useState(true);
+  const [band, setBand] = useState(false);
+  const [comparisonView, setComparisonView] = useState<"line" | "bar">("line");
   const [saved, setSaved] = useState<SavedScenario[]>(() => loadScenarios());
   const [name, setName] = useState("");
   const [open, setOpen] = useState(false);
@@ -220,6 +283,9 @@ function ForecastPage() {
     [inputs, txns, pays, payrollNames],
   );
   const { rows } = result;
+  const comparisonRows = useMemo(() => rows.map((row) => ({ ...row, confidenceRange: [row.lower, row.upper] })), [rows]);
+  const stressScenario = inputs.revenueGrowth < 0 || inputs.churn >= 10 || inputs.opexAdj >= 10;
+  const scenarioColor = stressScenario ? "var(--forecast-stress)" : "var(--forecast-scenario)";
 
   const budget = useBudget(inputs.fy);
   const actuals = useMemo(() => actualsByCategory(txns), [txns]);
@@ -697,15 +763,20 @@ function ForecastPage() {
                     : "not enough history yet — using a gentle default trend"}
                 </CardDescription>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-3">
                 {tab === "profit" && (
-                  <Button
-                    variant={band ? "secondary" : "outline"}
-                    size="sm"
-                    onClick={() => setBand((b) => !b)}
-                  >
-                    95% band
-                  </Button>
+                  <>
+                    <div className="flex items-center gap-2">
+                      <Switch id="forecast-confidence" checked={band} onCheckedChange={setBand} aria-label="Show Confidence Interval" />
+                      <Label htmlFor="forecast-confidence" className="whitespace-nowrap text-xs">Show Confidence Interval</Label>
+                    </div>
+                    <Tabs value={comparisonView} onValueChange={(v) => setComparisonView(v as "line" | "bar")}>
+                      <TabsList aria-label="Comparison chart view">
+                        <TabsTrigger value="line" className="text-xs">Line View</TabsTrigger>
+                        <TabsTrigger value="bar" className="text-xs">Side-by-Side Bar Comparison View</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                  </>
                 )}
                 <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
                   <TabsList>
@@ -718,7 +789,7 @@ function ForecastPage() {
                 </Tabs>
               </div>
             </CardHeader>
-            <CardContent className="h-[340px]">
+            <CardContent className="h-[380px] min-w-0">
               <ResponsiveContainer width="100%" height="100%">
                 {tab === "revopex" ? (
                   <BarChart data={rows} margin={{ top: 26 }}>
@@ -808,14 +879,8 @@ function ForecastPage() {
                     </Line>
                   </ComposedChart>
 
-                ) : (
-                  <AreaChart data={rows} margin={{ top: 26, right: 16 }}>
-                    <defs>
-                      <linearGradient id="scen" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#0284c7" stopOpacity={0.35} />
-                        <stop offset="100%" stopColor="#0284c7" stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
+                ) : comparisonView === "bar" ? (
+                  <BarChart data={comparisonRows} margin={{ top: 32, right: 24, bottom: 8, left: 16 }} barGap={3}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                     <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
                     <YAxis
@@ -823,88 +888,59 @@ function ForecastPage() {
                       tickLine={false}
                       axisLine={false}
                       fontSize={12}
-                      width={72}
+                      width={80}
                     />
-                    <Tooltip formatter={(v) => inr(Number(v))} />
+                    <Tooltip content={<ForecastComparisonTooltip />} />
                     <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                    <Bar dataKey="baseProfit" name="Baseline" fill="var(--forecast-baseline)" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="scenProfit" name="Scenario" fill={scenarioColor} radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                ) : (
+                  <ComposedChart data={comparisonRows} margin={{ top: 44, right: 24, bottom: 28, left: 16 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                    <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
+                    <YAxis tickFormatter={(v) => inr(Number(v), true)} tickLine={false} axisLine={false} fontSize={12} width={80} />
+                    <Tooltip content={<ForecastComparisonTooltip />} />
                     {band && (
                       <Area
                         type="monotone"
-                        dataKey="upper"
-                        name="95% confidence"
+                        dataKey="confidenceRange"
+                        name="95% confidence interval"
                         stroke="transparent"
-                        fill="#0284c7"
-                        fillOpacity={0.12}
-                      >
-                        <LabelList dataKey="upper" position="top" offset={20} {...chartLabelProps} formatter={moneyDataLabel} />
-                      </Area>
-                    )}
-                    {band && (
-                      <Area
-                        type="monotone"
-                        dataKey="upper80"
-                        name="80% confidence"
-                        stroke="transparent"
-                        fill="#0284c7"
-                        fillOpacity={0.2}
-                      >
-                        <LabelList dataKey="upper80" position="top" offset={6} {...chartLabelProps} formatter={moneyDataLabel} />
-                      </Area>
-                    )}
-                    {band && (
-                      <Area
-                        type="monotone"
-                        dataKey="lower80"
-                        name="80% lower"
-                        stroke="#0284c7"
-                        strokeOpacity={0.25}
-                        strokeWidth={1}
-                        fill="transparent"
                         legendType="none"
                         tooltipType="none"
-                      >
-                        <LabelList dataKey="lower80" position="bottom" offset={6} {...chartLabelProps} formatter={moneyDataLabel} />
-                      </Area>
+                        fill={scenarioColor}
+                        fillOpacity={0.08}
+                        isAnimationActive={false}
+                      />
                     )}
-                    {band && (
-                      <Area
-                        type="monotone"
-                        dataKey="lower"
-                        name="Lower bound"
-                        stroke="#0284c7"
-                        strokeOpacity={0.3}
-                        strokeWidth={1}
-                        fill="transparent"
-                        legendType="none"
-                        tooltipType="none"
-                      >
-                        <LabelList dataKey="lower" position="bottom" offset={20} {...chartLabelProps} formatter={moneyDataLabel} />
-                      </Area>
-                    )}
-                    <Area
+                    <Legend iconType="line" wrapperStyle={{ fontSize: 12 }} />
+                    <Line
                       type="monotone"
                       dataKey="baseProfit"
                       name="Baseline"
-                      stroke="#334155"
-                      strokeDasharray="5 4"
-                      strokeWidth={2}
-                      fill="transparent"
-                      dot={{ r: 3 }}
+                      stroke="var(--forecast-baseline)"
+                      strokeWidth={2.5}
+                      dot={{ r: 2.5 }}
+                      activeDot={{ r: 5 }}
+                      isAnimationActive={false}
                     >
-                      <LabelList dataKey="baseProfit" position="top" {...chartLabelProps} formatter={moneyDataLabel} />
-                    </Area>
-                    <Area
+                      <LabelList dataKey="baseProfit" content={milestoneBadge(rows, "baseProfit", true)} />
+                    </Line>
+                    <Line
                       type="monotone"
                       dataKey="scenProfit"
                       name="Scenario"
-                      stroke="#0284c7"
-                      strokeWidth={2}
-                      fill="url(#scen)"
-                      dot={{ r: 3 }}
+                      stroke={scenarioColor}
+                      strokeDasharray="7 5"
+                      strokeWidth={2.5}
+                      dot={{ r: 2.5 }}
+                      activeDot={{ r: 5 }}
+                      isAnimationActive={false}
                     >
-                      <LabelList dataKey="scenProfit" position="bottom" {...chartLabelProps} formatter={moneyDataLabel} />
-                    </Area>
-                  </AreaChart>
+                      <LabelList dataKey="scenProfit" content={milestoneBadge(rows, "scenProfit", false)} />
+                    </Line>
+                  </ComposedChart>
                 )}
               </ResponsiveContainer>
             </CardContent>
