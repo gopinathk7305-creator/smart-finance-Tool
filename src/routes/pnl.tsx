@@ -272,9 +272,9 @@ function PnlPage() {
                 revenue with dates is available.
               </div>
             ) : (
-              <div className="h-[350px] min-w-[1320px]">
+              <div className="h-[350px] min-w-[1600px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={marginSeries} barGap={9} barCategoryGap="22%" margin={{ top: 42, right: 18, bottom: 8, left: 8 }}>
+                  <BarChart data={marginSeries} barGap={16} barCategoryGap="22%" margin={{ top: 42, right: 18, bottom: 8, left: 8 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                     <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
                     <YAxis tickFormatter={(v) => `${Number(v).toFixed(0)}%`} tickLine={false} axisLine={false} fontSize={12} width={44} />
