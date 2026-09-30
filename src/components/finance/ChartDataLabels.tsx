@@ -74,7 +74,7 @@ export function donutSliceLabels(items: { name: string; value: number }[]) {
 export function DonutBreakdownLegend({ items, colors }: { items: { name: string; value: number }[]; colors: string[] }) {
   const total = items.reduce((sum, item) => sum + item.value, 0);
   return (
-    <ul className="grid min-w-0 grid-cols-2 gap-x-3 gap-y-2 text-[11px] leading-4 sm:grid-cols-3" aria-label="Category distribution">
+    <ul className="grid min-w-0 grid-cols-2 gap-x-3 gap-y-2 text-[11px] leading-4" aria-label="Category distribution">
       {items.map((item, index) => {
         const pct = ((item.value / Math.max(total, 1)) * 100).toFixed(0);
         const label = `${item.name}: ${pct}% • ${formatCompactCurrency(item.value)}`;
