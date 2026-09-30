@@ -74,13 +74,20 @@ export function donutSliceLabels(items: { name: string; value: number }[]) {
 export function DonutBreakdownLegend({ items, colors }: { items: { name: string; value: number }[]; colors: string[] }) {
   const total = items.reduce((sum, item) => sum + item.value, 0);
   return (
-    <ul className="grid min-w-0 grid-cols-2 gap-x-3 gap-y-1.5 text-[11px] leading-4" aria-label="Category distribution">
-      {items.map((item, index) => (
-        <li key={`${item.name}-${index}`} className="flex min-w-0 items-start gap-2 text-foreground" title={`${item.name}: ${((item.value / Math.max(total, 1)) * 100).toFixed(0)}% (${formatCompactCurrency(item.value)})`}>
-          <span className="mt-1 size-2 shrink-0 rounded-full" style={{ backgroundColor: colors[index % colors.length] }} aria-hidden="true" />
-          <span className="min-w-0 break-words font-semibold">{item.name}: {((item.value / Math.max(total, 1)) * 100).toFixed(0)}%</span>
-        </li>
-      ))}
+    <ul className="grid min-w-0 grid-cols-2 gap-x-3 gap-y-2 text-[11px] leading-4 sm:grid-cols-3" aria-label="Category distribution">
+      {items.map((item, index) => {
+        const pct = ((item.value / Math.max(total, 1)) * 100).toFixed(0);
+        const label = `${item.name}: ${pct}% • ${formatCompactCurrency(item.value)}`;
+        return (
+          <li key={`${item.name}-${index}`} className="flex min-w-0 items-start gap-2 text-foreground" title={`${label} (${formatCompactCurrency(item.value, true)})`}>
+            <span className="mt-1 size-2 shrink-0 rounded-full" style={{ backgroundColor: colors[index % colors.length] }} aria-hidden="true" />
+            <span className="min-w-0 break-words">
+              <span className="font-semibold">{item.name}: {pct}%</span>
+              <span className="text-muted-foreground"> • {formatCompactCurrency(item.value)}</span>
+            </span>
+          </li>
+        );
+      })}
     </ul>
   );
 }
