@@ -111,8 +111,8 @@ function MetricCard({
           <Icon className="size-3.5" />
         </span>
       </div>
-      <p className="mt-2 whitespace-nowrap font-mono text-xl font-bold tracking-tight tabular-nums xl:text-2xl">{value}</p>
-      <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-[11px]">
+      <p className="mt-2 min-w-0 font-mono text-xl font-bold leading-tight tabular-nums break-words xl:text-lg 2xl:text-xl">{value}</p>
+      <div className="mt-1 flex min-h-5 min-w-0 flex-wrap items-center gap-1.5 text-[11px]">
         {delta !== undefined && <Pill delta={delta} />}
         <span className="truncate text-muted-foreground">{sub}</span>
       </div>
@@ -124,7 +124,7 @@ function MetricCard({
           />
         </div>
       ) : data.length > 1 ? (
-        <div className="mt-2 h-9">
+        <div className="mt-3 h-9" aria-hidden="true">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data} margin={{ top: 2, bottom: 0, left: 0, right: 0 }}>
               <defs>
