@@ -60,6 +60,8 @@ export const Route = createFileRoute("/users")({
         property: "og:description",
         content: "Manage roles, access status and monitor every action taken in the workspace.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: UsersPage,

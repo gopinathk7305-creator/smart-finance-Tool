@@ -22,6 +22,8 @@ export const Route = createFileRoute("/login")({
       },
       { property: "og:title", content: "Sign in — Finance IQ" },
       { property: "og:description", content: "Access your finance intelligence workspace." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: LoginPage,
