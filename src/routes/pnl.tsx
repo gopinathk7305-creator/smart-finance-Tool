@@ -284,10 +284,10 @@ function PnlPage() {
                       <LabelList dataKey="grossMargin" position="top" offset={8} {...chartLabelProps} formatter={percentDataLabel} />
                     </Bar>
                     <Bar dataKey="ebitdaMargin" name="EBITDA margin" fill="var(--success)" radius={[3, 3, 0, 0]} maxBarSize={20}>
-                      <LabelList dataKey="ebitdaMargin" position="top" offset={24} {...chartLabelProps} formatter={percentDataLabel} />
+                      <LabelList dataKey="ebitdaMargin" position="top" offset={38} {...chartLabelProps} formatter={percentDataLabel} />
                     </Bar>
                     <Bar dataKey="netMargin" name="Net margin" fill="var(--warning)" radius={[3, 3, 0, 0]} maxBarSize={20}>
-                      <LabelList dataKey="netMargin" position="top" offset={40} {...chartLabelProps} formatter={percentDataLabel} />
+                      <LabelList dataKey="netMargin" position="top" offset={5} {...chartLabelProps} formatter={percentDataLabel} />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
