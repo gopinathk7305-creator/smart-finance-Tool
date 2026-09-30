@@ -7,4 +7,4 @@
 - [x] Apply the shared CFO design system and validate all requested pages
 - [x] Add permanent Indian-value and percentage labels across financial charts
 - [x] Sharpen dashboard chart labels and replace overlapping donut callouts with readable category legends
-- [ ] Attach readable percentage and rupee callouts to Category Distribution slices while retaining its legend
+- [x] Attach readable percentage and rupee callouts to Category Distribution slices while retaining its legend
