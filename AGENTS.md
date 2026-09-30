@@ -12,3 +12,4 @@
 - Keep every finance module on the shared active-dataset and workspace pipeline; never add page-local demo financial figures because cross-page totals must reconcile.
 - Generate downloadable workbooks in the browser with SheetJS from the same report specification used for PDF exports so both formats reconcile.
 - Render permanent, theme-aware data labels on full-sized financial chart series while preserving hover tooltips; KPI mini sparklines stay text-free to prevent overflow.
+- Use shared crisp, theme-aware SVG chart typography and external legends for compact donuts to prevent overlapping slice callouts.

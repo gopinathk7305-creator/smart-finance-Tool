@@ -31,7 +31,7 @@ import {
 } from "recharts";
 
 import { AlertSettingsDialog } from "@/components/finance/AlertSettingsDialog";
-import { chartLabelProps, DonutValueLabel, moneyDataLabel } from "@/components/finance/ChartDataLabels";
+import { chartLabelProps, DonutBreakdownLegend, moneyDataLabel } from "@/components/finance/ChartDataLabels";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useBudget } from "@/lib/budget";
 import type { MonthlySummary, Transaction } from "@/lib/finance-data";
@@ -305,7 +305,8 @@ export function CommandCenter({
             <CardTitle className="text-base">Budgeted Allocation vs Actual Spend</CardTitle>
             <CardDescription>Monthly actuals (left axis) against budget line (right axis)</CardDescription>
           </CardHeader>
-          <CardContent className="h-[350px]">
+          <CardContent className="h-[350px] overflow-x-auto">
+            <div className="h-full min-w-[850px]">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={m.monthly} margin={{ top: 28, right: 8, left: 4 }}>
                 <defs>
@@ -320,8 +321,8 @@ export function CommandCenter({
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={11} />
-                <YAxis yAxisId="l" tickFormatter={(v) => lakh(Number(v))} tickLine={false} axisLine={false} fontSize={11} width={64} />
-                <YAxis yAxisId="r" orientation="right" tickFormatter={(v) => lakh(Number(v))} tickLine={false} axisLine={false} fontSize={11} width={64} />
+                 <YAxis yAxisId="l" tickFormatter={(v) => Number(v) === 0 ? "" : lakh(Number(v))} tickLine={false} axisLine={false} fontSize={11} width={64} />
+                 <YAxis yAxisId="r" orientation="right" tickFormatter={(v) => Number(v) === 0 ? "" : lakh(Number(v))} tickLine={false} axisLine={false} fontSize={11} width={64} />
                 <Tooltip
                   contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
                   formatter={(v, n, p) => {
@@ -332,13 +333,14 @@ export function CommandCenter({
                 />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
                 <Area yAxisId="r" type="monotone" dataKey="budget" name="Budgeted" stroke="var(--brand)" strokeDasharray="4 3" fill="url(#ccBudget)" dot={{ r: 3 }}>
-                  <LabelList dataKey="budget" position="top" offset={16} {...chartLabelProps} formatter={moneyDataLabel} />
+                   <LabelList dataKey="budget" position="top" offset={16} {...chartLabelProps} formatter={(value: number) => Number(value) > 0 ? moneyDataLabel(value) : ""} />
                 </Area>
                 <Bar yAxisId="l" dataKey="actual" name="Actual spend" fill="url(#ccActual)" radius={[4, 4, 0, 0]}>
-                  <LabelList dataKey="actual" position="top" offset={4} {...chartLabelProps} formatter={moneyDataLabel} />
+                   <LabelList dataKey="actual" position="top" offset={8} dy={-8} {...chartLabelProps} formatter={(value: number) => Number(value) > 0 ? moneyDataLabel(value) : ""} />
                 </Bar>
               </ComposedChart>
             </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
 
@@ -347,21 +349,23 @@ export function CommandCenter({
             <CardTitle className="text-base">Category Distribution</CardTitle>
             <CardDescription>Share of total expenditure</CardDescription>
           </CardHeader>
-          <CardContent className="h-[350px] overflow-visible">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart margin={{ top: 24, right: 84, bottom: 28, left: 84 }}>
-                <Pie data={donut} dataKey="value" nameKey="name" innerRadius={52} outerRadius={76} paddingAngle={2} labelLine={{ stroke: "var(--muted-foreground)" }} label={DonutValueLabel}>
-                  {donut.map((_, i) => (
-                    <Cell key={i} fill={DONUT[i % DONUT.length]} stroke="var(--card)" />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
-                  formatter={(v, n) => [`${exact(Number(v))} · ${((Number(v) / Math.max(1, totalCat)) * 100).toFixed(1)}%`, n]}
-                />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
-              </PieChart>
-            </ResponsiveContainer>
+          <CardContent className="grid h-[350px] min-w-0 grid-cols-[minmax(110px,42%)_minmax(0,1fr)] items-center gap-3">
+            <div className="h-[230px] min-w-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={donut} dataKey="value" nameKey="name" innerRadius="48%" outerRadius="77%" paddingAngle={2} label={false} labelLine={false}>
+                    {donut.map((_, i) => (
+                      <Cell key={i} fill={DONUT[i % DONUT.length]} stroke="var(--card)" />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
+                    formatter={(v, n) => [`${exact(Number(v))} · ${((Number(v) / Math.max(1, totalCat)) * 100).toFixed(1)}%`, n]}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <DonutBreakdownLegend items={donut} colors={DONUT} />
           </CardContent>
         </Card>
       </div>
