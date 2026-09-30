@@ -305,7 +305,8 @@ export function CommandCenter({
             <CardTitle className="text-base">Budgeted Allocation vs Actual Spend</CardTitle>
             <CardDescription>Monthly actuals (left axis) against budget line (right axis)</CardDescription>
           </CardHeader>
-          <CardContent className="h-[350px]">
+          <CardContent className="h-[350px] overflow-x-auto">
+            <div className="h-full min-w-[850px]">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={m.monthly} margin={{ top: 28, right: 8, left: 4 }}>
                 <defs>
@@ -320,8 +321,8 @@ export function CommandCenter({
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={11} />
-                <YAxis yAxisId="l" tickFormatter={(v) => lakh(Number(v))} tickLine={false} axisLine={false} fontSize={11} width={64} />
-                <YAxis yAxisId="r" orientation="right" tickFormatter={(v) => lakh(Number(v))} tickLine={false} axisLine={false} fontSize={11} width={64} />
+                 <YAxis yAxisId="l" tickFormatter={(v) => Number(v) === 0 ? "" : lakh(Number(v))} tickLine={false} axisLine={false} fontSize={11} width={64} />
+                 <YAxis yAxisId="r" orientation="right" tickFormatter={(v) => Number(v) === 0 ? "" : lakh(Number(v))} tickLine={false} axisLine={false} fontSize={11} width={64} />
                 <Tooltip
                   contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
                   formatter={(v, n, p) => {
@@ -339,6 +340,7 @@ export function CommandCenter({
                 </Bar>
               </ComposedChart>
             </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
 
