@@ -1,5 +1,3 @@
-import type { PieLabelRenderProps } from "recharts";
-
 import { formatCompactCurrency } from "@/lib/finance-data";
 
 export const moneyDataLabel = (value: unknown) => formatCompactCurrency(Number(value) || 0);
@@ -12,26 +10,16 @@ export const chartLabelProps = {
   className: "chart-data-label",
 } as const;
 
-export function DonutValueLabel({
-  cx = 0,
-  cy = 0,
-  midAngle = 0,
-  outerRadius = 0,
-  name = "",
-  value = 0,
-  percent = 0,
-}: PieLabelRenderProps) {
-  const angle = (Math.PI / 180) * -Number(midAngle);
-  const radius = Number(outerRadius) + 24;
-  const x = Number(cx) + radius * Math.cos(angle);
-  const y = Number(cy) + radius * Math.sin(angle);
-  const anchor = x > Number(cx) ? "start" : "end";
-  const label = String(name).length > 16 ? `${String(name).slice(0, 15)}…` : String(name);
-
+export function DonutBreakdownLegend({ items, colors }: { items: { name: string; value: number }[]; colors: string[] }) {
+  const total = items.reduce((sum, item) => sum + item.value, 0);
   return (
-    <text x={x} y={y} textAnchor={anchor} dominantBaseline="central" className="chart-data-label">
-      <tspan x={x} dy="-0.35em">{label}</tspan>
-      <tspan x={x} dy="1.25em">{`${(Number(percent) * 100).toFixed(0)}% • ${formatCompactCurrency(Number(value) || 0)}`}</tspan>
-    </text>
+    <ul className="grid min-w-0 content-center gap-2 text-[11px] leading-4" aria-label="Category distribution">
+      {items.map((item, index) => (
+        <li key={`${item.name}-${index}`} className="flex min-w-0 items-start gap-2 text-foreground" title={`${item.name}: ${((item.value / Math.max(total, 1)) * 100).toFixed(0)}% (${formatCompactCurrency(item.value)})`}>
+          <span className="mt-1 size-2 shrink-0 rounded-full" style={{ backgroundColor: colors[index % colors.length] }} aria-hidden="true" />
+          <span className="min-w-0 break-words font-semibold">{item.name}: {((item.value / Math.max(total, 1)) * 100).toFixed(0)}%</span>
+        </li>
+      ))}
+    </ul>
   );
 }
