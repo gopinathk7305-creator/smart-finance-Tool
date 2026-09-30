@@ -61,10 +61,9 @@ export function donutSliceLabels(items: { name: string; value: number }[]) {
     return (
       <g className="donut-slice-callout">
         <path d={`M ${startX} ${startY} L ${elbowX} ${textY} L ${textX - direction * 3} ${textY}`} fill="none" stroke="var(--muted-foreground)" strokeWidth={1} />
-        <text x={textX} y={textY - 5} textAnchor={direction === 1 ? "start" : "end"} className="chart-data-label" dominantBaseline="central">
+        <text x={textX} y={textY} textAnchor={direction === 1 ? "start" : "end"} className="chart-data-label" dominantBaseline="central">
           <title>{`${item.name}: ${percentage} (${formatCompactCurrency(item.value)})`}</title>
-          <tspan x={textX} dy="0">{percentage}</tspan>
-          <tspan x={textX} dy="14">({formatCompactCurrency(item.value)})</tspan>
+          {percentage}
         </text>
       </g>
     );
@@ -77,13 +76,14 @@ export function DonutBreakdownLegend({ items, colors }: { items: { name: string;
     <ul className="grid min-w-0 grid-cols-2 gap-x-3 gap-y-2 text-[11px] leading-4" aria-label="Category distribution">
       {items.map((item, index) => {
         const pct = ((item.value / Math.max(total, 1)) * 100).toFixed(0);
-        const label = `${item.name}: ${pct}% • ${formatCompactCurrency(item.value)}`;
+        const label = `${item.name}: ${pct}% (${formatCompactCurrency(item.value)})`;
         return (
           <li key={`${item.name}-${index}`} className="flex min-w-0 items-start gap-2 text-foreground" title={label}>
             <span className="mt-1 size-2 shrink-0 rounded-full" style={{ backgroundColor: colors[index % colors.length] }} aria-hidden="true" />
             <span className="min-w-0 break-words">
-              <span className="font-semibold">{item.name}: {pct}%</span>
-              <span className="text-muted-foreground"> • {formatCompactCurrency(item.value)}</span>
+              <span className="font-semibold">{item.name}:</span>{" "}
+              <span>{pct}%</span>{" "}
+              <span className="text-muted-foreground">({formatCompactCurrency(item.value)})</span>
             </span>
           </li>
         );
