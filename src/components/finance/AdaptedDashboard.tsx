@@ -15,7 +15,7 @@ import {
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AutoDiscoveryKpis } from "@/components/finance/AutoDiscoveryKpis";
-import { chartLabelProps, DonutValueLabel } from "@/components/finance/ChartDataLabels";
+import { chartLabelProps, DonutBreakdownLegend } from "@/components/finance/ChartDataLabels";
 import { compactMoney } from "@/lib/adaptive-dashboard";
 import type { SchemaDiscovery } from "@/lib/schema-discovery";
 
@@ -75,18 +75,20 @@ export function AdaptedDashboard({ profile }: { profile: SchemaDiscovery }) {
               <CardTitle className="text-base">Distribution</CardTitle>
               <CardDescription>{breakdownLabel}</CardDescription>
             </CardHeader>
-            <CardContent className="h-[320px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart margin={{ top: 20, right: 74, bottom: 28, left: 74 }}>
-                  <Pie data={breakdown} dataKey="value" nameKey="name" cx="50%" cy="45%" innerRadius={40} outerRadius={62} labelLine={{ stroke: "var(--muted-foreground)" }} label={DonutValueLabel}>
-                    {breakdown.map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(v) => full.format(Number(v))} />
-                  <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
-                </PieChart>
-              </ResponsiveContainer>
+            <CardContent className="grid h-[320px] min-w-0 grid-cols-[minmax(110px,42%)_minmax(0,1fr)] items-center gap-3">
+              <div className="h-[210px] min-w-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={breakdown} dataKey="value" nameKey="name" innerRadius="48%" outerRadius="77%" labelLine={false} label={false}>
+                      {breakdown.map((_, i) => (
+                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v) => full.format(Number(v))} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <DonutBreakdownLegend items={breakdown} colors={PIE_COLORS} />
             </CardContent>
           </Card>
         )}
