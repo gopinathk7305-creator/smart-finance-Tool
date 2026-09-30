@@ -147,7 +147,7 @@ function milestoneIndices(rows: ForecastRow[], key: "baseProfit" | "scenProfit")
 
 function milestoneBadge(rows: ForecastRow[], key: "baseProfit" | "scenProfit", above: boolean) {
   const visible = milestoneIndices(rows, key);
-  return (props: { x?: number | string; y?: number | string; index?: number; value?: number | string }) => {
+  return (props: { x?: number | string | undefined; y?: number | string | undefined; index?: number | undefined; value?: number | string | undefined }) => {
     const index = Number(props.index);
     const x = Number(props.x);
     const y = Number(props.y);
