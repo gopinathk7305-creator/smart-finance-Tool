@@ -65,6 +65,8 @@ export const Route = createFileRoute("/")({
         property: "og:description",
         content: "Financial KPIs, revenue vs expense trends and cash runway in one dashboard.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: Dashboard,

@@ -54,6 +54,8 @@ export const Route = createFileRoute("/audit")({
         property: "og:description",
         content: "Review, approve or escalate flagged transactions with an immutable audit trail.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: AuditPage,
