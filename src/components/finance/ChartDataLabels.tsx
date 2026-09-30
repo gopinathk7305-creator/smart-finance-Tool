@@ -61,10 +61,9 @@ export function donutSliceLabels(items: { name: string; value: number }[]) {
     return (
       <g className="donut-slice-callout">
         <path d={`M ${startX} ${startY} L ${elbowX} ${textY} L ${textX - direction * 3} ${textY}`} fill="none" stroke="var(--muted-foreground)" strokeWidth={1} />
-        <text x={textX} y={textY - 5} textAnchor={direction === 1 ? "start" : "end"} className="chart-data-label" dominantBaseline="central">
+        <text x={textX} y={textY} textAnchor={direction === 1 ? "start" : "end"} className="chart-data-label" dominantBaseline="central">
           <title>{`${item.name}: ${percentage} (${formatCompactCurrency(item.value)})`}</title>
-          <tspan x={textX} dy="0">{percentage}</tspan>
-          <tspan x={textX} dy="14">({formatCompactCurrency(item.value)})</tspan>
+          {percentage}
         </text>
       </g>
     );
