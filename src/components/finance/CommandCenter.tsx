@@ -104,14 +104,14 @@ function MetricCard({
   const data = (spark ?? []).map((v, i) => ({ i, v }));
   const id = `spark-${label.replace(/\W/g, "")}`;
   return (
-    <Card className={cn("min-w-0 gap-0 border-border p-4 shadow-card transition-all", t.glow)}>
+    <Card className={cn("min-w-0 gap-0 border-border p-5 shadow-card transition-all", t.glow)}>
       <div className="flex items-start justify-between gap-3">
-        <p className="min-w-0 pt-0.5 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">{label}</p>
+        <p className="min-w-0 pt-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">{label}</p>
         <span className={cn("flex size-11 shrink-0 items-center justify-center rounded-xl", t.ring)}>
           <Icon className="size-6" strokeWidth={1.75} />
         </span>
       </div>
-      <p className="mt-2.5 min-w-0 font-mono text-2xl font-bold leading-tight tracking-tight tabular-nums break-words"> {value}</p>
+      <p className="mt-2.5 min-w-0 font-mono text-2xl font-bold leading-tight tracking-tight tabular-nums break-words">{value}</p>
       <div className="mt-1.5 flex min-h-5 min-w-0 flex-wrap items-center gap-1.5 text-[11px]">
         {delta !== undefined && <Pill delta={delta} />}
         <span className="truncate text-muted-foreground">{sub}</span>
