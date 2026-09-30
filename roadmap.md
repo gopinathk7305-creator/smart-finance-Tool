@@ -9,3 +9,4 @@
 - [x] Sharpen dashboard chart labels and replace overlapping donut callouts with readable category legends
 - [x] Attach readable percentage and rupee callouts to Category Distribution slices while retaining its legend
 - [x] Simplify the forecasting baseline/scenario comparison with milestone-only labels, comparison tooltip, and view controls
+- [ ] Compact the P&L waterfall and replace margin/bridge visualizations with grouped bars and a profit trajectory

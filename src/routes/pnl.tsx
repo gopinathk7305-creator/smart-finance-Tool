@@ -111,13 +111,12 @@ function PnlPage() {
   ];
   const bridge = useMemo(() => [
     { label: "Revenue", value: t.revenue },
-    { label: "COGS", value: -t.cogs },
-    { label: "Opex", value: -t.opex },
-    { label: "D&A", value: -t.depreciation },
-    { label: "Interest", value: -t.interest },
-    { label: "Tax", value: -tx.total },
-    { label: "Net profit", value: tx.netProfit },
-  ], [t.revenue, t.cogs, t.opex, t.depreciation, t.interest, tx.total, tx.netProfit]);
+    { label: "After COGS", value: t.grossProfit },
+    { label: "After Opex", value: t.ebitda },
+    { label: "After D&A", value: t.ebitda - t.depreciation },
+    { label: "After Interest", value: ebit },
+    { label: "After Tax", value: tx.netProfit },
+  ], [t.revenue, t.grossProfit, t.ebitda, t.depreciation, ebit, tx.netProfit]);
 
 
   const taxRows: [string, string][] = [
@@ -210,9 +209,9 @@ function PnlPage() {
         <KpiCard label="Net Margin" value={pctLabel(tx.netProfit, t.revenue)} icon={Percent} tone="neutral" hint="FY 2026-27" />
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-5">
-        <Card className="border-border shadow-card lg:col-span-3">
-          <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
+      <div className="mt-4 space-y-4">
+        <Card className="border-border shadow-card">
+          <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 space-y-0 pb-3">
             <div>
               <CardTitle className="text-base">Profit & Loss Waterfall</CardTitle>
               <CardDescription>
@@ -227,19 +226,19 @@ function PnlPage() {
               </Label>
             </div>
           </CardHeader>
-          <CardContent className="space-y-1">
+          <CardContent className="max-h-[390px] space-y-0.5 overflow-y-auto pr-3 pb-4">
             {rows.map((r) => (
               <div
                 key={r.label}
                 className={cn(
-                  "flex items-center justify-between rounded-md px-3 py-2 text-sm",
+                  "flex items-center justify-between gap-3 rounded-md px-3 py-1.5 text-xs sm:text-[13px]",
                   r.kind === "sub" && "pl-7 text-muted-foreground",
                   r.kind === "total" && "bg-secondary font-semibold",
                   r.kind === "grand" && "mt-2 bg-primary font-bold text-primary-foreground",
                 )}
               >
-                <span>{r.label}</span>
-                <span className="tabular flex items-center gap-3">
+                <span className="min-w-0">{r.label}</span>
+                <span className="tabular flex shrink-0 items-center gap-3 whitespace-nowrap">
                   {showPct && (
                     <span
                       className={cn(
@@ -259,38 +258,40 @@ function PnlPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-border shadow-card lg:col-span-2">
+        <Card className="border-border shadow-card">
           <CardHeader>
             <CardTitle className="text-base">Margin Trend</CardTitle>
             <CardDescription>
-              Gross margin (revenue − COGS) and EBITDA margin by month
+              Gross, EBITDA and net margin by month
             </CardDescription>
           </CardHeader>
-          <CardContent className="h-[340px]">
+          <CardContent className="min-w-0 overflow-x-auto">
             {marginSeries.length === 0 ? (
-              <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">
+              <div className="flex h-[340px] items-center justify-center text-center text-sm text-muted-foreground">
                 No dated revenue rows in this dataset yet — the monthly trend appears as soon as
                 revenue with dates is available.
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={marginSeries} margin={{ top: 24, right: 18 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                  <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
-                  <YAxis tickFormatter={(v) => `${Number(v).toFixed(0)}%`} tickLine={false} axisLine={false} fontSize={12} width={44} />
-                  <Tooltip formatter={(v) => `${Number(v).toFixed(1)}%`} />
-                  <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                  <Line type="monotone" dataKey="grossMargin" name="Gross margin" stroke="var(--brand)" strokeWidth={2} dot={{ r: 3 }}>
-                    <LabelList dataKey="grossMargin" position="top" offset={8} {...chartLabelProps} formatter={percentDataLabel} />
-                  </Line>
-                  <Line type="monotone" dataKey="ebitdaMargin" name="EBITDA margin" stroke="var(--success)" strokeWidth={2} dot={{ r: 3 }}>
-                    <LabelList dataKey="ebitdaMargin" position="right" offset={8} {...chartLabelProps} formatter={percentDataLabel} />
-                  </Line>
-                  <Line type="monotone" dataKey="netMargin" name="Net margin" stroke="var(--warning)" strokeWidth={2} dot={{ r: 3 }}>
-                    <LabelList dataKey="netMargin" position="bottom" offset={8} {...chartLabelProps} formatter={percentDataLabel} />
-                  </Line>
-                </LineChart>
-              </ResponsiveContainer>
+              <div className="h-[350px] min-w-[1320px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={marginSeries} barGap={9} barCategoryGap="22%" margin={{ top: 42, right: 18, bottom: 8, left: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                    <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
+                    <YAxis tickFormatter={(v) => `${Number(v).toFixed(0)}%`} tickLine={false} axisLine={false} fontSize={12} width={44} />
+                    <Tooltip formatter={(v) => `${Number(v).toFixed(1)}%`} />
+                    <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                    <Bar dataKey="grossMargin" name="Gross margin" fill="var(--brand)" radius={[3, 3, 0, 0]} maxBarSize={20}>
+                      <LabelList dataKey="grossMargin" position="top" offset={8} {...chartLabelProps} formatter={percentDataLabel} />
+                    </Bar>
+                    <Bar dataKey="ebitdaMargin" name="EBITDA margin" fill="var(--success)" radius={[3, 3, 0, 0]} maxBarSize={20}>
+                      <LabelList dataKey="ebitdaMargin" position="top" offset={24} {...chartLabelProps} formatter={percentDataLabel} />
+                    </Bar>
+                    <Bar dataKey="netMargin" name="Net margin" fill="var(--warning)" radius={[3, 3, 0, 0]} maxBarSize={20}>
+                      <LabelList dataKey="netMargin" position="top" offset={40} {...chartLabelProps} formatter={percentDataLabel} />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             )}
           </CardContent>
 
@@ -300,19 +301,19 @@ function PnlPage() {
       <Card className="mt-4 border-border shadow-card">
         <CardHeader>
           <CardTitle className="text-base">Profit Bridge</CardTitle>
-          <CardDescription>Revenue through operating costs, finance charges and tax to net profit</CardDescription>
+          <CardDescription>Remaining profit after each revenue and expense driver</CardDescription>
         </CardHeader>
         <CardContent className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={bridge} margin={{ top: 24 }}>
+            <LineChart data={bridge} margin={{ top: 28, right: 22, left: 8 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={11} interval={0} />
               <YAxis tickFormatter={(v) => inr(Number(v), true)} tickLine={false} axisLine={false} fontSize={12} width={72} />
               <Tooltip formatter={(v) => inr(Number(v))} />
-              <Bar dataKey="value" name="Contribution" fill="var(--brand)" radius={[4, 4, 0, 0]}>
-                <LabelList dataKey="value" position="top" offset={5} {...chartLabelProps} formatter={moneyDataLabel} />
-              </Bar>
-            </BarChart>
+              <Line type="monotone" dataKey="value" name="Remaining profit" stroke="var(--brand)" strokeWidth={2.5} dot={{ r: 4, fill: "var(--card)", strokeWidth: 2 }} activeDot={{ r: 6 }}>
+                <LabelList dataKey="value" position="top" offset={8} {...chartLabelProps} formatter={moneyDataLabel} />
+              </Line>
+            </LineChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
