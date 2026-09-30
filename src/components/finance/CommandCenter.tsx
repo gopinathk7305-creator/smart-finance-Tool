@@ -31,7 +31,7 @@ import {
 } from "recharts";
 
 import { AlertSettingsDialog } from "@/components/finance/AlertSettingsDialog";
-import { chartLabelProps, DonutBreakdownLegend, moneyDataLabel } from "@/components/finance/ChartDataLabels";
+import { chartLabelProps, DonutBreakdownLegend, donutSliceLabels, moneyDataLabel } from "@/components/finance/ChartDataLabels";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useBudget } from "@/lib/budget";
 import type { MonthlySummary, Transaction } from "@/lib/finance-data";
@@ -349,11 +349,11 @@ export function CommandCenter({
             <CardTitle className="text-base">Category Distribution</CardTitle>
             <CardDescription>Share of total expenditure</CardDescription>
           </CardHeader>
-          <CardContent className="grid h-[350px] min-w-0 grid-cols-[minmax(110px,42%)_minmax(0,1fr)] items-center gap-3">
-            <div className="h-[230px] min-w-0">
+          <CardContent className="min-w-0 space-y-2 pb-4">
+            <div className="h-[270px] min-w-0">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={donut} dataKey="value" nameKey="name" innerRadius="48%" outerRadius="77%" paddingAngle={2} label={false} labelLine={false}>
+                  <Pie data={donut} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={29} outerRadius={50} paddingAngle={2} startAngle={90} endAngle={-270} label={donutSliceLabels(donut)} labelLine={false} isAnimationActive={false}>
                     {donut.map((_, i) => (
                       <Cell key={i} fill={DONUT[i % DONUT.length]} stroke="var(--card)" />
                     ))}
