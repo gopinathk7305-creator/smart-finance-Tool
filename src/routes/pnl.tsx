@@ -226,7 +226,7 @@ function PnlPage() {
               </Label>
             </div>
           </CardHeader>
-          <CardContent className="max-h-[390px] space-y-0.5 overflow-y-auto pr-3 pb-4">
+          <CardContent className="h-auto space-y-0.5 pb-4">
             {rows.map((r) => (
               <div
                 key={r.label}
