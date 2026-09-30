@@ -33,8 +33,11 @@ export function donutSliceLabels(items: { name: string; value: number }[]) {
     });
     // A second pass prevents a later callout from crossing an earlier one.
     for (let i = 1; i < lane.length; i++) {
-      const previous = positions.get(lane[i - 1].index);
-      const current = positions.get(lane[i].index);
+      const previousEntry = lane[i - 1];
+      const currentEntry = lane[i];
+      if (!previousEntry || !currentEntry) continue;
+      const previous = positions.get(previousEntry.index);
+      const current = positions.get(currentEntry.index);
       if (previous && current && current.level < previous.level + 34) current.level = previous.level + 34;
     }
   }
