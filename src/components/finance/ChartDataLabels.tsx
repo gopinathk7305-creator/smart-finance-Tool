@@ -79,7 +79,7 @@ export function DonutBreakdownLegend({ items, colors }: { items: { name: string;
         const pct = ((item.value / Math.max(total, 1)) * 100).toFixed(0);
         const label = `${item.name}: ${pct}% • ${formatCompactCurrency(item.value)}`;
         return (
-          <li key={`${item.name}-${index}`} className="flex min-w-0 items-start gap-2 text-foreground" title={`${label} (${formatCompactCurrency(item.value, true)})`}>
+          <li key={`${item.name}-${index}`} className="flex min-w-0 items-start gap-2 text-foreground" title={label}>
             <span className="mt-1 size-2 shrink-0 rounded-full" style={{ backgroundColor: colors[index % colors.length] }} aria-hidden="true" />
             <span className="min-w-0 break-words">
               <span className="font-semibold">{item.name}: {pct}%</span>
