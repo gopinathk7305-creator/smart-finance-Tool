@@ -124,6 +124,9 @@
   --brand-foreground: oklch(0.985 0 0);
   --brand-soft: oklch(0.958 0.024 277.1);
   --chart-label: #1e293b;
+  --forecast-baseline: oklch(0.511 0.226 277.1);
+  --forecast-scenario: oklch(0.596 0.167 157.8);
+  --forecast-stress: oklch(0.666 0.167 65.4);
 }
 
 .dark {
@@ -160,6 +163,9 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.551 0.027 264.364);
   --chart-label: #f8fafc;
+  --forecast-baseline: oklch(0.71 0.18 277.1);
+  --forecast-scenario: oklch(0.76 0.16 157.8);
+  --forecast-stress: oklch(0.8 0.15 75);
 }
 
 @layer base {
@@ -200,6 +206,19 @@
     font-variant-numeric: tabular-nums;
     letter-spacing: 0;
     pointer-events: none;
+  }
+
+  .forecast-milestone text {
+    fill: var(--chart-label);
+    font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .forecast-milestone rect {
+    fill: var(--card);
+    stroke: var(--border);
   }
 
   .recharts-surface {
