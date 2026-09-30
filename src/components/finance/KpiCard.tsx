@@ -31,14 +31,14 @@ export function KpiCard({
   return (
     <Card className="gap-0 border-border p-5 shadow-card">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{label}</p>
+        <p className="min-w-0 pt-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">{label}</p>
         {Icon && (
-          <span className={cn("flex size-8 items-center justify-center rounded-md", toneRing)}>
-            <Icon className="size-4" />
+          <span className={cn("flex size-11 shrink-0 items-center justify-center rounded-xl", toneRing)}>
+            <Icon className="size-6" strokeWidth={1.75} />
           </span>
         )}
       </div>
-      <p className="mt-3 text-2xl font-bold tracking-tight" data-financial-value>{value}</p>
+      <p className="mt-3 min-w-0 text-2xl font-bold tracking-tight break-words sm:text-[26px]" data-financial-value>{value}</p>
       <div className="mt-2 flex items-center gap-2 text-xs">
         {delta !== undefined && (
           <span
