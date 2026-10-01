@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useTransition,
   type ReactNode,
@@ -93,25 +94,27 @@ export function ActiveDatasetProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  const datasets = data ?? [];
+  // Stable identity: a fresh [] every render would invalidate every consumer.
+  const datasets = useMemo(() => data ?? [], [data]);
+  const switchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(switchTimer.current), []);
 
   const setActiveId = useCallback(
     (id: string | null) => {
       // "" records an explicit "all datasets" choice so it survives reloads.
       window.localStorage.setItem(ACTIVE_KEY, id ?? "");
       setSyncing(true);
-      // The switch itself is a low-priority update: the dropdown closes and the
-      // skeleton paints immediately while React re-renders the heavy modules in
-      // the background instead of blocking the browser thread.
-      startTransition(() => {
-        setActiveIdState(id);
-        // Only the module currently on screen refetches; every other module
-        // stays stale and reloads lazily when the user opens it. Keeps a 50k-row
-        // switch instant instead of blocking on 11 modules at once.
-        queryClient.invalidateQueries({ queryKey: ["dataset"], refetchType: "active" });
-        queryClient.invalidateQueries({ queryKey: ["dataset-summary"], refetchType: "active" });
-      });
-      window.setTimeout(() => setSyncing(false), 300);
+      // 300ms debounce: rapid back-to-back switches collapse into one heavy
+      // recompute, and the switch itself runs as a low-priority transition.
+      clearTimeout(switchTimer.current);
+      switchTimer.current = setTimeout(() => {
+        startTransition(() => {
+          setActiveIdState(id);
+          queryClient.invalidateQueries({ queryKey: ["dataset"], refetchType: "active" });
+          queryClient.invalidateQueries({ queryKey: ["dataset-summary"], refetchType: "active" });
+        });
+        setSyncing(false);
+      }, 300);
     },
     [queryClient, startTransition],
   );

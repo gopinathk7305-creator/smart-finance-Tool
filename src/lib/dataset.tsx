@@ -140,15 +140,23 @@ function useDatasetInternal(fetchEnabled: boolean): Dataset {
   }, [queryClient]);
 
   // Realtime cloud sync: any insert/update/delete on the ingested tables
-  // refreshes every page that reads the dataset.
+  // refreshes every page that reads the dataset. A bulk upload fires thousands
+  // of row events, so they are coalesced into one refetch after 1.5s of quiet
+  // instead of triggering a refetch storm that hangs the tab.
   useEffect(() => {
     if (!user || !fetchEnabled) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const schedule = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(refresh, 1500);
+    };
     const channel = supabase.channel(`dataset-sync-${user.id}-${Math.random().toString(36).slice(2)}`);
     ["transactions", "payroll_records", "budget_targets", "arap_records"].forEach((table) => {
-      channel.on("postgres_changes", { event: "*", schema: "public", table }, () => refresh());
+      channel.on("postgres_changes", { event: "*", schema: "public", table }, schedule);
     });
     channel.subscribe();
     return () => {
+      if (timer) clearTimeout(timer);
       void supabase.removeChannel(channel);
     };
   }, [user, refresh, fetchEnabled]);
@@ -327,13 +335,27 @@ export function useDatasetRaw(): Record<string, unknown>[] {
   const fallback = user ? localFallbacks.get(user.id) : undefined;
 
   return useMemo(() => {
+    // Many widgets call this hook; share one flattened copy per cached
+    // snapshot instead of re-walking 15k+ rows in every component.
+    const cacheKey = `${activeFile ?? ""}`;
+    const owner = (cached ?? fallback ?? EMPTY_OWNER) as object;
+    const hit = rawCache.get(owner);
+    if (hit && hit.key === cacheKey && hit.fallback === fallback) return hit.rows;
     const rows = mergeRows((cached?.t ?? []) as { id?: string }[], (fallback?.t ?? []) as { id?: string }[]);
     const scoped = activeFile
       ? rows.filter((r) => (r as { source_file?: string | null }).source_file === activeFile)
       : rows;
-    return scoped.map((r) => withRawColumns(r as Record<string, unknown>));
+    const out = scoped.map((r) => withRawColumns(r as Record<string, unknown>));
+    rawCache.set(owner, { key: cacheKey, fallback, rows: out });
+    return out;
   }, [cached, fallback, activeFile]);
 }
+
+const EMPTY_OWNER = {};
+const rawCache = new WeakMap<
+  object,
+  { key: string; fallback: Partial<CloudDataset> | undefined; rows: Record<string, unknown>[] }
+>();
 
 function byVendor<T>(rows: T[], vendor: string, pick: (r: T) => string): T[] {
   if (vendor === ALL) return rows;
