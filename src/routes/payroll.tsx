@@ -69,6 +69,101 @@ export const Route = createFileRoute("/payroll")({
   component: PayrollPage,
 });
 
+type DeptRow = { department: string; basic: number; allowances: number; deductions: number; total: number };
+type PayrollSummary = {
+  totalCost: number;
+  totalPf: number;
+  totalTds: number;
+  totalNet: number;
+  totalOther: number;
+  byDept: DeptRow[];
+};
+
+const SUMMARY_CHUNK = 2000;
+
+function newSummaryAcc() {
+  return { cost: 0, pf: 0, tds: 0, net: 0, other: 0, dept: new Map<string, DeptRow>() };
+}
+type SummaryAcc = ReturnType<typeof newSummaryAcc>;
+
+function addToSummary(acc: SummaryAcc, rows: PayrollRecord[], from: number, to: number) {
+  for (let i = from; i < to; i++) {
+    const p = rows[i]!;
+    acc.cost += grossPay(p);
+    acc.pf += p.pf_deduction;
+    acc.tds += p.tds_deduction;
+    acc.net += netPay(p);
+    acc.other += p.deductions;
+    const department = payrollDepartment({ department: p.department });
+    let d = acc.dept.get(department);
+    if (!d) {
+      d = { department, basic: 0, allowances: 0, deductions: 0, total: 0 };
+      acc.dept.set(department, d);
+    }
+    d.basic += p.basic_pay;
+    d.allowances += p.allowances;
+    d.deductions += p.pf_deduction + p.tds_deduction + p.deductions;
+  }
+}
+
+function finishSummary(acc: SummaryAcc): PayrollSummary {
+  const byDept = [...acc.dept.values()].map((d) => ({ ...d, total: d.basic + d.allowances + d.deductions }));
+  return { totalCost: acc.cost, totalPf: acc.pf, totalTds: acc.tds, totalNet: acc.net, totalOther: acc.other, byDept };
+}
+
+/**
+ * Payroll totals + department split. Small runs compute synchronously; large
+ * runs (15k+ rows) are aggregated in 2,000-row slices across setTimeout ticks
+ * so the tab never stalls. Recomputes only when the payroll array changes.
+ */
+function usePayrollSummary(payroll: PayrollRecord[]): PayrollSummary | null {
+  const small = payroll.length <= SUMMARY_CHUNK;
+  const syncSummary = useMemo(() => {
+    if (!small) return null;
+    const acc = newSummaryAcc();
+    addToSummary(acc, payroll, 0, payroll.length);
+    return finishSummary(acc);
+  }, [payroll, small]);
+
+  const [async, setAsync] = useState<{ source: PayrollRecord[]; summary: PayrollSummary } | null>(null);
+  useEffect(() => {
+    if (small) return;
+    let cancelled = false;
+    let handle: ReturnType<typeof setTimeout>;
+    const acc = newSummaryAcc();
+    let i = 0;
+    const step = () => {
+      if (cancelled) return;
+      const end = Math.min(payroll.length, i + SUMMARY_CHUNK);
+      addToSummary(acc, payroll, i, end);
+      i = end;
+      if (i < payroll.length) handle = setTimeout(step, 0);
+      else setAsync({ source: payroll, summary: finishSummary(acc) });
+    };
+    handle = setTimeout(step, 0);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [payroll, small]);
+
+  if (small) return syncSummary;
+  return async && async.source === payroll ? async.summary : null;
+}
+
+function ChartSkeleton() {
+  return (
+    <div className="flex h-full flex-col justify-end gap-2" aria-busy="true" aria-label="Calculating">
+      <div className="flex h-full items-end gap-3">
+        {[60, 85, 45, 70, 55].map((h, i) => (
+          <div key={i} className="flex-1 animate-pulse rounded-t bg-muted" style={{ height: `${h}%` }} />
+        ))}
+      </div>
+      <p className="text-center text-xs text-muted-foreground">Calculating department totals…</p>
+    </div>
+  );
+}
+
 function PayrollPage() {
   const { pays: payroll } = useDataset();
   const { syncing } = useActiveDataset();
@@ -77,14 +172,17 @@ function PayrollPage() {
   const [taxFor, setTaxFor] = useState<PayrollRecord | null>(null);
   const [regime, setRegime] = useState<"new" | "old">("new");
   const [page, setPage] = useState(0);
-  const PAGE_SIZE = 50;
+  const PAGE_SIZE = 20;
 
+  // Lower-cased search text built once per dataset, not per keystroke.
+  const searchIndex = useMemo(
+    () => payroll.map((p) => `${p.name} ${p.employee_id} ${p.department}`.toLowerCase()),
+    [payroll],
+  );
   const filtered = useMemo(() => {
-    const q = debouncedQuery.toLowerCase();
-    return q
-      ? payroll.filter((p) => `${p.name} ${p.employee_id} ${p.department}`.toLowerCase().includes(q))
-      : payroll;
-  }, [debouncedQuery, payroll]);
+    const q = debouncedQuery.trim().toLowerCase();
+    return q ? payroll.filter((_, i) => searchIndex[i]!.includes(q)) : payroll;
+  }, [debouncedQuery, payroll, searchIndex]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
   const pageRows = useMemo(
@@ -92,59 +190,48 @@ function PayrollPage() {
     [filtered, safePage],
   );
 
-  const { totalCost, totalPf, totalTds } = useMemo(() => {
-    let c = 0, pf = 0, tds = 0;
-    for (const p of payroll) {
-      c += grossPay(p);
-      pf += p.pf_deduction;
-      tds += p.tds_deduction;
-    }
-    return { totalCost: c, totalPf: pf, totalTds: tds };
-  }, [payroll]);
+  const summary = usePayrollSummary(payroll);
+  const totalCost = summary?.totalCost ?? 0;
+  const totalPf = summary?.totalPf ?? 0;
+  const totalTds = summary?.totalTds ?? 0;
+  const totalNet = summary?.totalNet ?? 0;
+  const totalOther = summary?.totalOther ?? 0;
+  const byDept = useMemo(() => summary?.byDept ?? [], [summary]);
   const avgSalary = payroll.length ? totalCost / payroll.length : 0;
-
-  const byDept = Object.values(
-    payroll.reduce<Record<string, { department: string; basic: number; allowances: number; deductions: number; total: number }>>(
-      (acc, p) => {
-        const department = payrollDepartment({ department: p.department });
-        const d = (acc[department] ??= {
-          department,
-          basic: 0,
-          allowances: 0,
-          deductions: 0,
-          total: 0,
-        });
-        d.basic += p.basic_pay;
-        d.allowances += p.allowances;
-        d.deductions += p.pf_deduction + p.tds_deduction + p.deductions;
-        d.total = d.basic + d.allowances + d.deductions;
-        return acc;
-      },
-      {},
-    ),
+  const grossNetRows = useMemo(
+    () =>
+      byDept.map((d) => ({
+        department: d.department,
+        gross: d.basic + d.allowances,
+        net: d.basic + d.allowances - d.deductions,
+      })),
+    [byDept],
   );
 
   // Renders only the stack total above each bar — no text inside segments.
   // x is the segment's left edge; center the badge over the bar width and
   // float it 8px above the top of the deductions segment.
-  const deptTotalBadge = (props: {
-    x?: number | string | undefined;
-    y?: number | string | undefined;
-    width?: number | string | undefined;
-    index?: number | undefined;
-  }) => {
-    const x = Number(props.x);
-    const y = Number(props.y);
-    const w = Number(props.width);
-    const item = byDept[Number(props.index)];
-    if (!Number.isFinite(x) || !Number.isFinite(y) || !item) return null;
-    const cx = Number.isFinite(w) ? x + w / 2 : x;
-    return (
-      <text x={cx} y={y - 8} dx={0} dy={0} textAnchor="middle" className="chart-data-label">
-        {moneyDataLabel(item.total)}
-      </text>
-    );
-  };
+  const deptTotalBadge = useCallback(
+    (props: {
+      x?: number | string | undefined;
+      y?: number | string | undefined;
+      width?: number | string | undefined;
+      index?: number | undefined;
+    }) => {
+      const x = Number(props.x);
+      const y = Number(props.y);
+      const w = Number(props.width);
+      const item = byDept[Number(props.index)];
+      if (!Number.isFinite(x) || !Number.isFinite(y) || !item) return null;
+      const cx = Number.isFinite(w) ? x + w / 2 : x;
+      return (
+        <text x={cx} y={y - 8} dx={0} dy={0} textAnchor="middle" className="chart-data-label">
+          {moneyDataLabel(item.total)}
+        </text>
+      );
+    },
+    [byDept],
+  );
 
   const exportCsv = () => {
     downloadCSV(
