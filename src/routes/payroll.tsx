@@ -72,20 +72,34 @@ function PayrollPage() {
   const { pays: payroll } = useDataset();
   const { syncing } = useActiveDataset();
   const [query, setQuery] = useState("");
+  const debouncedQuery = useDebounced(query, 300);
   const [taxFor, setTaxFor] = useState<PayrollRecord | null>(null);
   const [regime, setRegime] = useState<"new" | "old">("new");
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 50;
 
-  const filtered = useMemo(
-    () =>
-      payroll.filter((p) =>
-        `${p.name} ${p.employee_id} ${p.department}`.toLowerCase().includes(query.toLowerCase()),
-      ),
-    [query, payroll],
+  const filtered = useMemo(() => {
+    const q = debouncedQuery.toLowerCase();
+    return q
+      ? payroll.filter((p) => `${p.name} ${p.employee_id} ${p.department}`.toLowerCase().includes(q))
+      : payroll;
+  }, [debouncedQuery, payroll]);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const pageRows = useMemo(
+    () => filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE),
+    [filtered, safePage],
   );
 
-  const totalCost = payroll.reduce((s, p) => s + grossPay(p), 0);
-  const totalPf = payroll.reduce((s, p) => s + p.pf_deduction, 0);
-  const totalTds = payroll.reduce((s, p) => s + p.tds_deduction, 0);
+  const { totalCost, totalPf, totalTds } = useMemo(() => {
+    let c = 0, pf = 0, tds = 0;
+    for (const p of payroll) {
+      c += grossPay(p);
+      pf += p.pf_deduction;
+      tds += p.tds_deduction;
+    }
+    return { totalCost: c, totalPf: pf, totalTds: tds };
+  }, [payroll]);
   const avgSalary = payroll.length ? totalCost / payroll.length : 0;
 
   const byDept = Object.values(
@@ -316,7 +330,7 @@ function PayrollPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((p) => (
+                {pageRows.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.employee_id}</TableCell>
                     <TableCell>{p.name}</TableCell>
