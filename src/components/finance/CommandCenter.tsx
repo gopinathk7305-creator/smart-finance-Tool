@@ -332,10 +332,10 @@ export function CommandCenter({
                   }}
                 />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Area yAxisId="r" type="monotone" dataKey="budget" name="Budgeted" stroke="var(--brand)" strokeDasharray="4 3" fill="url(#ccBudget)" dot={{ r: 3 }}>
+                <Area isAnimationActive={false} yAxisId="r" type="monotone" dataKey="budget" name="Budgeted" stroke="var(--brand)" strokeDasharray="4 3" fill="url(#ccBudget)" dot={{ r: 3 }}>
                    <LabelList dataKey="budget" position="top" offset={16} {...chartLabelProps} formatter={(value: number) => Number(value) > 0 ? moneyDataLabel(value) : ""} />
                 </Area>
-                <Bar yAxisId="l" dataKey="actual" name="Actual spend" fill="url(#ccActual)" radius={[4, 4, 0, 0]}>
+                <Bar isAnimationActive={false} yAxisId="l" dataKey="actual" name="Actual spend" fill="url(#ccActual)" radius={[4, 4, 0, 0]}>
                    <LabelList dataKey="actual" position="top" offset={8} dy={-8} {...chartLabelProps} formatter={(value: number) => Number(value) > 0 ? moneyDataLabel(value) : ""} />
                 </Bar>
               </ComposedChart>
@@ -397,11 +397,11 @@ export function CommandCenter({
                   formatter={(v, n) => [exact(Number(v)), n]}
                 />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Area type="monotone" dataKey="spent" name="Cumulative spend" stroke="var(--danger)" strokeWidth={2} fill="url(#ccSpent)" dot={{ r: 3 }}>
+                <Area isAnimationActive={false} type="monotone" dataKey="spent" name="Cumulative spend" stroke="var(--danger)" strokeWidth={2} fill="url(#ccSpent)" dot={{ r: 3 }}>
                   <LabelList dataKey="spent" position="top" offset={8} {...chartLabelProps} formatter={moneyDataLabel} />
                 </Area>
                 {m.planned > 0 && (
-                  <Area type="monotone" dataKey="remaining" name="Budget remaining" stroke="var(--success)" strokeWidth={2} fill="url(#ccLeft)" dot={{ r: 3 }}>
+                  <Area isAnimationActive={false} type="monotone" dataKey="remaining" name="Budget remaining" stroke="var(--success)" strokeWidth={2} fill="url(#ccLeft)" dot={{ r: 3 }}>
                     <LabelList dataKey="remaining" position="bottom" offset={8} {...chartLabelProps} formatter={moneyDataLabel} />
                   </Area>
                 )}

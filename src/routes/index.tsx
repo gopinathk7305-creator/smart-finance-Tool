@@ -28,6 +28,7 @@ import { AdaptedDashboard } from "@/components/finance/AdaptedDashboard";
 import { CommandCenter } from "@/components/finance/CommandCenter";
 import { useSchemaDiscovery } from "@/lib/schema-discovery";
 import { AiReportButton } from "@/components/finance/AiReportButton";
+import { LazyVisible } from "@/components/finance/LazyVisible";
 import { AppShell } from "@/components/finance/AppShell";
 import { useActiveDataset } from "@/lib/active-dataset";
 import { useActiveDatasetMetrics } from "@/lib/dataset-metrics";
@@ -215,6 +216,7 @@ function Dashboard() {
         </div>
       )}
 
+      <LazyVisible minHeight={200}>
       <Card className="mt-4 border-border shadow-card">
         <CardHeader>
           <CardTitle className="text-base">Recent Transactions</CardTitle>
@@ -259,6 +261,7 @@ function Dashboard() {
           )}
         </CardContent>
       </Card>
+      </LazyVisible>
     </AppShell>
   );
 }

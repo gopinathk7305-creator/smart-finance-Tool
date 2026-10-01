@@ -401,10 +401,10 @@ function BudgetPage() {
                 <YAxis type="category" dataKey="category" width={140} tickLine={false} axisLine={false} fontSize={12} />
                 <Tooltip formatter={(v) => inr(Number(v))} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="budgeted_amount" name="Planned" fill="var(--primary)" radius={[0, 4, 4, 0]}>
+                <Bar isAnimationActive={false} dataKey="budgeted_amount" name="Planned" fill="var(--primary)" radius={[0, 4, 4, 0]}>
                   <LabelList dataKey="budgeted_amount" position="right" offset={6} {...chartLabelProps} formatter={moneyDataLabel} />
                 </Bar>
-                <Bar dataKey="actual" name="Actual" fill="var(--brand)" radius={[0, 4, 4, 0]}>
+                <Bar isAnimationActive={false} dataKey="actual" name="Actual" fill="var(--brand)" radius={[0, 4, 4, 0]}>
                   <LabelList dataKey="actual" position="right" offset={6} {...chartLabelProps} formatter={moneyDataLabel} />
                 </Bar>
               </BarChart>
@@ -440,10 +440,10 @@ function BudgetPage() {
                 />
                 <Tooltip formatter={(v) => inr(Number(v))} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="actual" name="Actual spend" fill="var(--brand)" radius={[4, 4, 0, 0]}>
+                <Bar isAnimationActive={false} dataKey="actual" name="Actual spend" fill="var(--brand)" radius={[4, 4, 0, 0]}>
                   <LabelList dataKey="actual" position="top" offset={5} {...chartLabelProps} formatter={moneyDataLabel} />
                 </Bar>
-                <Line
+                <Line isAnimationActive={false}
                   type="monotone"
                   dataKey="plan"
                   name="Monthly plan"

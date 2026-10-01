@@ -55,7 +55,7 @@ export function AdaptedDashboard({ profile }: { profile: SchemaDiscovery }) {
                   />
                   <Tooltip formatter={(v) => full.format(Number(v))} />
                   <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="spend" name="Spend" fill="var(--danger)" radius={[4, 4, 0, 0]}>
+                  <Bar isAnimationActive={false} dataKey="spend" name="Spend" fill="var(--danger)" radius={[4, 4, 0, 0]}>
                     <LabelList
                       dataKey="spend"
                       position="top"
@@ -79,7 +79,7 @@ export function AdaptedDashboard({ profile }: { profile: SchemaDiscovery }) {
               <div className="h-[210px] min-w-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={breakdown} dataKey="value" nameKey="name" innerRadius="48%" outerRadius="77%" labelLine={false} label={false}>
+                    <Pie isAnimationActive={false} data={breakdown} dataKey="value" nameKey="name" innerRadius="48%" outerRadius="77%" labelLine={false} label={false}>
                       {breakdown.map((_, i) => (
                         <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                       ))}

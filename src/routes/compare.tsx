@@ -356,8 +356,8 @@ function ComparePage() {
                 />
                 <Tooltip formatter={(v) => inr(Number(v))} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="revenueA" name={shortA} fill="var(--brand)" radius={[4, 4, 0, 0]}><LabelList dataKey="revenueA" position="top" {...chartLabelProps} formatter={moneyDataLabel} /></Bar>
-                <Bar dataKey="revenueB" name={shortB} fill="var(--primary)" radius={[4, 4, 0, 0]}><LabelList dataKey="revenueB" position="top" {...chartLabelProps} formatter={moneyDataLabel} /></Bar>
+                <Bar isAnimationActive={false} dataKey="revenueA" name={shortA} fill="var(--brand)" radius={[4, 4, 0, 0]}><LabelList dataKey="revenueA" position="top" {...chartLabelProps} formatter={moneyDataLabel} /></Bar>
+                <Bar isAnimationActive={false} dataKey="revenueB" name={shortB} fill="var(--primary)" radius={[4, 4, 0, 0]}><LabelList dataKey="revenueB" position="top" {...chartLabelProps} formatter={moneyDataLabel} /></Bar>
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -382,8 +382,8 @@ function ComparePage() {
                 />
                 <Tooltip formatter={(v) => inr(Number(v))} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="expenseA" name={shortA} fill="var(--danger)" radius={[4, 4, 0, 0]}><LabelList dataKey="expenseA" position="top" {...chartLabelProps} formatter={moneyDataLabel} /></Bar>
-                <Bar dataKey="expenseB" name={shortB} fill="var(--warning)" radius={[4, 4, 0, 0]}><LabelList dataKey="expenseB" position="top" {...chartLabelProps} formatter={moneyDataLabel} /></Bar>
+                <Bar isAnimationActive={false} dataKey="expenseA" name={shortA} fill="var(--danger)" radius={[4, 4, 0, 0]}><LabelList dataKey="expenseA" position="top" {...chartLabelProps} formatter={moneyDataLabel} /></Bar>
+                <Bar isAnimationActive={false} dataKey="expenseB" name={shortB} fill="var(--warning)" radius={[4, 4, 0, 0]}><LabelList dataKey="expenseB" position="top" {...chartLabelProps} formatter={moneyDataLabel} /></Bar>
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -409,8 +409,8 @@ function ComparePage() {
               />
               <Tooltip formatter={(v) => inr(Number(v))} />
               <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
-              <Line type="monotone" dataKey="cashA" name={shortA} stroke="var(--brand)" strokeWidth={2} dot={{ r: 3 }}><LabelList dataKey="cashA" position="top" {...chartLabelProps} formatter={moneyDataLabel} /></Line>
-              <Line type="monotone" dataKey="cashB" name={shortB} stroke="var(--primary)" strokeWidth={2} dot={{ r: 3 }}><LabelList dataKey="cashB" position="bottom" {...chartLabelProps} formatter={moneyDataLabel} /></Line>
+              <Line isAnimationActive={false} type="monotone" dataKey="cashA" name={shortA} stroke="var(--brand)" strokeWidth={2} dot={{ r: 3 }}><LabelList dataKey="cashA" position="top" {...chartLabelProps} formatter={moneyDataLabel} /></Line>
+              <Line isAnimationActive={false} type="monotone" dataKey="cashB" name={shortB} stroke="var(--primary)" strokeWidth={2} dot={{ r: 3 }}><LabelList dataKey="cashB" position="bottom" {...chartLabelProps} formatter={moneyDataLabel} /></Line>
             </LineChart>
           </ResponsiveContainer>
         </CardContent>

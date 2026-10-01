@@ -120,7 +120,7 @@ export function AdaptiveDashboard({ profile }: { profile: Profile }) {
                 />
                 <Tooltip formatter={(v) => full.format(Number(v))} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="revenue" name="Revenue" fill="var(--primary)" radius={[4, 4, 0, 0]}>
+                <Bar isAnimationActive={false} dataKey="revenue" name="Revenue" fill="var(--primary)" radius={[4, 4, 0, 0]}>
                   <LabelList
                     dataKey="revenue"
                     position="top"
@@ -128,7 +128,7 @@ export function AdaptiveDashboard({ profile }: { profile: Profile }) {
                     formatter={(val: number) => compactMoney(Number(val))}
                   />
                 </Bar>
-                <Bar dataKey="expenses" name="Expenses" fill="var(--danger)" radius={[4, 4, 0, 0]}>
+                <Bar isAnimationActive={false} dataKey="expenses" name="Expenses" fill="var(--danger)" radius={[4, 4, 0, 0]}>
                   <LabelList
                     dataKey="expenses"
                     position="top"
@@ -171,7 +171,7 @@ export function AdaptiveDashboard({ profile }: { profile: Profile }) {
                   <Tooltip formatter={(v) => full.format(Number(v))} />
                   <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
                   {trendSeries.map((col, i) => (
-                    <Bar
+                    <Bar isAnimationActive={false}
                       key={col}
                       dataKey={col}
                       name={titleCase(col)}
@@ -205,7 +205,7 @@ export function AdaptiveDashboard({ profile }: { profile: Profile }) {
               <div className="h-[200px] min-w-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={breakdown} dataKey="value" nameKey="name" innerRadius="48%" outerRadius="77%" labelLine={false} label={false}>
+                    <Pie isAnimationActive={false} data={breakdown} dataKey="value" nameKey="name" innerRadius="48%" outerRadius="77%" labelLine={false} label={false}>
                       {breakdown.map((_, i) => (
                         <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                       ))}
@@ -245,7 +245,7 @@ export function AdaptiveDashboard({ profile }: { profile: Profile }) {
                   width={64}
                 />
                 <Tooltip formatter={(v) => full.format(Number(v))} />
-                <Area
+                <Area isAnimationActive={false}
                   type="monotone"
                   dataKey="value"
                   name="Cumulative"

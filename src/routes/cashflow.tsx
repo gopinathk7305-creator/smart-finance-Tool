@@ -140,10 +140,10 @@ function CashFlowPage() {
                 <YAxis tickFormatter={(v) => inr(Number(v), true)} tickLine={false} axisLine={false} fontSize={12} width={70} />
                 <Tooltip formatter={(v) => inr(Number(v))} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Line type="monotone" dataKey="revenue" name="Cash inflow" stroke="var(--success)" strokeWidth={2} dot={{ r: 3 }}>
+                <Line isAnimationActive={false} type="monotone" dataKey="revenue" name="Cash inflow" stroke="var(--success)" strokeWidth={2} dot={{ r: 3 }}>
                   <LabelList dataKey="revenue" position="top" offset={8} {...chartLabelProps} formatter={moneyDataLabel} />
                 </Line>
-                <Line type="monotone" dataKey="expense" name="Cash outflow" stroke="var(--danger)" strokeWidth={2} dot={{ r: 3 }}>
+                <Line isAnimationActive={false} type="monotone" dataKey="expense" name="Cash outflow" stroke="var(--danger)" strokeWidth={2} dot={{ r: 3 }}>
                   <LabelList dataKey="expense" position="bottom" offset={8} {...chartLabelProps} formatter={moneyDataLabel} />
                 </Line>
               </LineChart>
@@ -189,7 +189,7 @@ function CashFlowPage() {
                   <XAxis dataKey="bucket" tickLine={false} axisLine={false} fontSize={12} />
                   <YAxis tickFormatter={(v) => inr(Number(v), true)} tickLine={false} axisLine={false} fontSize={12} width={70} />
                   <Tooltip formatter={(v) => inr(Number(v))} />
-                  <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
+                  <Bar isAnimationActive={false} dataKey="amount" radius={[4, 4, 0, 0]}>
                     <LabelList dataKey="amount" position="top" offset={5} {...chartLabelProps} formatter={moneyDataLabel} />
                     {bucketData(type).map((_, i) => (
                       <Cell

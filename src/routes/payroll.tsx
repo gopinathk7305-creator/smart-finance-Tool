@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Banknote, Download, Percent, Receipt, Users } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
+import { useDebounced } from "@/hooks/use-debounced";
 import { toast } from "sonner";
 import {
   Bar,
@@ -72,20 +73,34 @@ function PayrollPage() {
   const { pays: payroll } = useDataset();
   const { syncing } = useActiveDataset();
   const [query, setQuery] = useState("");
+  const debouncedQuery = useDebounced(query, 300);
   const [taxFor, setTaxFor] = useState<PayrollRecord | null>(null);
   const [regime, setRegime] = useState<"new" | "old">("new");
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 50;
 
-  const filtered = useMemo(
-    () =>
-      payroll.filter((p) =>
-        `${p.name} ${p.employee_id} ${p.department}`.toLowerCase().includes(query.toLowerCase()),
-      ),
-    [query, payroll],
+  const filtered = useMemo(() => {
+    const q = debouncedQuery.toLowerCase();
+    return q
+      ? payroll.filter((p) => `${p.name} ${p.employee_id} ${p.department}`.toLowerCase().includes(q))
+      : payroll;
+  }, [debouncedQuery, payroll]);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const pageRows = useMemo(
+    () => filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE),
+    [filtered, safePage],
   );
 
-  const totalCost = payroll.reduce((s, p) => s + grossPay(p), 0);
-  const totalPf = payroll.reduce((s, p) => s + p.pf_deduction, 0);
-  const totalTds = payroll.reduce((s, p) => s + p.tds_deduction, 0);
+  const { totalCost, totalPf, totalTds } = useMemo(() => {
+    let c = 0, pf = 0, tds = 0;
+    for (const p of payroll) {
+      c += grossPay(p);
+      pf += p.pf_deduction;
+      tds += p.tds_deduction;
+    }
+    return { totalCost: c, totalPf: pf, totalTds: tds };
+  }, [payroll]);
   const avgSalary = payroll.length ? totalCost / payroll.length : 0;
 
   const byDept = Object.values(
@@ -235,9 +250,9 @@ function PayrollPage() {
                 <YAxis tickFormatter={(v) => inr(Number(v), true)} tickLine={false} axisLine={false} fontSize={12} width={70} />
                 <Tooltip content={<PayrollAllocationTooltip />} cursor={{ fill: "var(--secondary)" }} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="basic" stackId="a" name="Basic" fill="var(--primary)" />
-                <Bar dataKey="allowances" stackId="a" name="Allowances" fill="var(--brand)" minPointSize={8} />
-                <Bar dataKey="deductions" stackId="a" name="Deductions" fill="var(--warning)" minPointSize={8} radius={[4, 4, 0, 0]}>
+                <Bar isAnimationActive={false} dataKey="basic" stackId="a" name="Basic" fill="var(--primary)" />
+                <Bar isAnimationActive={false} dataKey="allowances" stackId="a" name="Allowances" fill="var(--brand)" minPointSize={8} />
+                <Bar isAnimationActive={false} dataKey="deductions" stackId="a" name="Deductions" fill="var(--warning)" minPointSize={8} radius={[4, 4, 0, 0]}>
                   {/* Total badge sits above the stack; segments themselves stay text-free. */}
                   <LabelList dataKey="total" position="top" offset={4} content={deptTotalBadge} />
                 </Bar>
@@ -267,10 +282,10 @@ function PayrollPage() {
                 <YAxis tickFormatter={(v) => inr(Number(v), true)} tickLine={false} axisLine={false} fontSize={12} width={70} />
                 <Tooltip formatter={(v) => inr(Number(v))} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="gross" name="Gross" fill="var(--brand)" radius={[4, 4, 0, 0]}>
+                <Bar isAnimationActive={false} dataKey="gross" name="Gross" fill="var(--brand)" radius={[4, 4, 0, 0]}>
                   <LabelList dataKey="gross" position="top" offset={5} {...chartLabelProps} formatter={moneyDataLabel} />
                 </Bar>
-                <Bar dataKey="net" name="Net" fill="var(--success)" radius={[4, 4, 0, 0]}>
+                <Bar isAnimationActive={false} dataKey="net" name="Net" fill="var(--success)" radius={[4, 4, 0, 0]}>
                   <LabelList dataKey="net" position="top" offset={5} {...chartLabelProps} formatter={moneyDataLabel} />
                 </Bar>
               </BarChart>
@@ -289,7 +304,7 @@ function PayrollPage() {
             <Input
               placeholder="Search employee or department"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => { setQuery(e.target.value); setPage(0); }}
               className="w-56 bg-background"
             />
             <Button variant="outline" onClick={exportCsv}>
@@ -316,7 +331,7 @@ function PayrollPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((p) => (
+                {pageRows.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.employee_id}</TableCell>
                     <TableCell>{p.name}</TableCell>
@@ -346,6 +361,25 @@ function PayrollPage() {
               </TableBody>
             </Table>
           </div>
+          {filtered.length > PAGE_SIZE && (
+            <div className="mt-3 flex items-center justify-end gap-2 text-xs text-muted-foreground">
+              <span className="tabular">
+                {safePage * PAGE_SIZE + 1}–{Math.min(filtered.length, (safePage + 1) * PAGE_SIZE)} of{" "}
+                {filtered.length.toLocaleString("en-IN")}
+              </span>
+              <Button size="sm" variant="outline" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>
+                Previous
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={safePage >= pageCount - 1}
+                onClick={() => setPage(safePage + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
