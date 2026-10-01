@@ -360,6 +360,25 @@ function PayrollPage() {
               </TableBody>
             </Table>
           </div>
+          {filtered.length > PAGE_SIZE && (
+            <div className="mt-3 flex items-center justify-end gap-2 text-xs text-muted-foreground">
+              <span className="tabular">
+                {safePage * PAGE_SIZE + 1}–{Math.min(filtered.length, (safePage + 1) * PAGE_SIZE)} of{" "}
+                {filtered.length.toLocaleString("en-IN")}
+              </span>
+              <Button size="sm" variant="outline" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>
+                Previous
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={safePage >= pageCount - 1}
+                onClick={() => setPage(safePage + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

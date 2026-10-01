@@ -164,9 +164,17 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     persist("all", { start: "", end: "" });
   }, [persist]);
 
+  // 300ms debounce so rapid date edits don't recompute every module.
+  const [debounced, setDebounced] = useState({ preset, custom });
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced({ preset, custom }), 300);
+    return () => clearTimeout(id);
+  }, [preset, custom]);
+  const range = useMemo(() => resolveRange(debounced.preset, debounced.custom), [debounced]);
+
   const value = useMemo<WorkspaceValue>(
-    () => ({ preset, custom, range: resolveRange(preset, custom), setPreset, setCustom, resetRange }),
-    [preset, custom, setPreset, setCustom, resetRange],
+    () => ({ preset, custom, range, setPreset, setCustom, resetRange }),
+    [preset, custom, range, setPreset, setCustom, resetRange],
   );
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;

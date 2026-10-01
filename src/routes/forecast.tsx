@@ -1117,31 +1117,38 @@ function Lever({
   currency?: boolean;
   onChange: (v: number) => void;
 }) {
+  const [local, setLocal] = useState(value);
+  useEffect(() => setLocal(value), [value]);
+  useEffect(() => {
+    if (local === value) return;
+    const id = setTimeout(() => onChange(local), 300);
+    return () => clearTimeout(id);
+  }, [local]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="space-y-2.5">
       <div className="flex items-center justify-between gap-2">
         <Label className="text-xs">{label}</Label>
         <Input
           type="number"
-          value={value}
+          value={local}
           min={min}
           max={max}
           step={step}
-          onChange={(e) => onChange(clamp(Number(e.target.value), min, max))}
+          onChange={(e) => setLocal(clamp(Number(e.target.value), min, max))}
           className="tabular h-8 w-24 text-right text-xs"
         />
       </div>
       <Slider
-        value={[value]}
+        value={[local]}
         min={min}
         max={max}
         step={step}
-        onValueChange={([v]) => onChange(v ?? min)}
+        onValueChange={([v]) => setLocal(v ?? min)}
       />
       <div className="flex justify-between text-[11px] text-muted-foreground">
         <span>{currency ? inr(min, true) : `${min}${suffix}`}</span>
         <span className="font-medium text-foreground">
-          {currency ? inr(value, true) : `${value}${suffix}`}
+          {currency ? inr(local, true) : `${local}${suffix}`}
         </span>
         <span>{currency ? inr(max, true) : `${max}${suffix}`}</span>
       </div>
