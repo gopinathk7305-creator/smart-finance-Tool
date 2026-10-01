@@ -43,6 +43,7 @@ import { downloadCSV, grossPay, inr, netPay, type PayrollRecord } from "@/lib/fi
 import { useDataset } from "@/lib/dataset";
 import { useActiveDataset } from "@/lib/active-dataset";
 import { computeTax, type TaxComputation } from "@/lib/enterprise-data";
+import { payrollDepartment } from "@/lib/module-derive";
 import { explainPayroll } from "@/lib/ai.functions";
 import { Sparkles } from "lucide-react";
 
@@ -90,8 +91,9 @@ function PayrollPage() {
   const byDept = Object.values(
     payroll.reduce<Record<string, { department: string; basic: number; allowances: number; deductions: number; total: number }>>(
       (acc, p) => {
-        const d = (acc[p.department] ??= {
-          department: p.department,
+        const department = payrollDepartment({ department: p.department });
+        const d = (acc[department] ??= {
+          department,
           basic: 0,
           allowances: 0,
           deductions: 0,
@@ -215,22 +217,24 @@ function PayrollPage() {
             <CardTitle className="text-base">Department-wise Payroll Allocation</CardTitle>
             <CardDescription>Basic, allowances and deductions stacked</CardDescription>
           </CardHeader>
-          <CardContent className="h-[300px]">
+          <CardContent className="h-[300px] min-w-0 overflow-x-auto">
+            <div className="h-full min-w-[540px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={byDept} margin={{ top: 24 }}>
+              <BarChart data={byDept} margin={{ top: 28, right: 10, bottom: 6, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="department" tickLine={false} axisLine={false} fontSize={12} />
+                <XAxis dataKey="department" tickLine={false} axisLine={false} fontSize={12} interval={0} />
                 <YAxis tickFormatter={(v) => inr(Number(v), true)} tickLine={false} axisLine={false} fontSize={12} width={70} />
-                <Tooltip formatter={(v) => inr(Number(v))} />
+                <Tooltip content={<PayrollAllocationTooltip />} cursor={{ fill: "var(--secondary)" }} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
                 <Bar dataKey="basic" stackId="a" name="Basic" fill="var(--primary)" />
-                <Bar dataKey="allowances" stackId="a" name="Allowances" fill="var(--brand)" />
-                <Bar dataKey="deductions" stackId="a" name="Deductions" fill="var(--warning)" radius={[4, 4, 0, 0]}>
+                <Bar dataKey="allowances" stackId="a" name="Allowances" fill="var(--brand)" minPointSize={8} />
+                <Bar dataKey="deductions" stackId="a" name="Deductions" fill="var(--warning)" minPointSize={8} radius={[4, 4, 0, 0]}>
                   {/* Total badge sits above the stack; segments themselves stay text-free. */}
                   <LabelList dataKey="total" position="top" offset={4} content={deptTotalBadge} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
 
@@ -338,6 +342,41 @@ function PayrollPage() {
 
       <TaxDialog record={taxFor} regime={regime} setRegime={setRegime} onClose={() => setTaxFor(null)} />
     </AppShell>
+  );
+}
+
+function precisePayrollAmount(value: number): string {
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "−" : "";
+  if (abs >= 1_00_00_000) return `${sign}₹${(abs / 1_00_00_000).toFixed(2)}Cr`;
+  if (abs >= 1_00_000) return `${sign}₹${(abs / 1_00_000).toFixed(2)}L`;
+  return inr(value);
+}
+
+function PayrollAllocationTooltip({ active, payload, label }: {
+  active?: boolean;
+  payload?: ReadonlyArray<{ name?: string; value?: number | string }>;
+  label?: string | number;
+}) {
+  if (!active || !payload?.length) return null;
+  const colors: Record<string, string> = {
+    Basic: "bg-primary",
+    Allowances: "bg-brand",
+    Deductions: "bg-warning",
+  };
+  return (
+    <div className="min-w-44 rounded-md border border-border bg-popover p-3 text-popover-foreground shadow-md">
+      <p className="mb-2 text-xs font-semibold">{label}</p>
+      {payload.map((item) => (
+        <div key={item.name} className="flex items-center justify-between gap-5 py-0.5 text-xs">
+          <span className="flex items-center gap-2">
+            <span className={`size-2.5 rounded-sm ${colors[item.name ?? ""] ?? "bg-muted"}`} />
+            {item.name}
+          </span>
+          <span className="tabular font-semibold">{precisePayrollAmount(Number(item.value) || 0)}</span>
+        </div>
+      ))}
+    </div>
   );
 }
 

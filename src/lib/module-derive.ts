@@ -50,10 +50,22 @@ const PAYROLL_SIGNALS = {
   tds: ["tds_deduction", "tds", "income_tax", "tax_deducted", "tax"],
   net: ["net_pay", "net_salary", "take_home", "net_amount"],
   name: ["employee_name", "emp_name", "employee", "name"],
-  dept: ["department", "dept", "division", "team", "cost_centre", "cost_center"],
+  dept: ["department", "employee_department", "department_name", "dept_name", "dept", "division", "team", "business_unit", "cost_centre", "cost_center", "cost_center_name", "function"],
   empId: ["employee_id", "emp_id", "emp_code", "employee_code", "staff_id"],
   month: ["month_year", "pay_month", "salary_month", "month", "period", "pay_date", "date"],
 };
+
+/** Prefer an actual uploaded department over a placeholder in a stored canonical column. */
+export function payrollDepartment(row: Record<string, unknown>): string {
+  const entries = Object.entries(row).filter(([key]) =>
+    PAYROLL_SIGNALS.dept.some((signal) => canon(key) === signal || canon(key).includes(signal)),
+  );
+  const real = entries.find(([, value]) => {
+    const name = String(value ?? "").trim();
+    return name && !/^(unassigned|unspecified|unknown|n\/?a|none|null|-)$/i.test(name);
+  });
+  return real ? String(real[1]).trim() : "Unmapped";
+}
 
 /**
  * Payroll records from any dataset. Uses real payroll columns when present,
@@ -86,7 +98,7 @@ export function derivePayroll(rows: Record<string, unknown>[], txns: Transaction
           month_year: isoish(row[col.month ?? ""]) || str(row, col.month),
           employee_id: str(row, col.empId) || `E${i + 1}`,
           name: str(row, col.name) || `Employee ${i + 1}`,
-          department: str(row, col.dept) || "Unspecified",
+          department: payrollDepartment(row),
           basic_pay: Math.abs(basic),
           allowances: Math.abs(parseNum(row[col.allowances ?? ""])),
           deductions: Math.abs(parseNum(row[col.deductions ?? ""])),
