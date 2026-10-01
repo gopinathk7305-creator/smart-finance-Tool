@@ -217,7 +217,8 @@ function PayrollPage() {
             <CardTitle className="text-base">Department-wise Payroll Allocation</CardTitle>
             <CardDescription>Basic, allowances and deductions stacked</CardDescription>
           </CardHeader>
-          <CardContent className="h-[300px] min-w-0">
+          <CardContent className="h-[300px] min-w-0 overflow-x-auto">
+            <div className="h-full min-w-[540px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={byDept} margin={{ top: 28, right: 10, bottom: 6, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
@@ -233,6 +234,7 @@ function PayrollPage() {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
 
