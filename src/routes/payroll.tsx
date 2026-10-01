@@ -110,13 +110,22 @@ function PayrollPage() {
   );
 
   // Renders only the stack total above each bar — no text inside segments.
-  const deptTotalBadge = (props: { x?: number | string | undefined; y?: number | string | undefined; index?: number | undefined }) => {
+  // x is the segment's left edge; center the badge over the bar width and
+  // float it 8px above the top of the deductions segment.
+  const deptTotalBadge = (props: {
+    x?: number | string | undefined;
+    y?: number | string | undefined;
+    width?: number | string | undefined;
+    index?: number | undefined;
+  }) => {
     const x = Number(props.x);
     const y = Number(props.y);
+    const w = Number(props.width);
     const item = byDept[Number(props.index)];
     if (!Number.isFinite(x) || !Number.isFinite(y) || !item) return null;
+    const cx = Number.isFinite(w) ? x + w / 2 : x;
     return (
-      <text x={x} y={y} textAnchor="middle" className="chart-data-label">
+      <text x={cx} y={y - 8} dx={0} dy={0} textAnchor="middle" className="chart-data-label">
         {moneyDataLabel(item.total)}
       </text>
     );
