@@ -107,6 +107,19 @@ function PayrollPage() {
     ),
   );
 
+  // Renders only the stack total above each bar — no text inside segments.
+  const deptTotalBadge = (props: { x?: number | string; y?: number | string; index?: number }) => {
+    const x = Number(props.x);
+    const y = Number(props.y);
+    const item = byDept[Number(props.index)];
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !item) return null;
+    return (
+      <text x={x} y={y} textAnchor="middle" className="chart-data-label">
+        {moneyDataLabel(item.total)}
+      </text>
+    );
+  };
+
   const exportCsv = () => {
     downloadCSV(
       "payroll-dec-2026.csv",
