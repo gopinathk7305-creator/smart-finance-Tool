@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Banknote, Download, Percent, Receipt, Users } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDebounced } from "@/hooks/use-debounced";
 import { toast } from "sonner";
 import {
@@ -252,8 +252,6 @@ function PayrollPage() {
   };
 
   const chartsRef = useRef<HTMLDivElement>(null);
-  const totalNet = payroll.reduce((s, p) => s + netPay(p), 0);
-  const totalOther = payroll.reduce((s, p) => s + p.deductions, 0);
 
   const buildReport = () => ({
     page: "payroll" as const,
@@ -330,6 +328,7 @@ function PayrollPage() {
           </CardHeader>
           <CardContent className="h-[300px] min-w-0 overflow-x-auto">
             <div className="h-full min-w-[540px]">
+            {!summary ? <ChartSkeleton /> : (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={byDept} margin={{ top: 28, right: 10, bottom: 6, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
@@ -345,6 +344,7 @@ function PayrollPage() {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+            )}
             </div>
           </CardContent>
         </Card>
@@ -355,15 +355,9 @@ function PayrollPage() {
             <CardDescription>Take-home after statutory deductions</CardDescription>
           </CardHeader>
           <CardContent className="h-[300px]">
+            {!summary ? <ChartSkeleton /> : (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                margin={{ top: 24 }}
-                data={byDept.map((d) => ({
-                  department: d.department,
-                  gross: d.basic + d.allowances,
-                  net: d.basic + d.allowances - d.deductions,
-                }))}
-              >
+              <BarChart margin={{ top: 24 }} data={grossNetRows}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="department" tickLine={false} axisLine={false} fontSize={12} />
                 <YAxis tickFormatter={(v) => inr(Number(v), true)} tickLine={false} axisLine={false} fontSize={12} width={70} />
@@ -377,6 +371,7 @@ function PayrollPage() {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
       </div>
