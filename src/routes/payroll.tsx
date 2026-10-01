@@ -108,7 +108,7 @@ function PayrollPage() {
   );
 
   // Renders only the stack total above each bar — no text inside segments.
-  const deptTotalBadge = (props: { x?: number | string; y?: number | string; index?: number }) => {
+  const deptTotalBadge = (props: { x?: number | string | undefined; y?: number | string | undefined; index?: number | undefined }) => {
     const x = Number(props.x);
     const y = Number(props.y);
     const item = byDept[Number(props.index)];
