@@ -370,10 +370,10 @@ function CompliancePage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-1 text-sm">
-          <Line isAnimationActive={false} label="Taxable profit (EBIT)" value={inr(tax.ebt)} />
-          <Line isAnimationActive={false} label={`Base corporate tax @ ${(tax.rate * 100).toFixed(0)}%`} value={inr(tax.base)} />
-          <Line isAnimationActive={false} label={`Surcharge @ ${tax.surchargePct}%`} value={inr(tax.surcharge)} />
-          <Line isAnimationActive={false} label="Health & education cess @ 4%" value={inr(tax.cess)} />
+          <Line label="Taxable profit (EBIT)" value={inr(tax.ebt)} />
+          <Line label={`Base corporate tax @ ${(tax.rate * 100).toFixed(0)}%`} value={inr(tax.base)} />
+          <Line label={`Surcharge @ ${tax.surchargePct}%`} value={inr(tax.surcharge)} />
+          <Line label="Health & education cess @ 4%" value={inr(tax.cess)} />
           <div className="mt-2 flex justify-between rounded-md bg-primary px-3 py-2 font-bold text-primary-foreground">
             <span>Total tax payable</span>
             <span className="tabular">{inr(tax.total)}</span>
