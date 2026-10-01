@@ -280,13 +280,13 @@ function PnlPage() {
                     <YAxis tickFormatter={(v) => `${Number(v).toFixed(0)}%`} tickLine={false} axisLine={false} fontSize={12} width={44} />
                     <Tooltip formatter={(v) => `${Number(v).toFixed(1)}%`} />
                     <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                    <Bar dataKey="grossMargin" name="Gross margin" fill="var(--brand)" radius={[3, 3, 0, 0]} maxBarSize={20}>
+                    <Bar isAnimationActive={false} dataKey="grossMargin" name="Gross margin" fill="var(--brand)" radius={[3, 3, 0, 0]} maxBarSize={20}>
                       <LabelList dataKey="grossMargin" position="top" offset={8} {...chartLabelProps} formatter={percentDataLabel} />
                     </Bar>
-                    <Bar dataKey="ebitdaMargin" name="EBITDA margin" fill="var(--success)" radius={[3, 3, 0, 0]} maxBarSize={20}>
+                    <Bar isAnimationActive={false} dataKey="ebitdaMargin" name="EBITDA margin" fill="var(--success)" radius={[3, 3, 0, 0]} maxBarSize={20}>
                       <LabelList dataKey="ebitdaMargin" position="top" offset={38} {...chartLabelProps} formatter={percentDataLabel} />
                     </Bar>
-                    <Bar dataKey="netMargin" name="Net margin" fill="var(--warning)" radius={[3, 3, 0, 0]} maxBarSize={20}>
+                    <Bar isAnimationActive={false} dataKey="netMargin" name="Net margin" fill="var(--warning)" radius={[3, 3, 0, 0]} maxBarSize={20}>
                       <LabelList dataKey="netMargin" position="top" offset={5} {...chartLabelProps} formatter={percentDataLabel} />
                     </Bar>
                   </BarChart>
@@ -310,7 +310,7 @@ function PnlPage() {
               <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={11} interval={0} />
               <YAxis tickFormatter={(v) => inr(Number(v), true)} tickLine={false} axisLine={false} fontSize={12} width={72} />
               <Tooltip formatter={(v) => inr(Number(v))} />
-              <Line type="monotone" dataKey="value" name="Remaining profit" stroke="var(--brand)" strokeWidth={2.5} dot={{ r: 4, fill: "var(--card)", strokeWidth: 2 }} activeDot={{ r: 6 }}>
+              <Line isAnimationActive={false} type="monotone" dataKey="value" name="Remaining profit" stroke="var(--brand)" strokeWidth={2.5} dot={{ r: 4, fill: "var(--card)", strokeWidth: 2 }} activeDot={{ r: 6 }}>
                 <LabelList dataKey="value" position="top" offset={8} {...chartLabelProps} formatter={moneyDataLabel} />
               </Line>
             </LineChart>

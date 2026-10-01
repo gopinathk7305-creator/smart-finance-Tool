@@ -804,10 +804,10 @@ function ForecastPage() {
                     />
                     <Tooltip formatter={(v) => inr(Number(v))} />
                     <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                    <Bar dataKey="scenRevenue" name="Revenue" fill="#0284c7" radius={[4, 4, 0, 0]}>
+                    <Bar isAnimationActive={false} dataKey="scenRevenue" name="Revenue" fill="#0284c7" radius={[4, 4, 0, 0]}>
                       <LabelList dataKey="scenRevenue" position="top" {...chartLabelProps} formatter={moneyDataLabel} />
                     </Bar>
-                    <Bar dataKey="scenExpense" name="Opex" fill="#334155" radius={[4, 4, 0, 0]}>
+                    <Bar isAnimationActive={false} dataKey="scenExpense" name="Opex" fill="#334155" radius={[4, 4, 0, 0]}>
                       <LabelList dataKey="scenExpense" position="top" {...chartLabelProps} formatter={moneyDataLabel} />
                     </Bar>
                   </BarChart>
@@ -824,7 +824,7 @@ function ForecastPage() {
                     />
                     <Tooltip formatter={(v) => `${Number(v).toFixed(1)} months`} />
                     <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                    <Line
+                    <Line isAnimationActive={false}
                       type="monotone"
                       dataKey="runway"
                       name="Runway"
@@ -855,7 +855,7 @@ function ForecastPage() {
                     />
                     <Tooltip formatter={(v) => inr(Number(v))} />
                     <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                    <Area
+                    <Area isAnimationActive={false}
                       type="monotone"
                       dataKey="cumulative"
                       name="Cumulative cash flow"
@@ -866,7 +866,7 @@ function ForecastPage() {
                     >
                       <LabelList dataKey="cumulative" position="top" {...chartLabelProps} formatter={moneyDataLabel} />
                     </Area>
-                    <Line
+                    <Line isAnimationActive={false}
                       type="monotone"
                       dataKey="advanceTax"
                       name="Advance tax payout"
@@ -892,8 +892,8 @@ function ForecastPage() {
                     />
                     <Tooltip content={<ForecastComparisonTooltip />} />
                     <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                    <Bar dataKey="baseProfit" name="Baseline" fill="var(--forecast-baseline)" radius={[3, 3, 0, 0]} />
-                    <Bar dataKey="scenProfit" name="Scenario" fill={scenarioColor} radius={[3, 3, 0, 0]} />
+                    <Bar isAnimationActive={false} dataKey="baseProfit" name="Baseline" fill="var(--forecast-baseline)" radius={[3, 3, 0, 0]} />
+                    <Bar isAnimationActive={false} dataKey="scenProfit" name="Scenario" fill={scenarioColor} radius={[3, 3, 0, 0]} />
                   </BarChart>
                 ) : (
                   <ComposedChart data={comparisonRows} margin={{ top: 44, right: 24, bottom: 28, left: 16 }}>

@@ -235,9 +235,9 @@ function PayrollPage() {
                 <YAxis tickFormatter={(v) => inr(Number(v), true)} tickLine={false} axisLine={false} fontSize={12} width={70} />
                 <Tooltip content={<PayrollAllocationTooltip />} cursor={{ fill: "var(--secondary)" }} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="basic" stackId="a" name="Basic" fill="var(--primary)" />
-                <Bar dataKey="allowances" stackId="a" name="Allowances" fill="var(--brand)" minPointSize={8} />
-                <Bar dataKey="deductions" stackId="a" name="Deductions" fill="var(--warning)" minPointSize={8} radius={[4, 4, 0, 0]}>
+                <Bar isAnimationActive={false} dataKey="basic" stackId="a" name="Basic" fill="var(--primary)" />
+                <Bar isAnimationActive={false} dataKey="allowances" stackId="a" name="Allowances" fill="var(--brand)" minPointSize={8} />
+                <Bar isAnimationActive={false} dataKey="deductions" stackId="a" name="Deductions" fill="var(--warning)" minPointSize={8} radius={[4, 4, 0, 0]}>
                   {/* Total badge sits above the stack; segments themselves stay text-free. */}
                   <LabelList dataKey="total" position="top" offset={4} content={deptTotalBadge} />
                 </Bar>
@@ -267,10 +267,10 @@ function PayrollPage() {
                 <YAxis tickFormatter={(v) => inr(Number(v), true)} tickLine={false} axisLine={false} fontSize={12} width={70} />
                 <Tooltip formatter={(v) => inr(Number(v))} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="gross" name="Gross" fill="var(--brand)" radius={[4, 4, 0, 0]}>
+                <Bar isAnimationActive={false} dataKey="gross" name="Gross" fill="var(--brand)" radius={[4, 4, 0, 0]}>
                   <LabelList dataKey="gross" position="top" offset={5} {...chartLabelProps} formatter={moneyDataLabel} />
                 </Bar>
-                <Bar dataKey="net" name="Net" fill="var(--success)" radius={[4, 4, 0, 0]}>
+                <Bar isAnimationActive={false} dataKey="net" name="Net" fill="var(--success)" radius={[4, 4, 0, 0]}>
                   <LabelList dataKey="net" position="top" offset={5} {...chartLabelProps} formatter={moneyDataLabel} />
                 </Bar>
               </BarChart>
@@ -431,11 +431,11 @@ function TaxDialog({
           <p className="mb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
             Monthly salary build-up
           </p>
-          <Line label="Basic pay" value={inr(record.basic_pay)} />
-          <Line label="Allowances" value={inr(record.allowances)} />
-          <Line label="Gross salary" value={inr(c.gross)} tone="font-semibold" />
-          <Line label="Employee PF (12% of basic)" value={`- ${inr(c.pf)}`} tone="text-warning" />
-          <Line
+          <Line isAnimationActive={false} label="Basic pay" value={inr(record.basic_pay)} />
+          <Line isAnimationActive={false} label="Allowances" value={inr(record.allowances)} />
+          <Line isAnimationActive={false} label="Gross salary" value={inr(c.gross)} tone="font-semibold" />
+          <Line isAnimationActive={false} label="Employee PF (12% of basic)" value={`- ${inr(c.pf)}`} tone="text-warning" />
+          <Line isAnimationActive={false}
             label={`ESI (0.75% ${c.esi ? "" : "— not applicable, gross > ₹21,000"})`}
             value={`- ${inr(c.esi)}`}
             tone="text-warning"
@@ -471,17 +471,17 @@ function TaxDialog({
             </Table>
           </div>
           <div className="mt-2">
-            <Line label="Taxable annual income (after standard deduction)" value={inr(c.annualGross)} />
-            <Line label="Health & education cess (4%)" value={inr(c.cess)} />
-            <Line label="Annual tax liability" value={inr(c.annualTax)} tone="font-semibold" />
-            <Line label="Monthly TDS" value={`- ${inr(c.monthlyTds)}`} tone="text-danger" />
+            <Line isAnimationActive={false} label="Taxable annual income (after standard deduction)" value={inr(c.annualGross)} />
+            <Line isAnimationActive={false} label="Health & education cess (4%)" value={inr(c.cess)} />
+            <Line isAnimationActive={false} label="Annual tax liability" value={inr(c.annualTax)} tone="font-semibold" />
+            <Line isAnimationActive={false} label="Monthly TDS" value={`- ${inr(c.monthlyTds)}`} tone="text-danger" />
           </div>
         </div>
 
         <AiExplain record={record} regime={regime} c={c} />
 
         <div className="rounded-lg bg-secondary p-3">
-          <Line label="Other deductions" value={`- ${inr(c.otherDeductions)}`} />
+          <Line isAnimationActive={false} label="Other deductions" value={`- ${inr(c.otherDeductions)}`} />
           <div className="flex items-center justify-between pt-2">
             <span className="text-sm font-semibold">Net take-home salary</span>
             <span className="tabular text-lg font-bold text-success">{inr(c.net)}</span>

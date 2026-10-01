@@ -263,7 +263,7 @@ function BalanceSheetPage() {
                   width={70}
                 />
                 <Tooltip formatter={(v) => inr(Number(v))} />
-                <Area
+                <Area isAnimationActive={false}
                   type="monotone"
                   dataKey="cash"
                   name="Cash balance"
