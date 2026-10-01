@@ -167,7 +167,8 @@ function useDatasetInternal(fetchEnabled: boolean): Dataset {
   // inside one memo keyed on the fetched rows + active dataset + filters, so
   // unrelated re-renders never re-walk the dataset (and every downstream memo
   // in the modules stays valid because these arrays keep their identity).
-  return useMemo<Dataset>(() => {
+  const userId = user?.id ?? null;
+  const derived = useMemo<DerivedDataset>(() => sharedDerive([data, fallback, activeFile, orgId, vendor, range, userId], () => {
     const combinedRaw = data
       ? {
           t: mergeRows(data.t, fallback?.t),
@@ -208,9 +209,8 @@ function useDatasetInternal(fetchEnabled: boolean): Dataset {
         araps: byVendor(demoAraps, vendor, (r) => r.party_name),
         vendors,
         live: false,
-        loading: !!user && isLoading,
+        pending: true,
         outOfRange: demo.txns.length > 0 && demoTxns.length === 0,
-        refresh,
       };
     }
 
@@ -222,9 +222,8 @@ function useDatasetInternal(fetchEnabled: boolean): Dataset {
         araps: [],
         vendors: [],
         live: true,
-        loading: !!user && isLoading,
+        pending: true,
         outOfRange: false,
-        refresh,
       };
     }
 
@@ -307,13 +306,37 @@ function useDatasetInternal(fetchEnabled: boolean): Dataset {
       araps: byVendor(arapsInRange, vendor, (r) => r.party_name),
       vendors: uniqueVendors(txns, araps),
       live: true,
-      loading: false,
+      pending: false,
       outOfRange:
         txns.length + araps.length + pays.length > 0 &&
         txnsInRange.length + arapsInRange.length + paysInRange.length === 0,
-      refresh,
     };
-  }, [data, fallback, activeFile, orgId, vendor, range, user, isLoading, refresh]);
+  }), [data, fallback, activeFile, orgId, vendor, range, userId]);
+
+  const loading = derived.pending && !!user && isLoading;
+  return useMemo<Dataset>(() => {
+    const { pending: _pending, ...rest } = derived;
+    return { ...rest, loading, refresh };
+  }, [derived, loading, refresh]);
+}
+
+type DerivedDataset = Omit<Dataset, "loading" | "refresh"> & { pending: boolean };
+
+// Page routes, the header banner and the insights dock all call useDataset /
+// useDatasetPeek. Without a shared cache every caller re-derived 15k+ rows
+// independently on mount, which froze the main thread on heavy pages.
+let derivedCache: { key: unknown[]; value: DerivedDataset } | null = null;
+function sharedDerive(key: unknown[], build: () => DerivedDataset): DerivedDataset {
+  if (
+    derivedCache &&
+    derivedCache.key.length === key.length &&
+    derivedCache.key.every((v, i) => Object.is(v, key[i]))
+  ) {
+    return derivedCache.value;
+  }
+  const value = build();
+  derivedCache = { key, value };
+  return value;
 }
 
 /**

@@ -14,3 +14,4 @@
 - Render permanent, theme-aware data labels on full-sized financial chart series while preserving hover tooltips; KPI mini sparklines stay text-free to prevent overflow.
 - Use shared crisp, theme-aware SVG chart typography and collision-spaced leader-line callouts alongside legends for compact donuts so slice values remain visible without overlap.
 - Keep forecasting comparisons on the shared forecast rows; label only milestones in the line view and retain month-by-month details in the hover tooltip to prevent chart clutter.
+- Dataset derivation is shared across all useDataset/useDatasetPeek callers via one module-level cache; heavy per-page aggregations over 2,000+ rows run in setTimeout-chunked slices so the main thread never stalls.
