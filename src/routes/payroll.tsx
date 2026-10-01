@@ -88,17 +88,19 @@ function PayrollPage() {
   const avgSalary = payroll.length ? totalCost / payroll.length : 0;
 
   const byDept = Object.values(
-    payroll.reduce<Record<string, { department: string; basic: number; allowances: number; deductions: number }>>(
+    payroll.reduce<Record<string, { department: string; basic: number; allowances: number; deductions: number; total: number }>>(
       (acc, p) => {
         const d = (acc[p.department] ??= {
           department: p.department,
           basic: 0,
           allowances: 0,
           deductions: 0,
+          total: 0,
         });
         d.basic += p.basic_pay;
         d.allowances += p.allowances;
         d.deductions += p.pf_deduction + p.tds_deduction + p.deductions;
+        d.total = d.basic + d.allowances + d.deductions;
         return acc;
       },
       {},
@@ -208,14 +210,12 @@ function PayrollPage() {
                 <YAxis tickFormatter={(v) => inr(Number(v), true)} tickLine={false} axisLine={false} fontSize={12} width={70} />
                 <Tooltip formatter={(v) => inr(Number(v))} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="basic" stackId="a" name="Basic" fill="var(--primary)">
-                  <LabelList dataKey="basic" position="center" {...chartLabelProps} formatter={moneyDataLabel} />
-                </Bar>
-                <Bar dataKey="allowances" stackId="a" name="Allowances" fill="var(--brand)">
-                  <LabelList dataKey="allowances" position="center" {...chartLabelProps} formatter={moneyDataLabel} />
-                </Bar>
-                <Bar dataKey="deductions" stackId="a" name="Deductions" fill="var(--warning)" radius={[4, 4, 0, 0]}>
-                  <LabelList dataKey="deductions" position="top" offset={5} {...chartLabelProps} formatter={moneyDataLabel} />
+                <Bar dataKey="basic" stackId="a" name="Basic" fill="var(--primary)" />
+                <Bar dataKey="allowances" stackId="a" name="Allowances" fill="var(--brand)" />
+                <Bar dataKey="deductions" stackId="a" name="Deductions" fill="var(--warning)" radius={[4, 4, 0, 0]} />
+                {/* Transparent spacer carries the total value badge above each stack. */}
+                <Bar dataKey="total" stackId="a" fill="transparent" isAnimationActive={false} tooltipType="none">
+                  <LabelList dataKey="total" position="top" offset={4} {...chartLabelProps} formatter={moneyDataLabel} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
