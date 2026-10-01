@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Banknote, Download, Percent, Receipt, Users } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
+import { useDebounced } from "@/hooks/use-debounced";
 import { toast } from "sonner";
 import {
   Bar,
