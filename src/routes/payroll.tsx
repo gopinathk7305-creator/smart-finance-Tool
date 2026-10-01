@@ -303,7 +303,7 @@ function PayrollPage() {
             <Input
               placeholder="Search employee or department"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => { setQuery(e.target.value); setPage(0); }}
               className="w-56 bg-background"
             />
             <Button variant="outline" onClick={exportCsv}>
