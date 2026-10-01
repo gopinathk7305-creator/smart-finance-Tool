@@ -125,7 +125,7 @@ function usePayrollSummary(payroll: PayrollRecord[]): PayrollSummary | null {
     return finishSummary(acc);
   }, [payroll, small]);
 
-  const [async, setAsync] = useState<{ source: PayrollRecord[]; summary: PayrollSummary } | null>(null);
+  const [chunked, setChunked] = useState<{ source: PayrollRecord[]; summary: PayrollSummary } | null>(null);
   useEffect(() => {
     if (small) return;
     let cancelled = false;
@@ -138,7 +138,7 @@ function usePayrollSummary(payroll: PayrollRecord[]): PayrollSummary | null {
       addToSummary(acc, payroll, i, end);
       i = end;
       if (i < payroll.length) handle = setTimeout(step, 0);
-      else setAsync({ source: payroll, summary: finishSummary(acc) });
+      else setChunked({ source: payroll, summary: finishSummary(acc) });
     };
     handle = setTimeout(step, 0);
     return () => {
@@ -148,7 +148,7 @@ function usePayrollSummary(payroll: PayrollRecord[]): PayrollSummary | null {
   }, [payroll, small]);
 
   if (small) return syncSummary;
-  return async && async.source === payroll ? async.summary : null;
+  return chunked && chunked.source === payroll ? chunked.summary : null;
 }
 
 function ChartSkeleton() {
