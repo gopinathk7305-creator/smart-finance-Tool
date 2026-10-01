@@ -212,10 +212,9 @@ function PayrollPage() {
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
                 <Bar dataKey="basic" stackId="a" name="Basic" fill="var(--primary)" />
                 <Bar dataKey="allowances" stackId="a" name="Allowances" fill="var(--brand)" />
-                <Bar dataKey="deductions" stackId="a" name="Deductions" fill="var(--warning)" radius={[4, 4, 0, 0]} />
-                {/* Transparent spacer carries the total value badge above each stack. */}
-                <Bar dataKey="total" stackId="a" fill="transparent" isAnimationActive={false} tooltipType="none">
-                  <LabelList dataKey="total" position="top" offset={4} {...chartLabelProps} formatter={moneyDataLabel} />
+                <Bar dataKey="deductions" stackId="a" name="Deductions" fill="var(--warning)" radius={[4, 4, 0, 0]}>
+                  {/* Total badge sits above the stack; segments themselves stay text-free. */}
+                  <LabelList dataKey="total" position="top" offset={4} content={deptTotalBadge} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
