@@ -10,3 +10,4 @@
 - [x] Attach readable percentage and rupee callouts to Category Distribution slices while retaining its legend
 - [x] Simplify the forecasting baseline/scenario comparison with milestone-only labels, comparison tooltip, and view controls
 - [x] Compact the P&L waterfall and replace margin/bridge visualizations with grouped bars and a profit trajectory
+- [x] Correct payroll department mapping and make small stacked components visible with compact, color-coded details

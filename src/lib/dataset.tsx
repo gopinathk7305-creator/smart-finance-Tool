@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { fetchAllRows, withRawColumns } from "@/lib/fetch-all";
 import { mapRowsToTransactions, parseNum } from "@/lib/column-map";
-import { deriveArAp, deriveBudget, derivePayroll } from "@/lib/module-derive";
+import { deriveArAp, deriveBudget, derivePayroll, payrollDepartment } from "@/lib/module-derive";
 import { unpivotMonthColumns } from "@/lib/wide-months";
 import { useAuth } from "@/lib/auth";
 import { ALL, demoDatasetFor, useOrg } from "@/lib/orgs";
@@ -239,7 +239,7 @@ function useDatasetInternal(fetchEnabled: boolean): Dataset {
       month_year: r.month_year ?? "",
       employee_id: r.employee_id ?? "",
       name: r.name ?? "",
-      department: r.department ?? "",
+      department: payrollDepartment(withRawColumns(r)),
       basic_pay: parseNum(r.basic_pay),
       allowances: parseNum(r.allowances),
       deductions: parseNum(r.deductions),
