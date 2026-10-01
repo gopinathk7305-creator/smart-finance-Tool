@@ -239,7 +239,12 @@ function useDatasetInternal(fetchEnabled: boolean): Dataset {
       month_year: r.month_year ?? "",
       employee_id: r.employee_id ?? "",
       name: r.name ?? "",
-      department: payrollDepartment(withRawColumns(r)),
+      department: payrollDepartment({
+        ...((r.raw_data && typeof r.raw_data === "object" && !Array.isArray(r.raw_data))
+          ? r.raw_data as Record<string, unknown>
+          : {}),
+        stored_department: r.department,
+      }),
       basic_pay: parseNum(r.basic_pay),
       allowances: parseNum(r.allowances),
       deductions: parseNum(r.deductions),
