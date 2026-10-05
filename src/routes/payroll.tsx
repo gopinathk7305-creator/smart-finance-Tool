@@ -173,7 +173,7 @@ function PayrollPage() {
   const [taxFor, setTaxFor] = useState<PayrollRecord | null>(null);
   const [regime, setRegime] = useState<"new" | "old">("new");
   const [page, setPage] = useState(0);
-  const PAGE_SIZE = 20;
+  const PAGE_SIZE = 10;
 
   // Lower-cased search text built once per dataset, not per keystroke.
   const searchIndex = useMemo(

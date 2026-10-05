@@ -116,8 +116,8 @@ export function derivePayroll(rows: Record<string, unknown>[], txns: Transaction
           basic_pay: Math.abs(basic),
           allowances: Math.abs(parseNum(row[col.allowances ?? ""])),
           deductions: Math.abs(parseNum(row[col.deductions ?? ""])),
-          pf_deduction: Math.abs(parseNum(row[col.pf ?? ""])),
-          tds_deduction: Math.abs(parseNum(row[col.tds ?? ""])),
+          pf_deduction: sumSignalColumns(row, PAYROLL_SIGNALS.pf),
+          tds_deduction: sumSignalColumns(row, PAYROLL_SIGNALS.tds),
         } satisfies PayrollRecord;
       })
       .filter((r): r is PayrollRecord => r !== null);
