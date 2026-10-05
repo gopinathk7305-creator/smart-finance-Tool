@@ -72,6 +72,7 @@
   --color-brand-foreground: var(--brand-foreground);
   --color-brand-soft: var(--brand-soft);
   --color-chart-label: var(--chart-label);
+  --color-chart-legend: var(--chart-legend);
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
   --shadow-card: 0 1px 2px 0 oklch(0.129 0.042 264.695 / 0.06), 0 1px 3px 0 oklch(0.129 0.042 264.695 / 0.05);
@@ -124,6 +125,7 @@
   --brand-foreground: oklch(0.985 0 0);
   --brand-soft: oklch(0.958 0.024 277.1);
   --chart-label: #1e293b;
+  --chart-legend: #334155;
   --forecast-baseline: oklch(0.511 0.226 277.1);
   --forecast-scenario: oklch(0.596 0.167 157.8);
   --forecast-stress: oklch(0.666 0.167 65.4);
@@ -163,6 +165,7 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.551 0.027 264.364);
   --chart-label: #f8fafc;
+  --chart-legend: #f8fafc;
   --forecast-baseline: oklch(0.71 0.18 277.1);
   --forecast-scenario: oklch(0.76 0.16 157.8);
   --forecast-stress: oklch(0.8 0.15 75);

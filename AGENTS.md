@@ -15,3 +15,4 @@
 - Use shared crisp, theme-aware SVG chart typography and collision-spaced leader-line callouts alongside legends for compact donuts so slice values remain visible without overlap.
 - Keep forecasting comparisons on the shared forecast rows; label only milestones in the line view and retain month-by-month details in the hover tooltip to prevent chart clutter.
 - Dataset derivation is shared across all useDataset/useDatasetPeek callers via one module-level cache; heavy per-page aggregations over 2,000+ rows run in setTimeout-chunked slices so the main thread never stalls.
+- Use the shared Command Center metric helpers for operating-spend classification and runway; reuse workspace closing cash rather than introducing a separate opening balance, and scale budget/actual axes independently.

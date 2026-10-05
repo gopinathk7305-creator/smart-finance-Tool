@@ -11,3 +11,4 @@
 - [x] Simplify the forecasting baseline/scenario comparison with milestone-only labels, comparison tooltip, and view controls
 - [x] Compact the P&L waterfall and replace margin/bridge visualizations with grouped bars and a profit trajectory
 - [x] Correct payroll department mapping and make small stacked components visible with compact, color-coded details
+- [ ] Correct dashboard operating metrics, independently scale the budget line, and improve legend contrast
