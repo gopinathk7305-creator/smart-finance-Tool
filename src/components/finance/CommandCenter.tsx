@@ -21,7 +21,7 @@ import {
   ComposedChart,
   LabelList,
   Legend,
-
+  Line,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -34,6 +34,8 @@ import { AlertSettingsDialog } from "@/components/finance/AlertSettingsDialog";
 import { chartLabelProps, DonutBreakdownLegend, donutSliceLabels, moneyDataLabel } from "@/components/finance/ChartDataLabels";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useBudget } from "@/lib/budget";
+import { useCategories } from "@/lib/categories";
+import { allocationAxisMaximum, isOperatingExpense, operatingRunway } from "@/lib/command-center-metrics";
 import type { MonthlySummary, Transaction } from "@/lib/finance-data";
 import { cn } from "@/lib/utils";
 
@@ -158,6 +160,7 @@ export function CommandCenter({
   alerts: Alert[];
 }) {
   const budget = useBudget();
+  const { categories } = useCategories();
 
   const m = useMemo(() => {
     const expenses = txns.filter((t) => t.type === "expense");
@@ -171,12 +174,12 @@ export function CommandCenter({
     }
     const cats = [...byCat.entries()].sort((a, b) => b[1] - a[1]);
     const planned = budget.plannedTotal;
-    const monthlyBudget = planned > 0 ? planned / 12 : 0;
+    const monthlyBudget = budget.annualTotal / 12;
 
     const monthly = series.map((s) => ({
       month: s.month,
       actual: s.expense,
-      budget: budget.byMonth.get(s.month) ?? monthlyBudget,
+      budget: (budget.byMonth.get(s.month) ?? 0) + monthlyBudget,
     }));
     let run = 0;
     let runBudget = 0;
@@ -192,8 +195,10 @@ export function CommandCenter({
     const mom = prev > 0 ? ((last - prev) / prev) * 100 : null;
     const burn = active.length ? actual / active.length : 0;
 
-    const opexRe = /capex|capital|asset|equipment|depreciation/i;
-    const opex = cats.filter(([c]) => !opexRe.test(c)).reduce((s, [, v]) => s + v, 0);
+    const operating = expenses.filter((transaction) => isOperatingExpense(transaction, categories));
+    const opex = operating.reduce((sum, transaction) => sum + transaction.amount, 0);
+    const operatingCategories = new Set(operating.map((transaction) => transaction.category)).size;
+    const runway = operatingRunway(series, opex);
 
     const lines = cats.slice(0, 12).map(([name, ytd]) => {
       const alloc = budget.byCategory.get(name.toLowerCase()) ?? 0;
@@ -238,12 +243,15 @@ export function CommandCenter({
       mom,
       burn,
       opex,
+      operatingCategories,
+      runway,
+      actualAxisMaximum: allocationAxisMaximum(monthly.map((month) => month.actual)),
+      budgetAxisMaximum: allocationAxisMaximum(monthly.map((month) => month.budget)),
       lines,
       anomalies,
-      utilization: planned > 0 ? (actual / planned) * 100 : null,
       spark: monthly.map((r) => r.actual),
     };
-  }, [txns, series, budget.plannedTotal, budget.byMonth, budget.byCategory]);
+  }, [txns, series, categories, budget.plannedTotal, budget.annualTotal, budget.byMonth, budget.byCategory]);
 
   const totalCat = m.cats.reduce((s, [, v]) => s + v, 0);
   const donut = m.cats.slice(0, 5).map(([name, value]) => ({ name, value }));
@@ -268,7 +276,7 @@ export function CommandCenter({
         <MetricCard
           label="Operating Expenses"
           value={lakh(m.opex)}
-          sub={`${m.actual > 0 ? ((m.opex / m.actual) * 100).toFixed(0) : 0}% of total · ${m.cats.length} categories`}
+          sub={`${m.actual > 0 ? ((m.opex / m.actual) * 100).toFixed(0) : 0}% of total · ${m.operatingCategories} operating categories`}
           icon={Layers}
           tone="danger"
           spark={m.spark}
@@ -290,12 +298,11 @@ export function CommandCenter({
           spark={m.cats.slice(0, 8).map(([, v]) => v)}
         />
         <MetricCard
-          label="Budget Utilization"
-          value={m.utilization === null ? "—" : `${m.utilization.toFixed(1)}%`}
-          sub={m.utilization === null ? "Add targets in Budget" : m.utilization > 100 ? "Over allocation" : "Of annual allocation used"}
+          label="Operating Runway (Months)"
+          value={m.runway === null ? "N/A" : `${m.runway.toFixed(1)} months`}
+          sub={m.runway === null ? "No operating spend to measure" : "Closing cash / avg monthly OpEx"}
           icon={Gauge}
-          tone={m.utilization !== null && m.utilization > 100 ? "danger" : "success"}
-          progress={m.utilization ?? 0}
+          tone={m.runway !== null && m.runway < 3 ? "warning" : "success"}
         />
       </div>
 
@@ -308,7 +315,7 @@ export function CommandCenter({
           <CardContent className="h-[350px] overflow-x-auto">
             <div className="h-full min-w-[850px]">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={m.monthly} margin={{ top: 28, right: 8, left: 4 }}>
+              <ComposedChart data={m.monthly} margin={{ top: 28, right: 8, left: 4, bottom: 12 }}>
                 <defs>
                   <linearGradient id="ccActual" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="var(--danger)" stopOpacity={0.9} />
@@ -320,9 +327,9 @@ export function CommandCenter({
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={11} />
-                 <YAxis yAxisId="l" tickFormatter={(v) => Number(v) === 0 ? "" : lakh(Number(v))} tickLine={false} axisLine={false} fontSize={11} width={64} />
-                 <YAxis yAxisId="r" orientation="right" tickFormatter={(v) => Number(v) === 0 ? "" : lakh(Number(v))} tickLine={false} axisLine={false} fontSize={11} width={64} />
+                <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={11} dy={12} height={44} />
+                 <YAxis yAxisId="l" domain={[0, m.actualAxisMaximum]} allowDataOverflow tickFormatter={(v) => Number(v) === 0 ? "" : lakh(Number(v))} tickLine={false} axisLine={false} fontSize={11} width={64} />
+                 <YAxis yAxisId="r" domain={[0, m.budgetAxisMaximum]} allowDataOverflow orientation="right" tickFormatter={(v) => Number(v) === 0 ? "" : lakh(Number(v))} tickLine={false} axisLine={false} fontSize={11} width={64} />
                 <Tooltip
                   contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
                   formatter={(v, n, p) => {
@@ -332,12 +339,14 @@ export function CommandCenter({
                   }}
                 />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Area isAnimationActive={false} yAxisId="r" type="monotone" dataKey="budget" name="Budgeted" stroke="var(--brand)" strokeDasharray="4 3" fill="url(#ccBudget)" dot={{ r: 3 }}>
-                   <LabelList dataKey="budget" position="top" offset={16} {...chartLabelProps} formatter={(value: number) => Number(value) > 0 ? moneyDataLabel(value) : ""} />
-                </Area>
                 <Bar isAnimationActive={false} yAxisId="l" dataKey="actual" name="Actual spend" fill="url(#ccActual)" radius={[4, 4, 0, 0]}>
                    <LabelList dataKey="actual" position="top" offset={8} dy={-8} {...chartLabelProps} formatter={(value: number) => Number(value) > 0 ? moneyDataLabel(value) : ""} />
                 </Bar>
+                {m.planned > 0 && (
+                  <Line isAnimationActive={false} yAxisId="r" type="monotone" dataKey="budget" name="Budgeted" stroke="var(--brand)" strokeWidth={2.5} strokeDasharray="4 3" dot={{ r: 3 }}>
+                    <LabelList dataKey="budget" position="top" offset={16} {...chartLabelProps} formatter={(value: number) => Number(value) > 0 ? moneyDataLabel(value) : ""} />
+                  </Line>
+                )}
               </ComposedChart>
             </ResponsiveContainer>
             </div>
