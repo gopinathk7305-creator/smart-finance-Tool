@@ -43,6 +43,10 @@ import { useAuth } from "@/lib/auth";
 import { safeMargin } from "@/lib/column-map";
 import { formatCompactCurrency, inr } from "@/lib/finance-data";
 import { useMonthlyCache } from "@/lib/monthly-cache";
+import { comparisonMonths, comparisonReady } from "@/lib/dataset-comparison";
+import { useDataset } from "@/lib/dataset";
+import { useCategories } from "@/lib/categories";
+import { BASE_SCENARIO, loadScenarios, runForecast, type SavedScenario } from "@/lib/forecast-engine";
 
 export const Route = createFileRoute("/compare")({
   head: () => ({
@@ -69,6 +73,8 @@ interface SummaryRow {
   revenue: number | string;
   expenses: number | string;
   txn_count: number;
+  payroll_count?: number;
+  arap_count?: number;
 }
 
 function useDatasetTotals(sourceFile: string | null) {
@@ -80,14 +86,15 @@ function useDatasetTotals(sourceFile: string | null) {
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
     queryFn: async () => {
+      if (!sourceFile) throw new Error("Select a dataset first.");
       const { data, error } = await supabase.rpc("dataset_summary", {
-        p_source_file: sourceFile!,
+        p_source_file: sourceFile,
       });
       if (error) throw new Error(error.message);
       const row = (Array.isArray(data) ? data[0] : data) as SummaryRow | undefined;
       const revenue = Number(row?.revenue) || 0;
       const expenses = Number(row?.expenses) || 0;
-      return { revenue, expenses, netProfit: revenue - expenses, rows: row?.txn_count ?? 0 };
+      return { revenue, expenses, netProfit: revenue - expenses, rows: Number(row?.txn_count ?? 0) + Number(row?.payroll_count ?? 0) + Number(row?.arap_count ?? 0) };
     },
   });
 }
@@ -96,62 +103,83 @@ const EMPTY = { revenue: 0, expenses: 0, netProfit: 0, rows: 0 };
 
 function ComparePage() {
   const { datasets, active, activeFile } = useActiveDataset();
-  const [left, setLeft] = useState<string | null>(null);
+  const [leftChoice, setLeft] = useState<string | null>(null);
   const [right, setRight] = useState<string | null>(null);
+  const [saved, setSaved] = useState<SavedScenario[]>([]);
+  const dataset = useDataset();
+  const { payrollNames } = useCategories();
+  const payrollKey = JSON.stringify(payrollNames);
+  const stablePayrollNames = useMemo<string[]>(() => JSON.parse(payrollKey), [payrollKey]);
+  const left = datasets.some((d) => d.file_name === leftChoice)
+    ? leftChoice : activeFile ?? datasets[0]?.file_name ?? null;
+  const scenarioSelected = right?.startsWith("scenario:") ?? false;
+  const rightFile = !scenarioSelected && datasets.some((d) => d.file_name === right) ? right : null;
 
-  // Every dated upload of the active file, newest first.
-  const activeBase = active?.base_name || active?.file_name || null;
-  const versions = useMemo(() => {
-    if (!activeBase) return [];
-    return datasets
-      .filter((d) => (d.base_name || d.file_name) === activeBase)
-      .sort((x, y) => (y.version ?? 1) - (x.version ?? 1));
-  }, [datasets, activeBase]);
-
-  // Default: the active dataset on the left, the next most recent on the right.
   useEffect(() => {
-    if (datasets.length === 0) return;
-    setLeft((cur) => cur ?? activeFile ?? datasets[0]!.file_name);
-    setRight((cur) => {
-      if (cur) return cur;
-      const first = activeFile ?? datasets[0]!.file_name;
-      return datasets.find((d) => d.file_name !== first)?.file_name ?? null;
-    });
-  }, [datasets, activeFile]);
+    const refresh = () => setSaved(loadScenarios());
+    refresh();
+    window.addEventListener("focus", refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, []);
+
+  const activeBase = active?.base_name || active?.file_name || null;
+  const versions = useMemo(() => datasets
+    .filter((d) => (d.base_name || d.file_name) === activeBase)
+    .sort((x, y) => (y.version ?? 1) - (x.version ?? 1)), [datasets, activeBase]);
 
   const leftTotals = useDatasetTotals(left);
-  const rightTotals = useDatasetTotals(right);
-  const leftMonthly = useMonthlyCache(left);
-  const rightMonthly = useMonthlyCache(right);
+  const rightTotals = useDatasetTotals(rightFile);
+  const leftMonthly = useMonthlyCache(left, !!left);
+  const rightMonthly = useMonthlyCache(rightFile, !!rightFile);
 
+  const projection = useMemo(() => {
+    if (!scenarioSelected || !activeFile || dataset.loading ||
+        (!dataset.txns.length && !dataset.pays.length)) return null;
+    const inputs = right === "scenario:baseline" ? BASE_SCENARIO
+      : saved[Number(right?.slice("scenario:".length))]?.inputs;
+    if (!inputs) return null;
+    return runForecast(inputs, dataset.txns, dataset.pays, stablePayrollNames);
+  }, [scenarioSelected, right, activeFile, dataset.loading, dataset.txns, dataset.pays, saved, stablePayrollNames]);
+  const scenarioSeries = useMemo(() => projection?.rows.map((row) => {
+    const baseline = right === "scenario:baseline";
+    return { month: row.month, revenue: baseline ? row.baseRevenue : row.scenRevenue,
+      expense: baseline ? row.baseExpense : row.scenExpense,
+      profit: baseline ? row.baseProfit : row.scenProfit,
+      cash: baseline ? row.baseCash : row.scenCash };
+  }) ?? [], [projection, right]);
+  const scenarioTotals = useMemo(() => projection ? {
+    revenue: scenarioSeries.reduce((sum, row) => sum + row.revenue, 0),
+    expenses: scenarioSeries.reduce((sum, row) => sum + row.expense, 0),
+    netProfit: scenarioSeries.reduce((sum, row) => sum + row.profit, 0),
+    rows: dataset.txns.length || dataset.pays.length,
+  } : undefined, [projection, scenarioSeries, dataset.txns.length, dataset.pays.length]);
   const a = leftTotals.data ?? EMPTY;
-  const b = rightTotals.data ?? EMPTY;
-  const loading = leftTotals.isLoading || rightTotals.isLoading;
+  const b = (scenarioSelected ? scenarioTotals : rightTotals.data) ?? EMPTY;
+  const loading = leftTotals.isFetching || (!!rightFile && rightTotals.isFetching) ||
+    (scenarioSelected && dataset.loading);
+  const error = leftTotals.error || rightTotals.error;
+  const ready = !loading && !error && comparisonReady(leftTotals.data,
+    scenarioSelected ? scenarioTotals : rightTotals.data);
 
   const marginA = safeMargin(a.netProfit, a.revenue);
   const marginB = safeMargin(b.netProfit, b.revenue);
   const diff = (x: number, y: number) => y - x;
   const pct = (x: number, y: number) => (x > 0 ? ((y - x) / x) * 100 : 0);
 
-  const monthly = useMemo(() => {
-    const labels = (leftMonthly.series.length ? leftMonthly.series : rightMonthly.series).map(
-      (m) => m.month,
-    );
-    return labels.map((month, i) => ({
-      month,
-      revenueA: leftMonthly.series[i]?.revenue ?? 0,
-      revenueB: rightMonthly.series[i]?.revenue ?? 0,
-      expenseA: leftMonthly.series[i]?.expense ?? 0,
-      expenseB: rightMonthly.series[i]?.expense ?? 0,
-      cashA: leftMonthly.series[i]?.cash ?? 0,
-      cashB: rightMonthly.series[i]?.cash ?? 0,
-    }));
-  }, [leftMonthly.series, rightMonthly.series]);
+  const monthly = useMemo(() => comparisonMonths(leftMonthly.series,
+    scenarioSelected ? scenarioSeries : rightMonthly.series),
+    [leftMonthly.series, rightMonthly.series, scenarioSelected, scenarioSeries]);
 
   const shortA = left ?? "Dataset A";
-  const shortB = right ?? "Dataset B";
+  const shortB = right === "scenario:baseline" ? "Forecast baseline"
+    : scenarioSelected ? saved[Number(right?.slice("scenario:".length))]?.name ?? "Saved scenario"
+    : rightFile ?? "Dataset B";
 
-  const rows: { label: string; a: string; b: string; delta: string }[] = [
+  const rows: { label: string; a: string; b: string; delta: string }[] = ready ? [
     {
       label: "Total revenue",
       a: inr(a.revenue, true),
@@ -182,7 +210,7 @@ function ComparePage() {
       b: b.rows.toLocaleString("en-IN"),
       delta: (b.rows - a.rows).toLocaleString("en-IN"),
     },
-  ];
+  ] : [];
 
   return (
     <AppShell
@@ -192,7 +220,7 @@ function ComparePage() {
       <Card className="border-border shadow-card">
         <CardContent className="flex flex-wrap items-center gap-3 py-4">
           <Select value={left ?? ""} onValueChange={(v) => setLeft(v)}>
-            <SelectTrigger className="w-[260px]">
+            <SelectTrigger aria-label="Dataset A" className="w-full sm:w-[300px]">
               <SelectValue placeholder="Choose first dataset" />
             </SelectTrigger>
             <SelectContent className="max-h-72">
@@ -204,14 +232,24 @@ function ComparePage() {
             </SelectContent>
           </Select>
           <ArrowRightLeft className="size-4 text-muted-foreground" />
-          <Select value={right ?? ""} onValueChange={(v) => setRight(v)}>
-            <SelectTrigger className="w-[260px]">
+          <Select value={right ?? "none"} onValueChange={(v) => {
+            setRight(v === "none" ? null : v);
+            if (v.startsWith("scenario:")) setLeft(activeFile);
+          }}>
+            <SelectTrigger aria-label="Dataset B" className="w-full sm:w-[300px]">
               <SelectValue placeholder="Choose second dataset" />
             </SelectTrigger>
             <SelectContent className="max-h-72">
+              <SelectItem value="none">Choose second dataset</SelectItem>
               {datasets.map((d) => (
                 <SelectItem key={d.id} value={d.file_name}>
-                  {d.file_name}
+                  {d.file_name} · v{d.version ?? 1}
+                </SelectItem>
+              ))}
+              {activeFile && <SelectItem value="scenario:baseline">Forecast baseline · active dataset</SelectItem>}
+              {activeFile && saved.map((scenario, index) => (
+                <SelectItem key={`scenario:${index}`} value={`scenario:${index}`}>
+                  {scenario.name} · saved scenario
                 </SelectItem>
               ))}
             </SelectContent>
@@ -267,10 +305,10 @@ function ComparePage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={v.file_name === activeFile}
+                        disabled={!activeFile || v.file_name === activeFile}
                         onClick={() => {
-                          setLeft(v.file_name);
-                          setRight(activeFile ?? v.file_name);
+                          setLeft(activeFile);
+                          setRight(v.file_name);
                         }}
                       >
                         Compare with active
@@ -284,6 +322,20 @@ function ComparePage() {
         </Card>
       )}
 
+      {!ready ? (
+        <section className="mt-6 flex min-h-64 flex-col items-center justify-center gap-3 border-y border-border px-6 py-10 text-center" aria-live="polite">
+          <ArrowRightLeft className="size-8 text-muted-foreground" />
+          <p className="max-w-lg text-sm font-medium text-foreground">
+            {loading ? "Loading comparison…" : error ? "Comparison could not be loaded. Please retry."
+              : "Select a second dataset or upload a past version to view comparison"}
+          </p>
+          {!loading && !error && rightFile && b.rows === 0 && <p className="text-sm text-muted-foreground">Dataset B contains no records.</p>}
+          {!loading && error && <Button variant="outline" onClick={() => {
+            void leftTotals.refetch();
+            if (rightFile) void rightTotals.refetch();
+          }}>Retry</Button>}
+        </section>
+      ) : <>
       <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           label="Revenue difference"
@@ -342,9 +394,10 @@ function ComparePage() {
             <CardTitle className="text-base">Monthly revenue</CardTitle>
             <CardDescription>Both datasets, month by month</CardDescription>
           </CardHeader>
-          <CardContent className="h-[300px]">
+          <CardContent className="min-w-0 overflow-x-auto">
+            <div className="h-[320px]" style={{ minWidth: Math.max(640, monthly.length * 200) }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthly} barGap={4} margin={{ top: 24 }}>
+              <BarChart data={monthly} barGap={24} barCategoryGap="18%" margin={{ top: 40, right: 24, bottom: 12 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={11} />
                 <YAxis
@@ -356,10 +409,11 @@ function ComparePage() {
                 />
                 <Tooltip formatter={(v) => inr(Number(v))} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
-                <Bar isAnimationActive={false} dataKey="revenueA" name={shortA} fill="var(--brand)" radius={[4, 4, 0, 0]}><LabelList dataKey="revenueA" position="top" {...chartLabelProps} formatter={moneyDataLabel} /></Bar>
-                <Bar isAnimationActive={false} dataKey="revenueB" name={shortB} fill="var(--primary)" radius={[4, 4, 0, 0]}><LabelList dataKey="revenueB" position="top" {...chartLabelProps} formatter={moneyDataLabel} /></Bar>
+                <Bar isAnimationActive={false} dataKey="revenueA" name={shortA} fill="var(--brand)" radius={[4, 4, 0, 0]}><LabelList dataKey="revenueA" position="top" offset={12} {...chartLabelProps} formatter={moneyDataLabel} /></Bar>
+                <Bar isAnimationActive={false} dataKey="revenueB" name={shortB} fill="var(--primary)" radius={[4, 4, 0, 0]}><LabelList dataKey="revenueB" position="top" offset={12} {...chartLabelProps} formatter={moneyDataLabel} /></Bar>
               </BarChart>
             </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
 
@@ -368,9 +422,10 @@ function ComparePage() {
             <CardTitle className="text-base">Monthly expenses</CardTitle>
             <CardDescription>Both datasets, month by month</CardDescription>
           </CardHeader>
-          <CardContent className="h-[300px]">
+          <CardContent className="min-w-0 overflow-x-auto">
+            <div className="h-[320px]" style={{ minWidth: Math.max(640, monthly.length * 200) }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthly} barGap={4} margin={{ top: 24 }}>
+              <BarChart data={monthly} barGap={24} barCategoryGap="18%" margin={{ top: 40, right: 24, bottom: 12 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={11} />
                 <YAxis
@@ -382,10 +437,11 @@ function ComparePage() {
                 />
                 <Tooltip formatter={(v) => inr(Number(v))} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
-                <Bar isAnimationActive={false} dataKey="expenseA" name={shortA} fill="var(--danger)" radius={[4, 4, 0, 0]}><LabelList dataKey="expenseA" position="top" {...chartLabelProps} formatter={moneyDataLabel} /></Bar>
-                <Bar isAnimationActive={false} dataKey="expenseB" name={shortB} fill="var(--warning)" radius={[4, 4, 0, 0]}><LabelList dataKey="expenseB" position="top" {...chartLabelProps} formatter={moneyDataLabel} /></Bar>
+                <Bar isAnimationActive={false} dataKey="expenseA" name={shortA} fill="var(--danger)" radius={[4, 4, 0, 0]}><LabelList dataKey="expenseA" position="top" offset={12} {...chartLabelProps} formatter={moneyDataLabel} /></Bar>
+                <Bar isAnimationActive={false} dataKey="expenseB" name={shortB} fill="var(--warning)" radius={[4, 4, 0, 0]}><LabelList dataKey="expenseB" position="top" offset={12} {...chartLabelProps} formatter={moneyDataLabel} /></Bar>
               </BarChart>
             </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -415,6 +471,7 @@ function ComparePage() {
           </ResponsiveContainer>
         </CardContent>
       </Card>
+      </>}
     </AppShell>
   );
 }
