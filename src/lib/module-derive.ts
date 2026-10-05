@@ -55,6 +55,20 @@ const PAYROLL_SIGNALS = {
   month: ["month_year", "pay_month", "salary_month", "month", "period", "pay_date", "date"],
 };
 
+/** Every column whose canonical name matches one of the signals, summed. */
+export function sumSignalColumns(row: Record<string, unknown>, signals: string[]): number {
+  let total = 0;
+  for (const key of Object.keys(row)) {
+    const c = canon(key);
+    if (signals.some((s) => c === s || c.includes(s))) total += Math.abs(parseNum(row[key]));
+  }
+  return total;
+}
+
+/** Statutory-deduction signal lists, exported so stored rows can re-read raw columns. */
+export const PF_SIGNALS = PAYROLL_SIGNALS.pf;
+export const TDS_SIGNALS = PAYROLL_SIGNALS.tds;
+
 /** Prefer an actual uploaded department over a placeholder in a stored canonical column. */
 export function payrollDepartment(row: Record<string, unknown>): string {
   const entries = Object.entries(row).filter(([key]) =>
