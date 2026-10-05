@@ -69,16 +69,29 @@ export function sumSignalColumns(row: Record<string, unknown>, signals: string[]
 export const PF_SIGNALS = PAYROLL_SIGNALS.pf;
 export const TDS_SIGNALS = PAYROLL_SIGNALS.tds;
 
-/** Prefer an actual uploaded department over a placeholder in a stored canonical column. */
+/** Prefer exact uploaded department headers; ignore IDs and placeholder values. */
 export function payrollDepartment(row: Record<string, unknown>): string {
-  const entries = Object.entries(row).filter(([key]) =>
-    PAYROLL_SIGNALS.dept.some((signal) => canon(key) === signal || canon(key).includes(signal)),
-  );
-  const real = entries.find(([, value]) => {
+  const signals = PAYROLL_SIGNALS.dept;
+  const rank = (key: string) => {
+    const c = canon(key).replace(/^(stored|mapped)_/, "");
+    if (/(^|_)(id|code|number|no|count)($|_)/.test(c)) return -1;
+    const exact = signals.indexOf(c);
+    if (exact >= 0) return exact;
+    // Also accepts camelCase headers and descriptive headers such as Employee Dept.
+    const compact = c.replace(/_/g, "");
+    const relaxed = signals.findIndex((signal) => compact === signal.replace(/_/g, "") ||
+      new RegExp(`(^|_)${signal}(_|$)`).test(c));
+    return relaxed < 0 ? -1 : signals.length + relaxed;
+  };
+  const entries = Object.entries(row)
+    .map(([key, value]) => ({ value, rank: rank(key), stored: /^stored_/.test(canon(key)) }))
+    .filter((entry) => entry.rank >= 0)
+    .sort((a, b) => Number(a.stored) - Number(b.stored) || a.rank - b.rank);
+  const real = entries.find(({ value }) => {
     const name = String(value ?? "").trim();
-    return name && !/^(unassigned|unspecified|unknown|n\/?a|none|null|-)$/i.test(name);
+    return name && !/^(unmapped|unassigned|unspecified|unknown|n\/?a|none|null|undefined|[-–—])$/i.test(name);
   });
-  return real ? String(real[1]).trim() : "Unmapped";
+  return real ? String(real.value).trim().replace(/\s+/g, " ") : "Unmapped";
 }
 
 /**
