@@ -17,3 +17,4 @@
 - Dataset derivation is shared across all useDataset/useDatasetPeek callers via one module-level cache; heavy per-page aggregations over 2,000+ rows run in setTimeout-chunked slices so the main thread never stalls.
 - Use the shared Command Center metric helpers for operating-spend classification and runway; reuse workspace closing cash rather than introducing a separate opening balance, and scale budget/actual axes independently.
 - Resolve payroll departments with the shared parser during ingestion and derivation; use shared pixel-floor geometry for stacked payroll segments without changing financial values.
+- Gate dataset comparisons on loaded, nonempty summaries; align monthly series by month label and derive baseline/scenario choices with the shared forecast engine against the active workspace.
