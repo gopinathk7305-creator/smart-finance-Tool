@@ -36,13 +36,13 @@ const hasValues = (series: MonthlySummary[]) =>
  * cached for 10 minutes, so the dashboard renders its charts from a 12-row
  * payload instead of re-aggregating 50,000 rows in the browser.
  */
-export function useMonthlyCache(sourceFile: string | null) {
+export function useMonthlyCache(sourceFile: string | null, enabled = true) {
   const { user } = useAuth();
   const key = sourceFile ?? "__all__";
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ["dataset-monthly", user?.id ?? "anon", key],
-    enabled: !!user,
+    enabled: !!user && enabled,
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
