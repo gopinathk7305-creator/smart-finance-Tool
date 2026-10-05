@@ -122,7 +122,7 @@ const ALIASES: Record<string, string[]> = {
   month_year: ["month_year", "month", "period", "salary_month", "pay_period"],
   employee_id: ["employee_id", "emp_id", "employee_code", "empcode", "staff_id"],
   name: ["name", "employee_name", "emp_name", "full_name"],
-  department: ["department", "employee_department", "department_name", "dept_name", "dept", "division", "team", "business_unit", "cost_centre", "cost_center", "cost_center_name", "function"],
+  department: ["department", "employee_department", "department_name", "dept_name", "dept", "division", "team", "business_unit", "cost_centre", "cost_center", "cost_center_name", "sub_department", "section", "org_unit", "function"],
   basic_pay: ["basic_pay", "basic", "basic_salary", "base_pay"],
   allowances: ["allowances", "allowance", "hra", "other_allowances"],
   deductions: ["deductions", "deduction", "other_deductions"],
