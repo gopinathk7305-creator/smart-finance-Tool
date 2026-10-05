@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { fetchAllRows, withRawColumns } from "@/lib/fetch-all";
 import { mapRowsToTransactions, parseNum } from "@/lib/column-map";
-import { deriveArAp, deriveBudget, derivePayroll, payrollDepartment } from "@/lib/module-derive";
+import { deriveArAp, deriveBudget, derivePayroll, payrollDepartment, PF_SIGNALS, sumSignalColumns, TDS_SIGNALS } from "@/lib/module-derive";
 import { unpivotMonthColumns } from "@/lib/wide-months";
 import { useAuth } from "@/lib/auth";
 import { ALL, demoDatasetFor, useOrg } from "@/lib/orgs";
@@ -241,23 +241,26 @@ function useDatasetInternal(fetchEnabled: boolean): Dataset {
       status: r.status === "pending" ? "pending" : "paid",
     }));
 
-    const pays: PayrollRecord[] = inOrg(combined.p).map((r) => ({
-      id: r.id,
-      month_year: r.month_year ?? "",
-      employee_id: r.employee_id ?? "",
-      name: r.name ?? "",
-      department: payrollDepartment({
-        ...((r.raw_data && typeof r.raw_data === "object" && !Array.isArray(r.raw_data))
-          ? r.raw_data as Record<string, unknown>
-          : {}),
-        stored_department: r.department,
-      }),
-      basic_pay: parseNum(r.basic_pay),
-      allowances: parseNum(r.allowances),
-      deductions: parseNum(r.deductions),
-      pf_deduction: parseNum(r.pf_deduction),
-      tds_deduction: parseNum(r.tds_deduction),
-    }));
+    const pays: PayrollRecord[] = inOrg(combined.p).map((r) => {
+      const raw =
+        r.raw_data && typeof r.raw_data === "object" && !Array.isArray(r.raw_data)
+          ? (r.raw_data as Record<string, unknown>)
+          : {};
+      return {
+        id: r.id,
+        month_year: r.month_year ?? "",
+        employee_id: r.employee_id ?? "",
+        name: r.name ?? "",
+        department: payrollDepartment({ ...raw, stored_department: r.department }),
+        basic_pay: parseNum(r.basic_pay),
+        allowances: parseNum(r.allowances),
+        deductions: parseNum(r.deductions),
+        // Rows stored before a column-signal fix carry 0; re-read the original
+        // uploaded columns so PF / TDS cards never stick at ₹0.
+        pf_deduction: parseNum(r.pf_deduction) || sumSignalColumns(raw, PF_SIGNALS),
+        tds_deduction: parseNum(r.tds_deduction) || sumSignalColumns(raw, TDS_SIGNALS),
+      };
+    });
 
     const buds: BudgetTarget[] = inOrg(combined.b).map((r) => ({
       id: r.id,
