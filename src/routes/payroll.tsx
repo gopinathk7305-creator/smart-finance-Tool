@@ -44,7 +44,6 @@ import { downloadCSV, grossPay, inr, netPay, type PayrollRecord } from "@/lib/fi
 import { useDataset } from "@/lib/dataset";
 import { useActiveDataset } from "@/lib/active-dataset";
 import { computeTax, type TaxComputation } from "@/lib/enterprise-data";
-import { payrollDepartment } from "@/lib/module-derive";
 import { explainPayroll } from "@/lib/ai.functions";
 import { Sparkles } from "lucide-react";
 
@@ -94,7 +93,9 @@ function addToSummary(acc: SummaryAcc, rows: PayrollRecord[], from: number, to: 
     acc.tds += p.tds_deduction;
     acc.net += netPay(p);
     acc.other += p.deductions;
-    const department = payrollDepartment({ department: p.department });
+    // Department is already resolved during derivation; never re-map it here,
+    // or a real name could be clobbered back to a placeholder bucket.
+    const department = p.department?.trim() || "Unmapped";
     let d = acc.dept.get(department);
     if (!d) {
       d = { department, basic: 0, allowances: 0, deductions: 0, total: 0 };

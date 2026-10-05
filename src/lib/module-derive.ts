@@ -46,14 +46,28 @@ const PAYROLL_SIGNALS = {
   basic: ["basic_pay", "basic_salary", "basic", "gross_salary", "salary", "ctc", "wage", "payroll"],
   allowances: ["allowances", "allowance", "hra", "bonus", "incentive", "reimbursement"],
   deductions: ["total_deduction", "deductions", "deduction"],
-  pf: ["pf_deduction", "provident_fund", "epf", "pf", "esi", "esic"],
-  tds: ["tds_deduction", "tds", "income_tax", "tax_deducted", "tax"],
+  pf: ["pf_deduction", "provident_fund", "epf", "pf_amount", "employee_pf", "pf_employee", "epf_contribution", "pf_contribution", "esi_deduction", "esi_contribution", "pf", "esi", "esic"],
+  tds: ["tds_deduction", "tds", "income_tax", "tax_deducted", "tax_deduction", "it_deduction", "withholding_tax", "withholding", "tax"],
   net: ["net_pay", "net_salary", "take_home", "net_amount"],
   name: ["employee_name", "emp_name", "employee", "name"],
-  dept: ["department", "employee_department", "department_name", "dept_name", "dept", "division", "team", "business_unit", "cost_centre", "cost_center", "cost_center_name", "function"],
+  dept: ["department", "employee_department", "department_name", "dept_name", "sub_department", "dept", "division", "team", "business_unit", "cost_centre", "cost_center", "cost_center_name", "section", "org_unit", "function"],
   empId: ["employee_id", "emp_id", "emp_code", "employee_code", "staff_id"],
   month: ["month_year", "pay_month", "salary_month", "month", "period", "pay_date", "date"],
 };
+
+/** Every column whose canonical name matches one of the signals, summed. */
+export function sumSignalColumns(row: Record<string, unknown>, signals: string[]): number {
+  let total = 0;
+  for (const key of Object.keys(row)) {
+    const c = canon(key);
+    if (signals.some((s) => c === s || c.includes(s))) total += Math.abs(parseNum(row[key]));
+  }
+  return total;
+}
+
+/** Statutory-deduction signal lists, exported so stored rows can re-read raw columns. */
+export const PF_SIGNALS = PAYROLL_SIGNALS.pf;
+export const TDS_SIGNALS = PAYROLL_SIGNALS.tds;
 
 /** Prefer an actual uploaded department over a placeholder in a stored canonical column. */
 export function payrollDepartment(row: Record<string, unknown>): string {
