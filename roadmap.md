@@ -12,3 +12,4 @@
 - [x] Compact the P&L waterfall and replace margin/bridge visualizations with grouped bars and a profit trajectory
 - [x] Correct payroll department mapping and make small stacked components visible with compact, color-coded details
 - [x] Correct dashboard operating metrics, independently scale the budget line, and improve legend contrast
+- [x] Correct payroll department priority and visibly separate small stacks while preserving totals and hover amounts

@@ -6,6 +6,7 @@ import { parseCSV, toNumber } from "@/lib/csv";
 import { toISODateSafe } from "@/lib/clean";
 import { computeTax } from "@/lib/enterprise-data";
 import type { PayrollRecord } from "@/lib/finance-data";
+import { payrollDepartment } from "@/lib/module-derive";
 
 export type DatasetKey = "transactions" | "payroll" | "budget" | "arap";
 
@@ -264,7 +265,7 @@ export function runEtl(
         month_year: cleanText(r["month_year"]),
         employee_id: cleanText(r["employee_id"]) || `EMP-${line}`,
         name: name || UNASSIGNED,
-        department: normaliseLabel(r["department"]) || UNASSIGNED,
+        department: payrollDepartment(r),
         basic_pay: basic.value,
         allowances,
         deductions: otherDed,
