@@ -9,6 +9,7 @@ import {
   CartesianGrid,
   LabelList,
   Legend,
+  Rectangle,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -45,6 +46,7 @@ import { useDataset } from "@/lib/dataset";
 import { useActiveDataset } from "@/lib/active-dataset";
 import { computeTax, type TaxComputation } from "@/lib/enterprise-data";
 import { explainPayroll } from "@/lib/ai.functions";
+import { payrollStackHeights } from "@/lib/payroll-chart";
 import { Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/payroll")({
@@ -87,7 +89,8 @@ type SummaryAcc = ReturnType<typeof newSummaryAcc>;
 
 function addToSummary(acc: SummaryAcc, rows: PayrollRecord[], from: number, to: number) {
   for (let i = from; i < to; i++) {
-    const p = rows[i]!;
+    const p = rows[i];
+    if (!p) continue;
     acc.cost += grossPay(p);
     acc.pf += p.pf_deduction;
     acc.tds += p.tds_deduction;
@@ -95,11 +98,12 @@ function addToSummary(acc: SummaryAcc, rows: PayrollRecord[], from: number, to: 
     acc.other += p.deductions;
     // Department is already resolved during derivation; never re-map it here,
     // or a real name could be clobbered back to a placeholder bucket.
-    const department = p.department?.trim() || "Unmapped";
-    let d = acc.dept.get(department);
+    const department = p.department?.trim().replace(/\s+/g, " ") || "Unmapped";
+    const departmentKey = department.toLowerCase();
+    let d = acc.dept.get(departmentKey);
     if (!d) {
       d = { department, basic: 0, allowances: 0, deductions: 0, total: 0 };
-      acc.dept.set(department, d);
+      acc.dept.set(departmentKey, d);
     }
     d.basic += p.basic_pay;
     d.allowances += p.allowances;
@@ -182,7 +186,7 @@ function PayrollPage() {
   );
   const filtered = useMemo(() => {
     const q = debouncedQuery.trim().toLowerCase();
-    return q ? payroll.filter((_, i) => searchIndex[i]!.includes(q)) : payroll;
+    return q ? payroll.filter((_, i) => searchIndex[i]?.includes(q)) : payroll;
   }, [debouncedQuery, payroll, searchIndex]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
@@ -198,6 +202,7 @@ function PayrollPage() {
   const totalNet = summary?.totalNet ?? 0;
   const totalOther = summary?.totalOther ?? 0;
   const byDept = useMemo(() => summary?.byDept ?? [], [summary]);
+  const allocationMaximum = useMemo(() => Math.max(1, ...byDept.map((d) => d.total)) * 1.25, [byDept]);
   const avgSalary = payroll.length ? totalCost / payroll.length : 0;
   const grossNetRows = useMemo(
     () =>
@@ -217,6 +222,7 @@ function PayrollPage() {
       x?: number | string | undefined;
       y?: number | string | undefined;
       width?: number | string | undefined;
+      height?: number | string | undefined;
       index?: number | undefined;
     }) => {
       const x = Number(props.x);
@@ -225,9 +231,12 @@ function PayrollPage() {
       const item = byDept[Number(props.index)];
       if (!Number.isFinite(x) || !Number.isFinite(y) || !item) return null;
       const cx = Number.isFinite(w) ? x + w / 2 : x;
+      const scale = item.deductions > 0 ? Math.abs(Number(props.height)) / item.deductions : 0;
+      const heights = payrollStackHeights(item.basic, item.allowances, item.deductions, scale);
+      const extraHeight = heights.allowances - item.allowances * scale + heights.deductions - item.deductions * scale;
       return (
-        <text x={cx} y={y - 8} dx={0} dy={0} textAnchor="middle" className="chart-data-label">
-          {moneyDataLabel(item.total)}
+        <text x={cx} y={y - extraHeight - 8} dx={0} dy={0} textAnchor="middle" className="chart-data-label">
+          {precisePayrollAmount(item.total)}
         </text>
       );
     },
@@ -331,15 +340,16 @@ function PayrollPage() {
             <div className="h-full min-w-[540px]">
             {!summary ? <ChartSkeleton /> : (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={byDept} margin={{ top: 28, right: 10, bottom: 6, left: 0 }}>
+              <BarChart data={byDept} margin={{ top: 48, right: 10, bottom: 6, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="department" tickLine={false} axisLine={false} fontSize={12} interval={0} />
-                <YAxis tickFormatter={(v) => inr(Number(v), true)} tickLine={false} axisLine={false} fontSize={12} width={70} />
+                <YAxis domain={[0, allocationMaximum]} allowDataOverflow tickFormatter={(v) => inr(Number(v), true)} tickLine={false} axisLine={false} fontSize={12} width={70} />
                 <Tooltip content={<PayrollAllocationTooltip />} cursor={{ fill: "var(--secondary)" }} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
                 <Bar isAnimationActive={false} dataKey="basic" stackId="a" name="Basic" fill="var(--primary)" />
-                <Bar isAnimationActive={false} dataKey="allowances" stackId="a" name="Allowances" fill="var(--brand)" minPointSize={8} />
-                <Bar isAnimationActive={false} dataKey="deductions" stackId="a" name="Deductions" fill="var(--warning)" minPointSize={8} radius={[4, 4, 0, 0]}>
+                {/* Custom pixel floors keep stacks contiguous; Recharts minPointSize alone overlaps thin layers. */}
+                <Bar isAnimationActive={false} dataKey="allowances" stackId="a" name="Allowances" fill="var(--brand)" shape={<PayrollStackSegment component="allowances" maximum={allocationMaximum} />} />
+                <Bar isAnimationActive={false} dataKey="deductions" stackId="a" name="Deductions" fill="var(--warning)" shape={<PayrollStackSegment component="deductions" maximum={allocationMaximum} />}>
                   {/* Total badge sits above the stack; segments themselves stay text-free. */}
                   <LabelList dataKey="total" position="top" offset={4} content={deptTotalBadge} />
                 </Bar>
@@ -504,6 +514,28 @@ function PayrollAllocationTooltip({ active, payload, label }: {
       ))}
     </div>
   );
+}
+
+function PayrollStackSegment(props: {
+  component: "allowances" | "deductions";
+  maximum: number;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  fill?: string;
+  payload?: DeptRow;
+  background?: { height?: number };
+}) {
+  const { component, maximum, x, y, width, height, fill, payload, background } = props;
+  if (!payload || x === undefined || y === undefined || width === undefined || height === undefined) return null;
+  if (payload[component] <= 0) return null;
+  const scale = (background?.height ?? 0) / maximum;
+  const heights = payrollStackHeights(payload.basic, payload.allowances, payload.deductions, scale);
+  const extraAllowances = heights.allowances - payload.allowances * scale;
+  const extraDeductions = heights.deductions - payload.deductions * scale;
+  const top = y - extraAllowances - (component === "deductions" ? extraDeductions : 0);
+  return <Rectangle x={x} y={top} width={width} height={heights[component]} fill={fill} radius={component === "deductions" ? [4, 4, 0, 0] : 0} />;
 }
 
 function TaxDialog({
