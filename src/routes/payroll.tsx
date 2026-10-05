@@ -44,7 +44,6 @@ import { downloadCSV, grossPay, inr, netPay, type PayrollRecord } from "@/lib/fi
 import { useDataset } from "@/lib/dataset";
 import { useActiveDataset } from "@/lib/active-dataset";
 import { computeTax, type TaxComputation } from "@/lib/enterprise-data";
-import { payrollDepartment } from "@/lib/module-derive";
 import { explainPayroll } from "@/lib/ai.functions";
 import { Sparkles } from "lucide-react";
 
