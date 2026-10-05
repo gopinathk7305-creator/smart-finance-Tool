@@ -110,9 +110,9 @@ function ComparePage() {
   const { payrollNames } = useCategories();
   const payrollKey = JSON.stringify(payrollNames);
   const stablePayrollNames = useMemo<string[]>(() => JSON.parse(payrollKey), [payrollKey]);
-  const left = datasets.some((d) => d.file_name === leftChoice)
-    ? leftChoice : activeFile ?? datasets[0]?.file_name ?? null;
   const scenarioSelected = right?.startsWith("scenario:") ?? false;
+  const left = scenarioSelected ? activeFile : datasets.some((d) => d.file_name === leftChoice)
+    ? leftChoice : activeFile ?? datasets[0]?.file_name ?? null;
   const rightFile = !scenarioSelected && datasets.some((d) => d.file_name === right) ? right : null;
 
   useEffect(() => {
@@ -219,7 +219,7 @@ function ComparePage() {
     >
       <Card className="border-border shadow-card">
         <CardContent className="flex flex-wrap items-center gap-3 py-4">
-          <Select value={left ?? ""} onValueChange={(v) => setLeft(v)}>
+          <Select value={left ?? ""} disabled={scenarioSelected} onValueChange={(v) => setLeft(v)}>
             <SelectTrigger aria-label="Dataset A" className="w-full sm:w-[300px]">
               <SelectValue placeholder="Choose first dataset" />
             </SelectTrigger>
