@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/services/api";
 import { useAuth } from "@/lib/auth";
 
 const ACTIVE_KEY = "financeiq.active-dataset";
@@ -83,14 +83,23 @@ export function ActiveDatasetProvider({ children }: { children: ReactNode }) {
     queryKey: ["dataset-registry", user?.id ?? "anon"],
     enabled: !!user,
     queryFn: async () => {
-      const { data: rows } = await supabase
-        .from("uploaded_datasets")
-        .select(
-          "id,file_name,base_name,version,table_name,dataset_key,row_count,modules,column_names,created_at",
-        )
-        .eq("user_id", user!.id)
-        .order("created_at", { ascending: false });
-      return (rows ?? []) as unknown as DatasetSummary[];
+      try {
+        const rows = await api.datasets.list();
+        return (rows ?? []).map((r) => ({
+          id: r.id,
+          file_name: r.source_file,
+          base_name: r.source_file,
+          version: 1,
+          table_name: r.file_type,
+          dataset_key: r.source_file,
+          row_count: r.row_count,
+          modules: ["transactions", "payroll", "budget", "arap"],
+          column_names: [],
+          created_at: (r as { created_at?: string }).created_at || new Date().toISOString(),
+        })) as DatasetSummary[];
+      } catch {
+        return [] as DatasetSummary[];
+      }
     },
   });
 

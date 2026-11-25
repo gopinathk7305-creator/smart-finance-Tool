@@ -191,7 +191,7 @@ function Dashboard() {
     <AppShell title="CFO Command Center" subtitle={live ? "Live view of your uploaded data" : "Sample data · upload your files to see real numbers"}>
       <ActiveDatasetBanner />
       <div className="mb-4 flex justify-end">
-        <AiReportButton build={buildReport} />
+        <div className="w-full flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">Good Morning, Welcome Back!</h2><p className="mt-0.5 text-sm text-muted-foreground">Here&apos;s your financial overview.</p></div><AiReportButton build={buildReport} /></div>
       </div>
       {(adaptedMode || discovery.mode !== "generic") && (
         <Card className="mb-4 border-border bg-muted/40 shadow-card">

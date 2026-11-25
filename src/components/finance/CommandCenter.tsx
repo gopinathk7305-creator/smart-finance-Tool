@@ -61,10 +61,10 @@ interface Alert {
 
 type Tone = "brand" | "success" | "warning" | "danger";
 const toneCls: Record<Tone, { ring: string; glow: string; stroke: string }> = {
-  brand: { ring: "bg-brand-soft text-brand", glow: "hover:border-brand/50 hover:shadow-[0_0_0_1px_var(--brand)]", stroke: "var(--brand)" },
-  success: { ring: "bg-success-soft text-success", glow: "hover:border-success/50 hover:shadow-[0_0_0_1px_var(--success)]", stroke: "var(--success)" },
-  warning: { ring: "bg-warning-soft text-warning", glow: "hover:border-warning/50 hover:shadow-[0_0_0_1px_var(--warning)]", stroke: "var(--warning)" },
-  danger: { ring: "bg-danger-soft text-danger", glow: "hover:border-danger/50 hover:shadow-[0_0_0_1px_var(--danger)]", stroke: "var(--danger)" },
+  brand: { ring: "bg-brand-soft text-brand ring-1 ring-brand/10", glow: "hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-card-hover", stroke: "var(--brand)" },
+  success: { ring: "bg-success-soft text-success ring-1 ring-success/10", glow: "hover:-translate-y-0.5 hover:border-success/40 hover:shadow-card-hover", stroke: "var(--success)" },
+  warning: { ring: "bg-warning-soft text-warning ring-1 ring-warning/15", glow: "hover:-translate-y-0.5 hover:border-warning/40 hover:shadow-card-hover", stroke: "var(--warning)" },
+  danger: { ring: "bg-danger-soft text-danger ring-1 ring-danger/10", glow: "hover:-translate-y-0.5 hover:border-danger/40 hover:shadow-card-hover", stroke: "var(--danger)" },
 };
 
 function Pill({ delta, invert = true }: { delta: number | null; invert?: boolean }) {
@@ -106,10 +106,10 @@ function MetricCard({
   const data = (spark ?? []).map((v, i) => ({ i, v }));
   const id = `spark-${label.replace(/\W/g, "")}`;
   return (
-    <Card className={cn("min-w-0 gap-0 border-border p-5 shadow-card transition-all", t.glow)}>
+    <Card className={cn("group min-w-0 gap-0 border-border/80 p-5 shadow-card", t.glow)}>
       <div className="flex items-start justify-between gap-3">
         <p className="min-w-0 pt-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">{label}</p>
-        <span className={cn("flex size-11 shrink-0 items-center justify-center rounded-xl", t.ring)}>
+        <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl transition-transform duration-200 group-hover:scale-105", t.ring)}>
           <Icon className="size-6" strokeWidth={1.75} />
         </span>
       </div>
@@ -121,7 +121,7 @@ function MetricCard({
       {progress !== undefined ? (
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
           <div
-            className={cn("h-full rounded-full", progress > 100 ? "bg-danger" : progress > 85 ? "bg-warning" : "bg-success")}
+            className={cn("h-full rounded-full transition-all duration-500 ease-out", progress > 100 ? "bg-danger" : progress > 85 ? "bg-warning" : "bg-success")}
             style={{ width: `${Math.min(100, progress)}%` }}
           />
         </div>

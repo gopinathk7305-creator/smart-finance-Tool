@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
@@ -31,7 +30,6 @@ const TEMPLATE: Record<string, string> = {
 };
 
 export const generateReportNarrative = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((input: ReportAiInput) => input)
   .handler(async ({ data }) => {
     const key = process.env["LOVABLE_API_KEY"];

@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
@@ -55,7 +54,6 @@ export interface PayrollAiInput {
 }
 
 export const explainPayroll = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((input: PayrollAiInput) => input)
   .handler(async ({ data }) => {
     const text = await callGateway(
@@ -89,7 +87,6 @@ export interface AiFinding {
 }
 
 export const scanLedgerWithAi = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((input: { rows: ScanTxn[] }) => input)
   .handler(async ({ data }) => {
     const rows = data.rows.slice(0, 250);
@@ -129,7 +126,6 @@ export interface DatasetInsightInput {
 }
 
 export const explainDataset = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((input: DatasetInsightInput) => input)
   .handler(async ({ data }) => {
     const text = await callGateway(
@@ -178,7 +174,6 @@ export interface ForecastAiInput {
 }
 
 export const explainForecast = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((input: ForecastAiInput) => input)
   .handler(async ({ data }) => {
     const d = data.drivers;

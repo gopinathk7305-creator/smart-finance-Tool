@@ -37,7 +37,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/services/api";
 import { useActiveDataset } from "@/lib/active-dataset";
 import { useAuth } from "@/lib/auth";
 import { safeMargin } from "@/lib/column-map";
@@ -87,14 +87,14 @@ function useDatasetTotals(sourceFile: string | null) {
     refetchOnWindowFocus: false,
     queryFn: async () => {
       if (!sourceFile) throw new Error("Select a dataset first.");
-      const { data, error } = await supabase.rpc("dataset_summary", {
-        p_source_file: sourceFile,
-      });
-      if (error) throw new Error(error.message);
-      const row = (Array.isArray(data) ? data[0] : data) as SummaryRow | undefined;
-      const revenue = Number(row?.revenue) || 0;
-      const expenses = Number(row?.expenses) || 0;
-      return { revenue, expenses, netProfit: revenue - expenses, rows: Number(row?.txn_count ?? 0) + Number(row?.payroll_count ?? 0) + Number(row?.arap_count ?? 0) };
+      try {
+        const d = await api.analytics.dashboard(sourceFile);
+        const revenue = Number(d.total_revenue) || 0;
+        const expenses = Number(d.total_expenses) || 0;
+        return { revenue, expenses, netProfit: revenue - expenses, rows: d.transaction_count || 0 };
+      } catch {
+        return { revenue: 0, expenses: 0, netProfit: 0, rows: 0 };
+      }
     },
   });
 }

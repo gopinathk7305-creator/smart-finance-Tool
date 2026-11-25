@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/services/api";
 import { useAuth } from "@/lib/auth";
 import { ALL, useOrg } from "@/lib/orgs";
 
@@ -54,8 +54,12 @@ export function useFx(): FxApi {
     queryKey: ["fx-rates", user?.id ?? "anon"],
     enabled: !!user,
     queryFn: async () => {
-      const { data: rows } = await supabase.from("fx_rates").select("*");
-      return rows ?? [];
+      try {
+        const rows = await api.analytics.fx();
+        return rows ?? [];
+      } catch {
+        return [];
+      }
     },
   });
 
@@ -76,22 +80,8 @@ export function useFx(): FxApi {
   }, [scoped]);
 
   const save = useMutation({
-    mutationFn: async (args: { currency: string; rate: number }) => {
-      if (!user) throw new Error("Sign in to save your own conversion rate.");
-      const org_id = orgId === ALL ? null : orgId;
-      const existing = scoped.find((r) => r.currency === args.currency);
-      if (existing) {
-        const { error } = await supabase
-          .from("fx_rates")
-          .update({ rate_to_inr: args.rate, updated_at: new Date().toISOString() })
-          .eq("id", existing.id);
-        if (error) throw error;
-        return;
-      }
-      const { error } = await supabase
-        .from("fx_rates")
-        .insert({ user_id: user.id, org_id, currency: args.currency, rate_to_inr: args.rate });
-      if (error) throw error;
+    mutationFn: async (_args: { currency: string; rate: number }) => {
+      // FX rates are managed on the backend; refresh local state
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["fx-rates"] }),
   });

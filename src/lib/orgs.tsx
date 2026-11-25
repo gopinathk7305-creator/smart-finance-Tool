@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/services/api";
 import { useAuth } from "@/lib/auth";
 import {
   arApRecords,
@@ -159,8 +159,12 @@ export function OrgProvider({ children }: { children: ReactNode }) {
     queryKey: ["organizations", user?.id ?? "anon"],
     enabled: !!user,
     queryFn: async () => {
-      const { data } = await supabase.from("organizations").select("id,name").order("name");
-      return (data ?? []) as Org[];
+      try {
+        const rows = await api.organizations.list();
+        return (rows ?? []) as Org[];
+      } catch {
+        return [] as Org[];
+      }
     },
   });
 
@@ -168,12 +172,10 @@ export function OrgProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user || !liveOrgRows || liveOrgRows.length > 0) return;
     const name =
-      (user.user_metadata?.["org_name"] as string | undefined)?.trim() ||
-      (user.email?.split("@")[1]?.split(".")[0] ?? "My organization");
-    void supabase
-      .from("organizations")
-      .insert({ user_id: user.id, name })
-      .then(() => queryClient.invalidateQueries({ queryKey: ["organizations"] }));
+      (user.user_metadata?.["org_name"] as string | undefined)?.trim() || "TechCorp Global";
+    void api.organizations.create(name)
+      .then(() => queryClient.invalidateQueries({ queryKey: ["organizations"] }))
+      .catch(() => {});
   }, [user, liveOrgRows, queryClient]);
 
   const liveOrgs = !!liveOrgRows && liveOrgRows.length > 0;
@@ -194,13 +196,9 @@ export function OrgProvider({ children }: { children: ReactNode }) {
   const createOrg = useCallback(
     async (name: string) => {
       if (!user) return;
-      const { data } = await supabase
-        .from("organizations")
-        .insert({ user_id: user.id, name })
-        .select("id,name")
-        .single();
+      const data = await api.organizations.create(name);
       await queryClient.invalidateQueries({ queryKey: ["organizations"] });
-      if (data) setOrgId(data.id);
+      if (data && (data as any).id) setOrgId((data as any).id);
     },
     [user, queryClient, setOrgId],
   );

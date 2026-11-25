@@ -34,7 +34,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/services/api";
 import { useAuth } from "@/lib/auth";
 import { useCategories } from "@/lib/categories";
 import {
@@ -103,8 +103,12 @@ function CompliancePage() {
     queryKey: ["compliance-filings", user?.id ?? "anon", activeFile ?? "all"],
     enabled: !!user,
     queryFn: async () => {
-      const { data } = await supabase.from("compliance_filings").select("*");
-      return data ?? [];
+      try {
+        const data = await api.compliance.filings();
+        return data ?? [];
+      } catch {
+        return [];
+      }
     },
   });
 
@@ -168,19 +172,13 @@ function CompliancePage() {
   const markFiled = useMutation({
     mutationFn: async (args: { row: FilingRow; ack: string; date: string }) => {
       if (!user) throw new Error("Sign in to record a filing.");
-      const { error } = await supabase.from("compliance_filings").insert({
-        user_id: user.id,
-        org_id: orgId === ALL ? null : orgId,
-        filing_key: args.row.key,
+      await api.compliance.createFiling({
+        title: args.row.form,
         filing_type: args.row.form,
-        period: args.row.period,
         due_date: args.row.dueDate,
         amount: args.row.amount,
-        status: "filed",
-        ack_number: args.ack,
-        filed_date: args.date,
+        status: "completed",
       });
-      if (error) throw error;
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["compliance-filings"] });

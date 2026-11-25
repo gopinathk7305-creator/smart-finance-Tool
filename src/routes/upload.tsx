@@ -49,7 +49,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/services/api";
 import { logActivity, useAuth } from "@/lib/auth";
 import { ALL, useOrg } from "@/lib/orgs";
 import { cacheLocalDatasetRows, clearLocalDatasetRows, useDataset } from "@/lib/dataset";
@@ -212,15 +212,24 @@ function UploadPage() {
     queryKey: ["stored-datasets", user?.id ?? "anon", scopeOrgId ?? "all"],
     enabled: !!user,
     queryFn: async () => {
-      let q = supabase
-        .from("uploaded_datasets")
-        .select("*")
-        .eq("user_id", user!.id)
-        .order("created_at", { ascending: false });
-      if (scopeOrgId) q = q.eq("org_id", scopeOrgId);
-      const { data, error } = await q;
-      if (error) throw error;
-      return (data ?? []) as unknown as StoredDataset[];
+      try {
+        const rows = await api.datasets.list();
+        return (rows ?? []).map((r) => ({
+          id: r.id,
+          file_name: r.source_file,
+          base_name: r.source_file,
+          version: 1,
+          table_name: r.file_type,
+          dataset_key: r.source_file,
+          row_count: r.row_count,
+          modules: ["transactions", "payroll", "budget", "arap"],
+          column_names: [],
+          created_at: (r as any).created_at || new Date().toISOString(),
+          status: (r as any).status || "ready",
+        })) as unknown as StoredDataset[];
+      } catch {
+        return [] as StoredDataset[];
+      }
     },
   });
 
@@ -245,20 +254,10 @@ function UploadPage() {
 
     void (async () => {
       try {
-        for (let from = 0; from < 200_000; from += PAGE) {
-          const { data, error } = await supabase
-            .from(viewer.table_name)
-            .select("*")
-            .eq("user_id", user.id)
-            .eq("source_file", viewer.file_name)
-            .range(from, from + PAGE - 1);
-          if (cancelled) return;
-          if (error) throw new Error(error.message);
-          const batch = (data ?? []) as unknown as Record<string, unknown>[];
-          // Original upload columns live in raw_data; merge them back so all 39+ render.
-          setLoadedRows((prev) => [...prev, ...batch.map(withRawColumns)]);
-          if (batch.length < PAGE) break;
-        }
+        const res = await api.datasets.data(viewer.file_name);
+        if (cancelled) return;
+        const rows = viewer.table_name === "payroll_records" ? res.p : viewer.table_name === "budget_targets" ? res.b : viewer.table_name === "arap_records" ? res.a : res.t;
+        setLoadedRows((rows ?? []).map((r) => withRawColumns(r as Record<string, unknown>)));
       } catch (e) {
         if (!cancelled) setRowsError(e instanceof Error ? e.message : "Could not load rows");
       } finally {
@@ -454,11 +453,8 @@ function UploadPage() {
     // intact and stores this one as the next version, so past versions can be
     // compared against the active dataset.
     const baseName = parsed.fileName;
-    const { data: priorVersions } = await supabase
-      .from("uploaded_datasets")
-      .select("version")
-      .eq("user_id", user.id)
-      .or(`base_name.eq.${baseName},file_name.eq.${baseName}`);
+    const priorList = await api.datasets.list().catch(() => []);
+    const priorVersions = priorList.filter((d) => d.source_file.startsWith(baseName)).map((_, i) => ({ version: i + 1 }));
     const versionNo =
       (priorVersions ?? []).reduce((max, r) => Math.max(max, Number(r.version) || 1), 0) + 1;
     const versionedName = versionNo === 1 ? baseName : `${baseName} (v${versionNo})`;
@@ -508,38 +504,22 @@ function UploadPage() {
 
     /** Upserts one chunk. On timeout the chunk is halved and retried so a slow
      *  request never abandons rows; returns the rows that could not be stored. */
-    const push = async (chunk: Record<string, unknown>[], depth = 0): Promise<Record<string, unknown>[]> => {
+    const push = async (chunk: Record<string, unknown>[]): Promise<Record<string, unknown>[]> => {
       if (!chunk.length) return [];
-      let lastError: unknown = null;
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        try {
-          const request = supabase.from(detection.table).upsert(chunk as never, { onConflict: "id" });
-          const result = await Promise.race([
-            request,
-            new Promise<never>((_, reject) =>
-              window.setTimeout(() => reject(new Error("cloud-timeout")), CLOUD_TIMEOUT_MS),
-            ),
-          ]);
-          if (result.error) throw result.error;
-          syncedRows += chunk.length;
-          tick();
-          return [];
-        } catch (error) {
-          lastError = error;
-          await sleep(400 * (attempt + 1));
-        }
+      try {
+        const payload: Record<string, unknown> = { source_file: versionedName, file_type: detection.key };
+        if (detection.key === "payroll") payload.payroll = chunk;
+        else if (detection.key === "budget") payload.budgets = chunk;
+        else if (detection.key === "arap") payload.arap = chunk;
+        else payload.transactions = chunk;
+        await api.datasets.uploadBatch(payload as any);
+        syncedRows += chunk.length;
+        tick();
+        return [];
+      } catch (error) {
+        errors.push(error instanceof Error ? error.message : "Upload failed");
+        return chunk;
       }
-      const message = lastError instanceof Error ? lastError.message : "cloud sync failed";
-      if (message === "cloud-timeout") timedOut = true;
-      // Split and retry: smaller chunks usually beat the database timeout.
-      if (chunk.length > 50 && depth < 4) {
-        const half = Math.ceil(chunk.length / 2);
-        const left = await push(chunk.slice(0, half), depth + 1);
-        const right = await push(chunk.slice(half), depth + 1);
-        return [...left, ...right];
-      }
-      errors.push(message);
-      return chunk;
     };
 
     let cursor = 0;
@@ -581,23 +561,7 @@ function UploadPage() {
 
     // The dataset entry is written whether or not every batch landed, so the
     // file always appears under "Manage cloud datasets" instead of vanishing.
-    if (syncedRows > 0 || complete) {
-      const { error: metadataError } = await supabase.from("uploaded_datasets").insert({
-        user_id: user.id,
-        org_id: scopeOrgId,
-        file_name: versionedName,
-        dataset_key: detection.key,
-        table_name: detection.table,
-        row_count: syncedRows,
-        column_names: detection.columns,
-        modules: detection.modules,
-        base_name: baseName,
-        version: versionNo,
-        status: complete ? "synced" : "partial",
-      } as never);
-      if (metadataError)
-        toast.warning(`Rows synced, but dataset history could not be saved: ${metadataError.message}`);
-    }
+    // Dataset metadata is automatically recorded by the Django batch upload endpoint.
 
     setCommitting(false);
     setProgress(null);
@@ -646,31 +610,8 @@ function UploadPage() {
     if (!user) return;
     setDeleting({ id: ds.id, removed: 0 });
     try {
-      let removed = 0;
-      for (let guard = 0; guard < 200; guard += 1) {
-        const { data, error } = await supabase.rpc("purge_dataset_batch", {
-          p_table: ds.table_name,
-          p_source_file: ds.file_name,
-          p_org_id: scopeOrgId ?? null,
-          p_limit: 5000,
-        } as never);
-        if (error) {
-          toast.error(`Could not finish deleting: ${error.message}`);
-          setDeleting(null);
-          return;
-        }
-        const count = Number(data ?? 0) || 0;
-        removed += count;
-        setDeleting({ id: ds.id, removed });
-        if (count === 0) break;
-        await new Promise((r) => window.setTimeout(r, 0));
-      }
-      const { error: metaError } = await supabase.from("uploaded_datasets").delete().eq("id", ds.id);
-      if (metaError) {
-        toast.error(`Rows removed, but the file entry stayed: ${metaError.message}`);
-        setDeleting(null);
-        return;
-      }
+      await api.datasets.purge(ds.file_name);
+      setDeleting({ id: ds.id, removed: ds.row_count || 1 });
       if (activeId === ds.id) setActiveId(null);
       refresh();
       void stored.refetch();

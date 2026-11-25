@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/services/api";
 import { useActiveDataset } from "@/lib/active-dataset";
 import { useAuth } from "@/lib/auth";
 import { useDatasetPeek } from "@/lib/dataset";
@@ -50,14 +50,21 @@ export function useActiveDatasetMetrics(): ActiveDatasetMetrics {
     refetchOnWindowFocus: false,
     placeholderData: (prev: SummaryRow | null | undefined) => prev,
     queryFn: async (): Promise<SummaryRow | null> => {
-      const args: { p_source_file?: string; p_start?: string; p_end?: string } = {};
-      if (activeFile) args.p_source_file = activeFile;
-      if (range.start) args.p_start = range.start;
-      if (range.end) args.p_end = range.end;
-      const { data: rows, error } = await supabase.rpc("dataset_summary", args);
-      if (error) throw new Error(error.message);
-      const row = (Array.isArray(rows) ? rows[0] : rows) as SummaryRow | undefined;
-      return row ?? null;
+      try {
+        const d = await api.analytics.dashboard(activeFile);
+        return {
+          revenue: Number(d.total_revenue) || 0,
+          expenses: Number(d.total_expenses) || 0,
+          tax_deductions: 0,
+          closing_cash: Number(d.cash_balance) || 0,
+          txn_count: d.transaction_count || 0,
+          payroll_count: 0,
+          budget_count: 0,
+          arap_count: 0,
+        };
+      } catch {
+        return null;
+      }
     },
   });
 

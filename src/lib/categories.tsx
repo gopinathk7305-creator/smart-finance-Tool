@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
 
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/services/api";
 import { useAuth } from "@/lib/auth";
 import { ALL, useOrg } from "@/lib/orgs";
 
@@ -61,11 +61,12 @@ export function useCategories(): CategoriesApi {
   const { data, isLoading } = useQuery({
     queryKey: ["expense-categories", user?.id ?? "anon"],
     queryFn: async () => {
-      const { data: rows } = await supabase
-        .from("expense_categories")
-        .select("*")
-        .order("sort_order");
-      return rows ?? [];
+      try {
+        const rows = await api.categories.list();
+        return (rows ?? []).map((r, idx) => ({ ...r, sort_order: idx }));
+      } catch {
+        return [];
+      }
     },
     enabled: !!user,
   });
@@ -97,33 +98,23 @@ export function useCategories(): CategoriesApi {
   const insert = useMutation({
     mutationFn: async (payload: { name: string; kind: CategoryKind; sort_order: number }[]) => {
       if (!user) throw new Error("Sign in to define your own categories.");
-      const { error } = await supabase.from("expense_categories").insert(
-        payload.map((p) => ({
-          ...p,
-          user_id: user.id,
-          org_id: orgId === ALL ? null : orgId,
-        })),
-      );
-      if (error) throw error;
+      for (const p of payload) {
+        await api.categories.create(p);
+      }
     },
     onSuccess: invalidate,
   });
 
   const patch = useMutation({
     mutationFn: async (args: { id: string; patch: { name?: string; kind?: CategoryKind } }) => {
-      const { error } = await supabase
-        .from("expense_categories")
-        .update(args.patch)
-        .eq("id", args.id);
-      if (error) throw error;
+      await api.patch(`/categories/${args.id}/`, args.patch);
     },
     onSuccess: invalidate,
   });
 
   const del = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("expense_categories").delete().eq("id", id);
-      if (error) throw error;
+      await api.categories.delete(id);
     },
     onSuccess: invalidate,
   });

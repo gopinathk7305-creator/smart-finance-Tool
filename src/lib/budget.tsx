@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
 
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/services/api";
 import { useAuth } from "@/lib/auth";
 import { useDataset } from "@/lib/dataset";
 import { ALL, useOrg } from "@/lib/orgs";
@@ -80,36 +80,25 @@ export function useBudget(fiscalYear?: string): BudgetApi {
   const insert = useMutation({
     mutationFn: async (draft: BudgetDraft) => {
       if (!user) throw new Error("Sign in to save your own budget.");
-      const { error } = await supabase.from("budget_targets").insert({
-        user_id: user.id,
-        org_id: orgId === ALL ? null : orgId,
-        fiscal_year: draft.fiscal_year,
+      await api.budgets.create({
         category: draft.category,
-        department: draft.department,
         budgeted_amount: draft.budgeted_amount,
-        month: draft.month ?? "Annual",
-        source_file: "manual entry",
+        month_year: draft.month ?? "Annual",
       });
-      if (error) throw error;
     },
     onSuccess: invalidate,
   });
 
   const patch = useMutation({
     mutationFn: async (args: { id: string; amount: number }) => {
-      const { error } = await supabase
-        .from("budget_targets")
-        .update({ budgeted_amount: args.amount })
-        .eq("id", args.id);
-      if (error) throw error;
+      await api.patch(`/budgets/${args.id}/`, { budgeted_amount: args.amount });
     },
     onSuccess: invalidate,
   });
 
   const del = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("budget_targets").delete().eq("id", id);
-      if (error) throw error;
+      await api.budgets.delete(id);
     },
     onSuccess: invalidate,
   });

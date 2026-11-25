@@ -9,8 +9,10 @@ import {
   FileText,
   LayoutDashboard,
   LineChart,
+  Menu,
   PanelLeft,
   Scale,
+  Search,
   ShieldAlert,
   ShieldCheck,
   Target,
@@ -29,6 +31,22 @@ import { useActiveDataset } from "@/lib/active-dataset";
 import { AiInsightsDock } from "@/components/finance/AiInsightsDock";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "@/components/ui/command";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { fiscalYearStart, fyLabel, useWorkspace, type RangePreset } from "@/lib/workspace";
 import { useDatasetPeek } from "@/lib/dataset";
 import {
@@ -52,19 +70,19 @@ import { alerts } from "@/lib/finance-data";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/users", label: "Users & Activity", icon: Users },
-  { to: "/upload", label: "Data Upload", icon: UploadCloud },
-  { to: "/payroll", label: "Payroll & Tax", icon: Calculator },
-  { to: "/budget", label: "Budget vs Actual", icon: Target },
-  { to: "/pnl", label: "Financial Analysis", icon: TrendingUp },
-  { to: "/balance-sheet", label: "Balance Sheet", icon: Scale },
-  { to: "/compare", label: "Compare Datasets", icon: ArrowRightLeft },
-  { to: "/cashflow", label: "Cash Flow & AR/AP", icon: Wallet },
-  { to: "/audit", label: "Internal Audit", icon: ShieldAlert },
-  { to: "/compliance", label: "Compliance & Filings", icon: ShieldCheck },
-  { to: "/forecast", label: "Forecasting", icon: LineChart },
-  { to: "/reports", label: "Reports & PDF", icon: FileText },
+  { to: "/", label: "Dashboard", icon: LayoutDashboard, group: "Overview" },
+  { to: "/pnl", label: "Financial Analysis", icon: TrendingUp, group: "Core Finance" },
+  { to: "/cashflow", label: "Cash Flow & AR/AP", icon: Wallet, group: "Core Finance" },
+  { to: "/budget", label: "Budget vs Actual", icon: Target, group: "Core Finance" },
+  { to: "/balance-sheet", label: "Balance Sheet", icon: Scale, group: "Core Finance" },
+  { to: "/payroll", label: "Payroll & Tax", icon: Calculator, group: "Operations" },
+  { to: "/forecast", label: "Forecasting", icon: LineChart, group: "Planning" },
+  { to: "/compare", label: "Compare Datasets", icon: ArrowRightLeft, group: "Planning" },
+  { to: "/audit", label: "Internal Audit", icon: ShieldAlert, group: "Governance" },
+  { to: "/compliance", label: "Compliance & Filings", icon: ShieldCheck, group: "Governance" },
+  { to: "/reports", label: "Reports & PDF", icon: FileText, group: "Governance" },
+  { to: "/upload", label: "Data Upload", icon: UploadCloud, group: "Workspace" },
+  { to: "/users", label: "Users & Activity", icon: Users, group: "Workspace" },
 ] as const;
 
 export function AppShell({
@@ -77,6 +95,8 @@ export function AppShell({
   children: ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { user, demoMode, signOut, loading } = useAuth();
   const navigate = useNavigate();
@@ -98,6 +118,18 @@ export function AppShell({
     if (!loading && !user && !demoMode) void navigate({ to: "/login", replace: true });
   }, [loading, user, demoMode, navigate]);
 
+  // Global Cmd+K / Ctrl+K quick jump
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen((open) => !open);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   const displayName =
     (user?.user_metadata?.["full_name"] as string | undefined) || user?.email?.split("@")[0] || "Demo user";
   const initials = displayName
@@ -106,90 +138,159 @@ export function AppShell({
     .map((w: string) => w[0]?.toUpperCase() ?? "")
     .join("");
 
+  const renderNavLinks = (isCollapsed: boolean, onSelect?: () => void) => (
+    <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-3" aria-label="Primary navigation">
+      {NAV.map(({ to, label, icon: Icon }) => {
+        const isActive = pathname === to;
+        return (
+          <Link
+            key={to}
+            to={to}
+            preload="intent"
+            title={label}
+            onClick={onSelect}
+            className={cn(
+              "group flex items-center gap-3 rounded-xl px-3 py-2 text-[13.5px] font-medium transition-all duration-150 ease-out",
+              isActive
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
+            )}
+          >
+            <Icon
+              className={cn(
+                "size-[17px] shrink-0 transition-transform duration-150",
+                !isActive && "group-hover:scale-105",
+              )}
+              strokeWidth={isActive ? 2.1 : 1.75}
+            />
+            {!isCollapsed && <span className="truncate">{label}</span>}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+
   return (
     <div className="flex min-h-screen bg-background">
+      {/* Desktop Collapsible Sidebar */}
       <aside
         className={cn(
-          "sticky top-0 hidden h-screen shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200 md:flex",
-          collapsed ? "w-[76px]" : "w-64",
+          "sticky top-0 hidden h-screen shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] md:flex",
+          collapsed ? "w-[74px]" : "w-64",
         )}
       >
-        <div className="flex h-16 items-center gap-2.5 border-b border-sidebar-border px-5">
-          <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+        <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-sidebar-border px-4">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs">
             <CircleDollarSign className="size-5" />
           </span>
           {!collapsed && (
-            <span className="text-sm leading-tight font-bold tracking-tight">
+            <span className="min-w-0 text-sm leading-tight font-bold tracking-tight">
               Finance IQ
-              <span className="block text-[11px] font-medium text-muted-foreground">
-                Intelligence & Planning
+              <span className="block truncate text-[11px] font-medium text-muted-foreground">
+                Intelligence &amp; Planning
               </span>
             </span>
           )}
         </div>
 
-        <nav className="flex flex-1 flex-col gap-1 p-3">
-          {NAV.map(({ to, label, icon: Icon }) => {
-            const active = pathname === to;
-            return (
-              <Link
-                key={to}
-                to={to}
-                title={label}
-                className={cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
-                  active
-                    ? "bg-primary text-primary-foreground shadow-card"
-                    : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
-                )}
-              >
-                <Icon className="size-[18px] shrink-0" />
-                {!collapsed && <span className="truncate">{label}</span>}
-              </Link>
-            );
-          })}
-        </nav>
+        {renderNavLinks(collapsed)}
 
-        <div className="border-t border-sidebar-border p-3">
+        <div className="shrink-0 border-t border-sidebar-border p-3">
           <Button
             variant="ghost"
             size="sm"
-            className="w-full justify-start gap-2 text-muted-foreground"
+            className={cn(
+              "w-full gap-2 rounded-xl text-muted-foreground hover:text-foreground",
+              collapsed ? "justify-center px-0" : "justify-start",
+            )}
             onClick={() => setCollapsed((c) => !c)}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {collapsed ? <PanelLeft className="size-4" /> : <ChevronLeft className="size-4" />}
-            {!collapsed && "Collapse"}
+            {!collapsed && <span className="text-xs font-medium">Collapse sidebar</span>}
           </Button>
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="glass sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border px-4 md:px-6">
-          <div className="min-w-0">
-            <h1 className="truncate text-base font-semibold tracking-tight">{title}</h1>
+        {/* Frosted Apple-Style Header */}
+        <header className="glass sticky top-0 z-20 flex h-16 items-center gap-2.5 border-b border-border/80 px-4 md:px-6">
+          {/* Mobile Navigation Drawer Trigger */}
+          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+            <SheetTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="shrink-0 md:hidden"
+                aria-label="Open navigation menu"
+              >
+                <Menu className="size-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="flex w-72 flex-col p-0">
+              <SheetHeader className="flex h-16 flex-row items-center gap-2.5 border-b border-border px-5 py-0 text-left">
+                <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                  <CircleDollarSign className="size-5" />
+                </span>
+                <div className="min-w-0">
+                  <SheetTitle className="text-sm font-bold tracking-tight">Finance IQ</SheetTitle>
+                  <p className="text-[11px] font-medium text-muted-foreground">
+                    Intelligence &amp; Planning
+                  </p>
+                </div>
+              </SheetHeader>
+              {renderNavLinks(false, () => setMobileOpen(false))}
+            </SheetContent>
+          </Sheet>
+
+          <div className="min-w-0 flex-1 md:flex-initial">
+            <h1 className="truncate text-[15px] font-semibold tracking-tight text-foreground sm:text-base">
+              {title}
+            </h1>
             {subtitle && (
-              <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
+              <p className="hidden truncate text-xs text-muted-foreground sm:block">{subtitle}</p>
             )}
           </div>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+            {/* Global Search / Command Palette */}
             <Button
               variant="outline"
               size="sm"
-              className="gap-2 bg-background font-medium"
+              className="hidden h-9 gap-2 border-border/80 bg-card/80 px-3 text-muted-foreground hover:text-foreground xl:flex"
+              onClick={() => setSearchOpen(true)}
+            >
+              <Search className="size-3.5" />
+              <span className="text-xs font-normal">Quick jump…</span>
+              <kbd className="pointer-events-none ml-2 inline-flex h-5 items-center rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+                ⌘K
+              </kbd>
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 border-border/80 bg-card/80 xl:hidden"
+              onClick={() => setSearchOpen(true)}
+              aria-label="Quick search"
+            >
+              <Search className="size-4 text-muted-foreground" />
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-2 border-border/80 bg-card/80 font-medium"
               disabled={refreshing}
               title="Refresh Page & Recalculate Metrics"
               onClick={handleRefresh}
             >
-              <RefreshCw className={cn("size-4 text-primary", refreshing && "animate-spin")} />
+              <RefreshCw className={cn("size-3.5 text-brand", refreshing && "animate-spin")} />
               <span className="hidden lg:inline">Refresh</span>
             </Button>
-            <Select
-              value={preset}
-              onValueChange={(v) => setPreset(v as RangePreset)}
-            >
-              <SelectTrigger className="w-[150px] bg-background font-medium sm:w-[190px]">
-                <CalendarRange className="size-4 text-primary" />
+
+            <Select value={preset} onValueChange={(v) => setPreset(v as RangePreset)}>
+              <SelectTrigger className="h-9 w-[124px] rounded-lg border-border/80 bg-card/80 text-xs font-medium sm:w-[165px] sm:text-sm">
+                <CalendarRange className="size-3.5 shrink-0 text-brand" />
                 <SelectValue placeholder="Date range" />
               </SelectTrigger>
               <SelectContent>
@@ -206,19 +307,19 @@ export function AppShell({
             </Select>
 
             {preset === "custom" && (
-              <div className="hidden items-center gap-1 lg:flex">
+              <div className="hidden items-center gap-1 2xl:flex">
                 <Input
                   type="date"
                   value={custom.start}
                   onChange={(e) => setCustom({ ...custom, start: e.target.value })}
-                  className="h-9 w-[140px]"
+                  className="h-9 w-[132px] rounded-lg"
                 />
                 <span className="text-xs text-muted-foreground">to</span>
                 <Input
                   type="date"
                   value={custom.end}
                   onChange={(e) => setCustom({ ...custom, end: e.target.value })}
-                  className="h-9 w-[140px]"
+                  className="h-9 w-[132px] rounded-lg"
                 />
               </div>
             )}
@@ -234,36 +335,39 @@ export function AppShell({
                 });
               }}
             >
-              <SelectTrigger className="w-[190px] border-primary/40 bg-primary/5 font-medium sm:w-[320px]">
-                <FolderOpen className="size-4 text-primary" />
+              <SelectTrigger className="hidden h-9 w-[170px] rounded-lg border-brand/25 bg-brand-soft/50 text-xs font-medium sm:flex sm:text-sm lg:w-[230px]">
+                <FolderOpen className="size-3.5 shrink-0 text-brand" />
                 <SelectValue placeholder="Active dataset" />
               </SelectTrigger>
               <SelectContent className="max-h-72">
                 <SelectItem value={ALL}>All datasets combined</SelectItem>
                 {datasets.map((d) => (
                   <SelectItem key={d.id} value={d.id}>
-                    📁 {d.file_name} ({d.row_count.toLocaleString("en-IN")} rows)
+                    {d.file_name} ({d.row_count.toLocaleString("en-IN")} rows)
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-
-
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="relative bg-background">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="relative h-9 w-9 border-border/80 bg-card/80"
+                  aria-label="Financial notifications"
+                >
                   <Bell className="size-4" />
-                  <span className="absolute -top-1.5 -right-1.5 flex size-4.5 items-center justify-center rounded-full bg-danger text-[10px] font-semibold text-danger-foreground">
+                  <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-danger text-[10px] font-semibold text-danger-foreground ring-2 ring-card">
                     {alerts.length}
                   </span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-80">
+              <DropdownMenuContent align="end" className="w-80 rounded-xl">
                 <DropdownMenuLabel>Financial alerts</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {alerts.map((a) => (
-                  <DropdownMenuItem key={a.title} className="flex-col items-start gap-0.5">
+                  <DropdownMenuItem key={a.title} className="flex-col items-start gap-0.5 py-2.5">
                     <span className="text-sm font-medium">{a.title}</span>
                     <span className="text-xs text-muted-foreground">{a.body}</span>
                   </DropdownMenuItem>
@@ -272,27 +376,32 @@ export function AppShell({
             </DropdownMenu>
 
             {demoMode && !user && (
-              <span className="hidden rounded-full bg-warning-soft px-2.5 py-1 text-[11px] font-semibold text-warning sm:inline">
+              <span className="hidden rounded-full bg-warning-soft px-2.5 py-1 text-[11px] font-semibold text-warning xl:inline">
                 Demo mode
               </span>
             )}
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="gap-2 px-2">
-                  <span className="flex size-8 items-center justify-center rounded-full bg-brand-soft text-xs font-semibold text-brand">
+                <Button variant="ghost" className="h-9 gap-2 rounded-full px-1.5 sm:px-2.5">
+                  <span className="flex size-7 items-center justify-center rounded-full bg-brand-soft text-xs font-semibold text-brand ring-1 ring-brand/15">
                     {initials}
                   </span>
                   <span className="hidden text-left text-xs leading-tight sm:block">
-                    {displayName}
-                    <span className="block text-muted-foreground">
+                    <span className="font-medium text-foreground">{displayName}</span>
+                    <span className="block text-[11px] text-muted-foreground">
                       {user ? "Signed in" : "Demo data"}
                     </span>
                   </span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>{user ? user.email : "Demo session"}</DropdownMenuLabel>
+              <DropdownMenuContent align="end" className="w-56 rounded-xl">
+                <DropdownMenuLabel className="font-normal">
+                  <p className="text-xs font-semibold text-foreground">{displayName}</p>
+                  <p className="truncate text-[11px] text-muted-foreground">
+                    {user ? user.email : "Demo session"}
+                  </p>
+                </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <Link to="/users">Users &amp; activity</Link>
@@ -302,6 +411,7 @@ export function AppShell({
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
+                  className="text-danger focus:text-danger"
                   onSelect={async () => {
                     await queryClient.cancelQueries();
                     queryClient.clear();
@@ -316,9 +426,9 @@ export function AppShell({
           </div>
         </header>
 
-        <main data-page-capture className="flex-1 p-4 md:p-6">
+        <main data-page-capture className="mx-auto w-full max-w-[1600px] flex-1 p-4 md:p-6 lg:p-8">
           {outOfRange && (
-            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-warning/40 bg-warning-soft px-4 py-3">
+            <div className="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-warning/40 bg-warning-soft/70 px-4 py-3">
               <CalendarRange className="size-4 text-warning" />
               <p className="text-sm font-medium text-foreground">
                 No records found for {range.label}
@@ -329,10 +439,67 @@ export function AppShell({
               </Button>
             </div>
           )}
-          {children}
+          <div key={pathname} className="animate-apple-enter">
+            {children}
+          </div>
         </main>
         <AiInsightsDock />
       </div>
+
+      {/* Global Command Palette (⌘K) */}
+      <CommandDialog open={searchOpen} onOpenChange={setSearchOpen}>
+        <CommandInput placeholder="Jump to any page or dataset…" />
+        <CommandList>
+          <CommandEmpty>No matching page or dataset found.</CommandEmpty>
+          <CommandGroup heading="Workspace Modules">
+            {NAV.map(({ to, label, icon: Icon }) => (
+              <CommandItem
+                key={to}
+                value={label}
+                onSelect={() => {
+                  setSearchOpen(false);
+                  void navigate({ to });
+                }}
+              >
+                <Icon className="mr-2 size-4 text-muted-foreground" />
+                <span>{label}</span>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+          {datasets.length > 0 && (
+            <>
+              <CommandSeparator />
+              <CommandGroup heading="Switch Active Dataset">
+                <CommandItem
+                  value="All datasets combined"
+                  onSelect={() => {
+                    setActiveId(null);
+                    setSearchOpen(false);
+                    toast.success("Switched to all datasets combined");
+                  }}
+                >
+                  <FolderOpen className="mr-2 size-4 text-brand" />
+                  <span>All datasets combined</span>
+                </CommandItem>
+                {datasets.map((d) => (
+                  <CommandItem
+                    key={d.id}
+                    value={d.file_name}
+                    onSelect={() => {
+                      setActiveId(d.id);
+                      setSearchOpen(false);
+                      toast.success(`Switched to ${d.file_name}`);
+                    }}
+                  >
+                    <FolderOpen className="mr-2 size-4 text-muted-foreground" />
+                    <span className="truncate">{d.file_name}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </>
+          )}
+        </CommandList>
+      </CommandDialog>
     </div>
   );
 }

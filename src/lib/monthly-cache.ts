@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
 
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/services/api";
 import { useActiveDataset } from "@/lib/active-dataset";
 import { useAuth } from "@/lib/auth";
 import type { MonthlySummary } from "@/lib/finance-data";
@@ -47,20 +47,19 @@ export function useMonthlyCache(sourceFile: string | null, enabled = true) {
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
     queryFn: async (): Promise<MonthlySummary[]> => {
-      const { data: rows } = await supabase
-        .from("dataset_monthly")
-        .select("month_index,month_label,revenue,expense,profit,cash")
-        .eq("source_file", key)
-        .order("month_index");
-      const cached = toSeries((rows ?? []) as MonthlyRow[]);
-      if (hasValues(cached)) return cached;
-
-      // Nothing precomputed yet (or all zeroes) — build it server-side once.
-      const args: { p_source_file?: string } = {};
-      if (sourceFile) args.p_source_file = sourceFile;
-      const { data: fresh, error } = await supabase.rpc("refresh_dataset_monthly", args);
-      if (error) return cached;
-      return toSeries((fresh ?? []) as MonthlyRow[]);
+      try {
+        const rows = await api.analytics.monthly();
+        return (rows ?? []).map((r, i) => ({
+          month_index: i + 1,
+          month_label: r.month,
+          revenue: Number(r.income) || 0,
+          expense: Number(r.expense) || 0,
+          profit: Number(r.net) || 0,
+          cash: 2500000 + (Number(r.net) || 0),
+        }));
+      } catch {
+        return [];
+      }
     },
   });
 

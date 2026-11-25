@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
 
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/services/api";
 import { useAuth } from "@/lib/auth";
 import { ALL, useOrg } from "@/lib/orgs";
 import { useActiveDataset } from "@/lib/active-dataset";
@@ -66,11 +66,12 @@ export function useAuditHistory(): AuditHistoryApi {
     queryKey: ["audit-findings", user?.id ?? "anon", activeFile ?? "all"],
     enabled: !!user,
     queryFn: async () => {
-      const { data: rows } = await supabase
-        .from("audit_findings")
-        .select("*")
-        .order("created_at", { ascending: false });
-      return rows ?? [];
+      try {
+        const rows = await api.compliance.findings();
+        return rows ?? [];
+      } catch {
+        return [];
+      }
     },
   });
 
@@ -104,37 +105,25 @@ export function useAuditHistory(): AuditHistoryApi {
   const insert = useMutation({
     mutationFn: async (findings: FindingInput[]) => {
       if (!user) throw new Error("Sign in to keep an audit history.");
-      const known = new Set(history.map((h) => h.fingerprint));
-      const fresh = findings.filter((f) => !known.has(fingerprintOf(f)));
-      if (!fresh.length) return 0;
-      const { error } = await supabase.from("audit_findings").insert(
-        fresh.map((f) => ({
-          user_id: user.id,
-          org_id: orgId === ALL ? null : orgId,
+      for (const f of findings) {
+        await api.compliance.createFinding({
           rule: f.rule,
           severity: f.severity,
           party: f.party,
-          finding_date: f.date || null,
           amount: f.amount,
           detail: f.detail,
-          origin: f.origin,
+          finding_date: f.date || null,
           status: "open",
-          fingerprint: fingerprintOf(f),
-        })),
-      );
-      if (error) throw error;
-      return fresh.length;
+        });
+      }
+      return findings.length;
     },
     onSuccess: invalidate,
   });
 
   const patch = useMutation({
     mutationFn: async (args: { id: string; status: FindingStatus }) => {
-      const { error } = await supabase
-        .from("audit_findings")
-        .update({ status: args.status })
-        .eq("id", args.id);
-      if (error) throw error;
+      await api.patch(`/compliance/findings/${args.id}/`, { status: args.status });
     },
     onSuccess: invalidate,
   });

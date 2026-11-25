@@ -1,7 +1,7 @@
 import { type QueryClient, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo } from "react";
 
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/services/api";
 import type { Database } from "@/integrations/supabase/types";
 import { fetchAllRows, withRawColumns } from "@/lib/fetch-all";
 import { mapRowsToTransactions, parseNum } from "@/lib/column-map";
@@ -40,27 +40,18 @@ type Row<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tab
  * every file and filtering in the browser) keeps a switch fast and guarantees
  * the newly selected file's rows are actually present.
  */
-async function fetchDataset(activeFile?: string | null) {
-  const scope = <T,>(q: T): T =>
-    activeFile ? ((q as { eq: (c: string, v: string) => T }).eq("source_file", activeFile) as T) : q;
-
-  // Every table is paged past the 1,000-row response cap.
-  const [t, p, b, a] = await Promise.all([
-    fetchAllRows<Row<"transactions">>((from, to) =>
-      scope(supabase.from("transactions").select("*").order("txn_date")).range(from, to),
-    ),
-    fetchAllRows<Row<"payroll_records">>((from, to) =>
-      scope(supabase.from("payroll_records").select("*").order("employee_id")).range(from, to),
-    ),
-    fetchAllRows<Row<"budget_targets">>((from, to) =>
-      scope(supabase.from("budget_targets").select("*")).range(from, to),
-    ),
-    fetchAllRows<Row<"arap_records">>((from, to) =>
-      scope(supabase.from("arap_records").select("*")).range(from, to),
-    ),
-  ]);
-
-  return { t, p, b, a };
+async function fetchDataset(activeFile?: string | null): Promise<CloudDataset> {
+  try {
+    const res = await api.datasets.data(activeFile);
+    return {
+      t: (res.t || []) as Row<"transactions">[],
+      p: (res.p || []) as Row<"payroll_records">[],
+      b: (res.b || []) as Row<"budget_targets">[],
+      a: (res.a || []) as Row<"arap_records">[],
+    };
+  } catch {
+    return { t: [], p: [], b: [], a: [] };
+  }
 }
 
 type CloudDataset = Awaited<ReturnType<typeof fetchDataset>>;
@@ -150,14 +141,10 @@ function useDatasetInternal(fetchEnabled: boolean): Dataset {
       if (timer) clearTimeout(timer);
       timer = setTimeout(refresh, 1500);
     };
-    const channel = supabase.channel(`dataset-sync-${user.id}-${Math.random().toString(36).slice(2)}`);
-    ["transactions", "payroll_records", "budget_targets", "arap_records"].forEach((table) => {
-      channel.on("postgres_changes", { event: "*", schema: "public", table }, schedule);
-    });
-    channel.subscribe();
+    const interval = setInterval(schedule, 30000);
     return () => {
       if (timer) clearTimeout(timer);
-      void supabase.removeChannel(channel);
+      clearInterval(interval);
     };
   }, [user, refresh, fetchEnabled]);
 
